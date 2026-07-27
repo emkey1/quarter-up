@@ -206,9 +206,16 @@ export class GamepadInput {
     return this.activeIndex >= 0 ? (this.pads()[this.activeIndex] ?? null) : null;
   }
 
+  /** Is any control currently deflected? Used to require a release between steps of
+   *  the auto-map walkthrough, so one held button cannot bind several actions. */
+  anyControlActive(): boolean {
+    for (const p of this.pads()) if (padUsable(p) && hasActivity(p)) return true;
+    return false;
+  }
+
   /** Any pad the browser will admit to, active or not. */
   anyPadConnected(): boolean {
-    for (const p of this.pads()) if (p?.connected) return true;
+    for (const p of this.pads()) if (padUsable(p)) return true;
     return false;
   }
 
@@ -218,12 +225,12 @@ export class GamepadInput {
 
     // Pick the pad the player is actually touching; fall back to the first connected.
     let pad = this.activeIndex >= 0 ? pads[this.activeIndex] : null;
-    if (!pad || !pad.connected) {
+    if (!padUsable(pad)) {
       pad = null;
       this.activeIndex = -1;
     }
     for (const p of pads) {
-      if (!p || !p.connected) continue;
+      if (!padUsable(p)) continue;
       if (!pad) {
         pad = p;
         this.activeIndex = p.index;
@@ -318,17 +325,16 @@ export class GamepadInput {
   beginDetect(): void {
     this.detectBaseline = new Map();
     for (const p of this.pads()) {
-      if (p?.connected) this.detectBaseline.set(p.index, Array.from(p.axes));
+      if (padUsable(p)) this.detectBaseline.set(p.index, Array.from(p.axes));
     }
   }
 
   detect(): { padId: string; padIndex: number; source: PadSource } | null {
     for (const pad of this.pads()) {
-      if (!pad?.connected) continue;
+      if (!padUsable(pad)) continue;
 
       for (let i = 0; i < pad.buttons.length; i++) {
-        const b = pad.buttons[i];
-        if (b && (b.pressed || b.value >= T.PAD_TRIGGER_THRESHOLD)) {
+        if (buttonPressed(pad.buttons[i])) {
           this.activeIndex = pad.index;
           return { padId: pad.id, padIndex: pad.index, source: { kind: 'button', index: i } };
         }
@@ -418,12 +424,40 @@ function deriveMoveStick(p: PadProfile): void {
   }
 }
 
+/**
+ * Read a button regardless of what shape the engine returns.
+ *
+ * The spec says GamepadButton objects, but engines have shipped plain numbers, and
+ * objects with `pressed` but no `value` (and vice versa). Reading `b.pressed || b.value`
+ * against a number yields undefined for both, so every button reads as never-pressed —
+ * the pad enumerates perfectly and no input ever arrives, which is indistinguishable
+ * from a dead controller.
+ */
+export function buttonValue(b: unknown): number {
+  if (typeof b === 'number') return b;
+  if (b && typeof b === 'object') {
+    const o = b as { value?: unknown; pressed?: unknown };
+    if (o.pressed === true) return 1;
+    if (typeof o.value === 'number') return o.value;
+    if (o.pressed === false) return 0;
+  }
+  return 0;
+}
+
+export function buttonPressed(b: unknown): boolean {
+  return buttonValue(b) >= T.PAD_TRIGGER_THRESHOLD;
+}
+
+/** A pad slot is usable unless the engine explicitly says it is disconnected.
+ *  Some engines omit `connected` entirely; a missing property must not mean "no". */
+export function padUsable(p: Gamepad | null | undefined): p is Gamepad {
+  return !!p && (p as { connected?: unknown }).connected !== false;
+}
+
 function readSource(pad: Gamepad, s: PadSource): boolean {
   switch (s.kind) {
-    case 'button': {
-      const b = pad.buttons[s.index];
-      return !!b && (b.pressed || b.value >= T.PAD_TRIGGER_THRESHOLD);
-    }
+    case 'button':
+      return buttonPressed(pad.buttons[s.index]);
     case 'axis': {
       const v = pad.axes[s.index] ?? 0;
       return v * s.sign >= (s.threshold ?? T.PAD_DEADZONE);
@@ -436,7 +470,7 @@ function readSource(pad: Gamepad, s: PadSource): boolean {
 }
 
 function hasActivity(pad: Gamepad): boolean {
-  for (const b of pad.buttons) if (b.pressed || b.value >= T.PAD_TRIGGER_THRESHOLD) return true;
+  for (const b of pad.buttons) if (buttonPressed(b)) return true;
   for (const a of pad.axes) if (Math.abs(a) >= T.PAD_DEADZONE) return true;
   return false;
 }

@@ -1,7 +1,7 @@
 import type { Layout } from '@/engine/display';
 import type { Input } from '@/engine/input';
 import type { ActionName } from '@/engine/actions';
-import type { PadSource } from '@/engine/gamepad';
+import { padUsable, buttonPressed, buttonValue, type PadSource } from '@/engine/gamepad';
 import { saveSettings } from '@/engine/storage';
 
 const BINDABLE: { action: ActionName; label: string }[] = [
@@ -34,10 +34,28 @@ export class PadTest {
   private cursor = 0;
   private awaiting: ActionName | null = null;
   private lastBound = '';
+  /** Remaining steps of the auto-map walkthrough. */
+  private queue: ActionName[] = [];
+  /** After a bind, the control must be released before the next step arms, or one
+   *  held button binds every remaining action in a single frame each. */
+  private waitingForRelease = false;
 
   toggle(): void {
     this.open = !this.open;
     this.awaiting = null;
+    this.queue = [];
+    this.waitingForRelease = false;
+  }
+
+  private armNext(input: Input): void {
+    const next = this.queue.shift();
+    this.awaiting = next ?? null;
+    if (next) {
+      this.waitingForRelease = true;
+    } else {
+      this.lastBound = 'auto-map complete';
+    }
+    void input;
   }
 
   /**
@@ -53,23 +71,43 @@ export class PadTest {
     const kb = input.keyboard;
 
     if (this.awaiting) {
+      if (kb.wasCodePressed('Escape')) {
+        this.awaiting = null;
+        this.queue = [];
+        return true;
+      }
+      if (this.waitingForRelease) {
+        if (!input.gamepad.anyControlActive()) {
+          this.waitingForRelease = false;
+          input.gamepad.beginDetect(); // re-baseline from the true resting position
+        }
+        return true;
+      }
       const hit = input.gamepad.detect();
       if (hit) {
         input.gamepad.bindAction(hit.padId, this.awaiting, hit.source);
         this.lastBound = `${this.awaiting} -> ${describe(hit.source)}`;
-        this.awaiting = null;
         saveSettings({ padProfiles: input.gamepad.profiles });
+        if (this.queue.length) this.armNext(input);
+        else this.awaiting = null;
       }
-      if (kb.wasCodePressed('Escape')) this.awaiting = null;
       return true;
     }
 
-    if (kb.wasCodePressed('ArrowDown')) this.cursor = (this.cursor + 1) % BINDABLE.length;
-    if (kb.wasCodePressed('ArrowUp'))
-      this.cursor = (this.cursor - 1 + BINDABLE.length) % BINDABLE.length;
+    const rows = BINDABLE.length + 1; // + the auto-map row
+    if (kb.wasCodePressed('ArrowDown')) this.cursor = (this.cursor + 1) % rows;
+    if (kb.wasCodePressed('ArrowUp')) this.cursor = (this.cursor - 1 + rows) % rows;
     if (kb.wasCodePressed('Enter')) {
-      this.awaiting = BINDABLE[this.cursor]!.action;
-      input.gamepad.beginDetect();
+      if (this.cursor === BINDABLE.length) {
+        // Auto-map: walk every action in order. Far less fiddly than eight separate
+        // rebinds, and it produces a working pad in about fifteen seconds whatever
+        // the browser decided to report.
+        this.queue = BINDABLE.map((b) => b.action);
+        this.armNext(input);
+      } else {
+        this.awaiting = BINDABLE[this.cursor]!.action;
+        this.waitingForRelease = true;
+      }
     }
     if (kb.wasCodePressed('Backspace')) {
       const pad = input.gamepad.activePad();
@@ -88,7 +126,7 @@ export class PadTest {
     const s = layout.uiScale;
     const gp = input.gamepad;
     const pads = gp.allPads();
-    const connected = pads.filter((p): p is Gamepad => !!p?.connected);
+    const connected = pads.filter(padUsable);
 
     ctx.save();
     ctx.fillStyle = 'rgba(5,6,9,.94)';
@@ -150,7 +188,22 @@ export class PadTest {
         `${p.id.slice(0, 40)}`,
         p.index === gp.status.index ? OK : FG,
       );
-      row('       mapping', `${p.mapping || 'non-standard'}  axes ${p.axes.length}  btns ${p.buttons.length}`, p.mapping === 'standard' ? OK : WARN);
+      row(
+        '       mapping',
+        `${p.mapping || 'non-standard'}  axes ${p.axes.length}  btns ${p.buttons.length}`,
+        p.mapping === 'standard' ? OK : WARN,
+      );
+      // What shape does this engine return for a button? Engines have shipped objects
+      // and plain numbers; reading the wrong one makes every button look un-pressed.
+      const b0: unknown = p.buttons[0];
+      const shape =
+        typeof b0 === 'number'
+          ? 'number (non-spec)'
+          : b0 && typeof b0 === 'object'
+            ? `object{${Object.keys(b0).slice(0, 3).join(',')}}`
+            : String(b0);
+      row('       button shape', shape, typeof b0 === 'object' ? OK : WARN);
+      row('       max value now', buttonValue(maxButton(p)).toFixed(2), FG);
     }
 
     if (!connected.length) {
@@ -196,7 +249,7 @@ export class PadTest {
       pad.buttons.forEach((b, i) => {
         const cx = bx0 + (i % 12) * cell;
         const cy = y - 9 * s + Math.floor(i / 12) * cell;
-        const on = b.pressed || b.value >= 0.5;
+        const on = buttonPressed(b);
         ctx.fillStyle = on ? OK : 'rgba(255,255,255,.07)';
         ctx.fillRect(cx, cy, cell - 3 * s, cell - 3 * s);
         ctx.fillStyle = on ? '#06210b' : 'rgba(255,255,255,.3)';
@@ -224,11 +277,33 @@ export class PadTest {
       y += 15 * s;
     });
 
+    // auto-map row
+    {
+      const sel = this.cursor === BINDABLE.length;
+      if (sel) {
+        ctx.fillStyle = 'rgba(255,255,255,.07)';
+        ctx.fillRect(x - 6 * s, y - 11 * s, 420 * s, 15 * s);
+      }
+      text(`${sel ? '>' : ' '} Auto-map all controls`, 11, sel ? OK : DIM, 600);
+      y += 18 * s;
+    }
+
     y += 10 * s;
     if (this.awaiting) {
-      text(`Press the control for "${this.awaiting}"  (ESC to cancel)`, 12, WARN, 600);
+      if (this.waitingForRelease) {
+        text('Release the controller…', 12, DIM, 600);
+      } else {
+        const step = this.queue.length ? ` (${BINDABLE.length - this.queue.length}/${BINDABLE.length})` : '';
+        text(`Press the control for "${this.awaiting}"${step}   ESC to cancel`, 12, WARN, 600);
+      }
     } else {
       text('Enter rebinds  •  Backspace resets this pad  •  Arrows move', 10, DIM);
+      y += 14 * s;
+      text(
+        'If the button lights above respond but the game does not, the mapping is wrong — use Auto-map.',
+        10,
+        DIM,
+      );
     }
     if (this.lastBound) {
       y += 15 * s;
@@ -237,6 +312,20 @@ export class PadTest {
 
     ctx.restore();
   }
+}
+
+/** The most-pressed button right now, so "is anything arriving at all?" is one glance. */
+function maxButton(p: Gamepad): unknown {
+  let best: unknown = 0;
+  let bestV = -1;
+  for (const b of p.buttons) {
+    const v = buttonValue(b);
+    if (v > bestV) {
+      bestV = v;
+      best = b;
+    }
+  }
+  return best;
 }
 
 function describe(s: PadSource): string {

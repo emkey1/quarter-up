@@ -136,6 +136,48 @@ describe('non-standard pad rescue', () => {
     expect([gp.moveX, gp.moveY]).toEqual([1, 0]);
   });
 
+  it('reads buttons reported as plain numbers instead of GamepadButton objects', () => {
+    // Some engines return numbers here. `b.pressed || b.value >= 0.5` yields undefined
+    // for both on a number, so every button reads as never-pressed: the pad enumerates
+    // perfectly and no input ever arrives.
+    install(makePad({ buttons: [0, 0, 0, 0, 0, 0, 0, 0] as unknown as readonly GamepadButton[] }));
+    const g = new GamepadInput();
+    g.poll();
+    expect(g.status.connected).toBe(true);
+
+    (pad.buttons as unknown as number[])[0] = 1;
+    g.poll();
+    expect(g.isHeld('fire')).toBe(true);
+
+    g.beginDetect();
+    expect(g.detect()?.source).toEqual({ kind: 'button', index: 0 });
+  });
+
+  it('reads buttons that expose pressed but no value', () => {
+    install(
+      makePad({
+        buttons: Array.from({ length: 8 }, () => ({ pressed: false })) as unknown as readonly GamepadButton[],
+      }),
+    );
+    const g = new GamepadInput();
+    (pad.buttons as unknown as { pressed: boolean }[])[0] = { pressed: true };
+    g.poll();
+    expect(g.isHeld('fire')).toBe(true);
+  });
+
+  it('treats a pad with no `connected` property as usable', () => {
+    // A missing property must not be read as "disconnected", or the pad enumerates in
+    // diagnostics while every input path silently discards it.
+    const p = makePad();
+    delete (p as unknown as Record<string, unknown>).connected;
+    install(p);
+    const g = new GamepadInput();
+    press(0);
+    g.poll();
+    expect(g.status.connected).toBe(true);
+    expect(g.isHeld('fire')).toBe(true);
+  });
+
   it('finds a pad that never became active', () => {
     // The failure mode being fixed: binding must not require the pad to already be
     // the "active" one, because a pad that does nothing never becomes active.

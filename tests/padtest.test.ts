@@ -20,18 +20,30 @@ class FakeKeyboard {
   }
 }
 
-function fakeInput(kb: FakeKeyboard): Input {
-  return {
-    keyboard: kb,
-    gamepad: {
-      detect: () => null,
-      beginDetect: () => {},
-      activePad: () => null,
-      profiles: {},
-      bindAction: () => {},
-      resetProfile: () => {},
-    },
-  } as unknown as Input;
+class FakeGamepad {
+  /** null = nothing held. */
+  held: { kind: 'button'; index: number } | null = null;
+  bound: string[] = [];
+  profiles: Record<string, unknown> = {};
+
+  detect() {
+    return this.held ? { padId: 'fake', padIndex: 0, source: this.held } : null;
+  }
+  anyControlActive() {
+    return this.held !== null;
+  }
+  beginDetect() {}
+  activePad() {
+    return null;
+  }
+  bindAction(_padId: string, action: string) {
+    this.bound.push(action);
+  }
+  resetProfile() {}
+}
+
+function fakeInput(kb: FakeKeyboard, gp: FakeGamepad = new FakeGamepad()): Input {
+  return { keyboard: kb, gamepad: gp } as unknown as Input;
 }
 
 describe('PadTest', () => {
@@ -85,6 +97,57 @@ describe('PadTest', () => {
     kb.press('Escape');
     pt.update(input);
     expect(pt.open).toBe(false); // second Escape closes
+  });
+
+  describe('auto-map walkthrough', () => {
+    const ACTIONS = ['up', 'down', 'left', 'right', 'fire', 'magic', 'faceLock', 'pause'];
+
+    function startAutoMap(): { pt: PadTest; gp: FakeGamepad; kb: FakeKeyboard; input: Input } {
+      const gp = new FakeGamepad();
+      const kb = new FakeKeyboard();
+      const input = fakeInput(kb, gp);
+      const pt = new PadTest();
+      pt.toggle();
+      // cursor to the auto-map row (one past the last bindable action)
+      for (let i = 0; i < ACTIONS.length; i++) {
+        kb.press('ArrowDown');
+        pt.update(input);
+      }
+      kb.press('Enter');
+      pt.update(input);
+      kb.press();
+      return { pt, gp, kb, input };
+    }
+
+    it('does not let one held control bind every action at once', () => {
+      const { pt, gp, input } = startAutoMap();
+      gp.held = { kind: 'button', index: 3 };
+      // Hold it down for many frames without ever releasing.
+      for (let i = 0; i < 50; i++) pt.update(input);
+      // It must still be waiting for a release, having bound nothing.
+      expect(gp.bound).toEqual([]);
+    });
+
+    it('walks every action in order, one release-press cycle each', () => {
+      const { pt, gp, input } = startAutoMap();
+      for (let i = 0; i < ACTIONS.length; i++) {
+        gp.held = null; // release
+        pt.update(input);
+        gp.held = { kind: 'button', index: i }; // press the control for this action
+        pt.update(input);
+      }
+      expect(gp.bound).toEqual(ACTIONS);
+    });
+
+    it('can be abandoned with Escape without closing the screen', () => {
+      const { pt, gp, kb, input } = startAutoMap();
+      kb.press('Escape');
+      pt.update(input);
+      expect(pt.open).toBe(true);
+      gp.held = { kind: 'button', index: 0 };
+      pt.update(input);
+      expect(gp.bound).toEqual([]); // no longer capturing
+    });
   });
 
   it('moves the cursor with the arrow keys', () => {
