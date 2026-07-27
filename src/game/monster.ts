@@ -26,6 +26,13 @@ export interface Monster {
   hurtFlash: number;
   /** Frames since spawn; used to fade in and to stop instant contact damage. */
   age: number;
+  /** Sorcerers only: frames until the next visibility flip. */
+  phaseCd: number;
+  /** Sorcerers only. While invisible, shots pass straight through — which also means
+   *  their generator is less well defended, and other sorcerers eat your fire. */
+  visible: boolean;
+  /** Demons and lobbers: frames until the next ranged attack. */
+  rangedCd: number;
 }
 
 export function makeMonster(kind: MonsterKind, level: MonsterLevel, x: number, y: number): Monster {
@@ -41,7 +48,15 @@ export function makeMonster(kind: MonsterKind, level: MonsterLevel, x: number, y
     attackCd: 0,
     hurtFlash: 0,
     age: 0,
+    phaseCd: kind === 'sorcerer' ? T.SORCERER_VISIBLE_F : 0,
+    visible: true,
+    rangedCd: kind === 'demon' ? T.DEMON_FIRE_COOLDOWN_F : T.LOBBER_COOLDOWN_F,
   };
+}
+
+/** Can this monster be hit right now? A phased-out sorcerer cannot. */
+export function targetable(m: Monster): boolean {
+  return m.alive && m.visible;
 }
 
 /** Contact/melee damage before the player's armour is applied. */

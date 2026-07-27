@@ -59,6 +59,10 @@ export class Player implements Body {
 
   moved = false;
   assisted = false;
+  /** Last frame's displacement. Lobbers lead their throws with this, which is why
+   *  running in a straight line gets you hit and jinking does not. */
+  lastVX = 0;
+  lastVY = 0;
 
   constructor(classId: ClassId) {
     this.classId = classId;
@@ -84,7 +88,12 @@ export class Player implements Body {
     return this.inventoryUsed >= T.INVENTORY_SLOTS;
   }
 
-  step(terrain: Terrain, a: Readonly<ActionState>, fireModel: FireModel): void {
+  step(
+    terrain: Terrain,
+    a: Readonly<ActionState>,
+    fireModel: FireModel,
+    rules?: { healthDrain: boolean; cornerAssist: boolean; fastDiagonals: boolean },
+  ): void {
     // --- fire bookkeeping (the shot itself lands in M1)
     this.fireHeldFrames = a.fire ? this.fireHeldFrames + 1 : 0;
     this.rooted = fireRoots(fireModel, a.fire, this.fireHeldFrames);
@@ -106,7 +115,8 @@ export class Player implements Body {
       vy = a.moveY * speed;
       // [i] The original almost certainly applied each axis independently, making
       // diagonals ~1.41x faster. Flagged for the fidelity pass; togglable meanwhile.
-      if (T.DIAGONAL_NORMALISE && vx !== 0 && vy !== 0) {
+      const normalise = rules ? !rules.fastDiagonals : T.DIAGONAL_NORMALISE;
+      if (normalise && vx !== 0 && vy !== 0) {
         const k = Math.SQRT1_2;
         vx *= k;
         vy *= k;
@@ -117,9 +127,13 @@ export class Player implements Body {
       const r = moveBody(terrain, this, vx, vy);
       this.moved = r.movedX !== 0 || r.movedY !== 0;
       this.assisted = r.assisted;
+      this.lastVX = r.movedX;
+      this.lastVY = r.movedY;
     } else {
       this.moved = false;
       this.assisted = false;
+      this.lastVX = 0;
+      this.lastVY = 0;
     }
 
     // Stillness for the walls-become-exits trick counts *movement input*, not
@@ -132,6 +146,7 @@ export class Player implements Body {
     if (this.damageFlash > 0) this.damageFlash--;
 
     // --- the clock that makes Gauntlet Gauntlet
+    if (rules && !rules.healthDrain) return;
     this.drainAcc += T.HEALTH_DRAIN_PER_SEC / T.STEP_HZ;
     if (this.drainAcc >= 1) {
       const whole = Math.floor(this.drainAcc);

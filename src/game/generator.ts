@@ -11,6 +11,8 @@ export interface Generator {
   cy: number;
   x: number;
   y: number;
+  /** Generators are physical: blocks and bone piles you cannot walk through. */
+  half: number;
   timer: number;
   alive: boolean;
   hurtFlash: number;
@@ -33,6 +35,7 @@ export function makeGenerator(
     cy,
     x: cx * T.TILE + T.TILE / 2,
     y: cy * T.TILE + T.TILE / 2,
+    half: T.TILE / 2,
     timer: spawnPeriod(level, 1),
     alive: true,
     hurtFlash: 0,

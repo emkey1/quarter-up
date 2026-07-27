@@ -70,8 +70,25 @@
       "t": "gen",
       "x": 24,
       "y": 24,
-      "kind": "grunt",
+      "kind": "sorcerer",
       "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 8,
+      "y": 24,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "death",
+      "x": 27,
+      "y": 16
+    },
+    {
+      "t": "thief",
+      "x": 16,
+      "y": 4
     },
     {
       "t": "key",

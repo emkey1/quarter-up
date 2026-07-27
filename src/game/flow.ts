@@ -2,6 +2,7 @@ import { T } from '@/data/tuning';
 import type { ClassId, UpgradeId } from '@/data/classes';
 import type { LevelData } from './level';
 import { World } from './world';
+import { DEFAULT_RULES, type Rules } from '@/data/rules';
 
 /**
  * What survives a level transition.
@@ -55,6 +56,7 @@ export class Run {
     classId: ClassId,
     private readonly seed: number,
     startIndex = 0,
+    public rules: Rules = DEFAULT_RULES,
   ) {
     this.state = newRunState(classId);
     this.levelIndex = startIndex;
@@ -63,7 +65,13 @@ export class Run {
 
   private build(): World {
     const level = this.campaign[this.levelIndex % this.campaign.length];
-    const w = new World(level, this.state.classId, this.seed + this.levelIndex * 7919, this.state);
+    const w = new World(
+      level,
+      this.state.classId,
+      this.seed + this.levelIndex * 7919,
+      this.state,
+      this.rules,
+    );
     w.depth = this.depth;
     return w;
   }
@@ -91,6 +99,13 @@ export class Run {
     this.state = this.world.exportState();
     this.state.health = T.CONTINUE_HEALTH;
     this.state.credits++;
+    this.world = this.build();
+  }
+
+  /** Apply new rules and rebuild the current level under them. */
+  applyRules(rules: Rules): void {
+    this.rules = rules;
+    this.state = this.world.exportState();
     this.world = this.build();
   }
 

@@ -104,6 +104,16 @@ export const T = {
   LOBBER_COOLDOWN_F: 90, // [i]
   DEMON_FIRE_COOLDOWN_F: 75, // [i]
   DEMON_RANGE_WU: 160, // [i]
+  /** How closely a demon must be lined up on an axis before it fires. It ignores walls
+   *  entirely, which is what lets you train its fire onto a generator. [i] */
+  DEMON_ALIGN_WU: 10,
+  /** Rocks arc: flight time scales with distance, and they ignore walls until they land. */
+  LOBBER_FLIGHT_MIN_F: 24, // [i]
+  LOBBER_FLIGHT_PER_WU: 0.18, // [i]
+  THIEF_SPEED: 2.2, // [i] wu/frame — must outrun every class but an upgraded Elf
+  THIEF_PATIENCE_F: 60 * 45, // [i]
+  THIEF_SCORE_THEFT: 1000, // [i]
+  DEATH_SPEED: 0.55, // [i] slow but relentless
   TELEPORT_COOLDOWN_F: 30,
 
   // ---------------------------------------------------------------- scoring

@@ -15,6 +15,21 @@ export interface Projectile {
   fromPlayer: boolean;
   alive: boolean;
   life: number;
+  /**
+   * Rocks only: frames of flight remaining. While this is above zero the rock is in the
+   * air and terrain is ignored entirely — that is the whole point of a lobber, and the
+   * reason they can shell you from behind a wall you cannot shoot through.
+   */
+  flight: number;
+  /** Render-only arc height, 0..1. Never read by the simulation. */
+  z: number;
+  /** Flight length at launch, for the arc shape. */
+  launchFlight: number;
+  /**
+   * Who fired this. A projectile spawns inside its own shooter, so without an owner to
+   * skip, a demon's fireball hits the demon on frame one and never reaches anything.
+   */
+  owner: object | null;
 }
 
 export interface ShotMoveResult {
@@ -41,6 +56,20 @@ export interface ShotMoveResult {
  * affects corner-threading through CORNER_SQUEEZE_MAX rather than through raw overlap.
  */
 export function moveProjectile(terrain: Terrain, p: Projectile): ShotMoveResult {
+  // A rock in flight is above the maze; it lands where it lands.
+  if (p.flight > 0) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.flight--;
+    const t = p.flight / Math.max(1, p.launchFlight);
+    p.z = 4 * t * (1 - t); // parabola peaking mid-flight
+    if (p.flight <= 0) {
+      p.z = 0;
+      return { hitWall: true, x: p.x, y: p.y }; // "hitWall" here means "landed"
+    }
+    return { hitWall: false, x: p.x, y: p.y };
+  }
+
   const dist = Math.hypot(p.vx, p.vy);
   const steps = Math.max(1, Math.ceil(dist / 2)); // never skip a cell
   const sx = p.vx / steps;
@@ -130,11 +159,13 @@ export function makeShot(
   half: number,
   damage: number,
   fromPlayer: boolean,
+  kind: ProjectileKind = 'shot',
+  owner: object | null = null,
 ): Projectile {
   // Normalise so a diagonal shot is not 1.41x faster than an orthogonal one.
   const len = Math.hypot(dx, dy) || 1;
   return {
-    kind: 'shot',
+    kind,
     x,
     y,
     vx: (dx / len) * speed,
@@ -144,5 +175,49 @@ export function makeShot(
     fromPlayer,
     alive: true,
     life: T.SHOT_LIFETIME_F,
+    flight: 0,
+    launchFlight: 0,
+    z: 0,
+    owner,
+  };
+}
+
+/**
+ * A lobbed rock.
+ *
+ * Aimed at where the target *will be* if it keeps going straight — the lead prediction
+ * that makes lobbers feel like they are reading you, and that skilled players exploit by
+ * moving erratically, or by walking a straight line that ends at a generator so the rock
+ * lands on it instead.
+ */
+export function makeRock(
+  x: number,
+  y: number,
+  targetX: number,
+  targetY: number,
+  targetVX: number,
+  targetVY: number,
+  damage: number,
+  owner: object | null = null,
+): Projectile {
+  const dist = Math.hypot(targetX - x, targetY - y);
+  const flight = Math.max(T.LOBBER_FLIGHT_MIN_F, Math.round(dist * T.LOBBER_FLIGHT_PER_WU));
+  const leadX = targetX + targetVX * flight;
+  const leadY = targetY + targetVY * flight;
+  return {
+    kind: 'rock',
+    x,
+    y,
+    vx: (leadX - x) / flight,
+    vy: (leadY - y) / flight,
+    half: 5,
+    damage,
+    fromPlayer: false,
+    alive: true,
+    life: T.SHOT_LIFETIME_F,
+    flight,
+    launchFlight: flight,
+    z: 0,
+    owner,
   };
 }

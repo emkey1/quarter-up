@@ -12,18 +12,17 @@ original; "Gauntlet" is a trademark of its respective owner.
 
 ## Status
 
-**M2 complete** — items and the 12-slot inventory, doors with their 18/36-second
-timers, traps, teleporters, breakable walls, the 180-second walls-become-exits trick,
-level flow across a 5-level campaign, and the rank curve that starves out food as your
-score climbs. The full monster roster arrives in M3. See DESIGN.md §12.
+**M3 complete** — the full monster roster (demons firing through walls, phasing
+sorcerers, lobbers arcing rocks over cover, Death, the Thief), plus a **setup screen**
+for enabling and disabling individual features. Presentation is M4. See DESIGN.md §12.
 
 | Milestone | State |
 | --- | --- |
 | M0 skeleton | done |
 | M1 combat core | done |
 | M2 items, terrain, level flow | done |
-| M3 full monster roster | next |
-| M4 presentation | |
+| M3 full monster roster | done |
+| M4 presentation | next |
 | M5 content + editor | |
 | M6 polish | |
 
@@ -85,6 +84,26 @@ The two usual causes:
 
 Rebinding all four directions to stick axes is recognised and promoted back to proper
 8-way octant quantisation, rather than being treated as four independent buttons.
+
+### Setup screen — feature toggles
+
+**`Tab`** opens the setup screen. Every monster family can be switched off individually
+(ghosts, grunts, demons, sorcerers, lobbers, Death, the Thief), along with the health
+drain, the rank curve, off-screen generator gating, and each reconstructed mechanic.
+
+This is not a bolt-on: the cabinet shipped with operator DIP switches for difficulty,
+starting health and monster speed, so a rules screen is the descendant of those. It also
+serves accessibility, level authoring, and the §13 fidelity work — every constant marked
+`[i]` in `tuning.ts` is a guess, and being able to flip the mechanic it drives at runtime
+is how those guesses get settled.
+
+Disabling a monster family **removes its generators** rather than substituting another
+kind, which would silently rewrite the level designer's intent while appearing to
+respect it.
+
+Changing anything is visible. The eligibility tier — **Arcade**, **Tagged**, or
+**Ineligible** — is derived from the rules on every frame and shown in-game whenever it
+is not Arcade, so an easier run can never quietly look like a real one.
 
 ### Fire models
 

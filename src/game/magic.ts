@@ -5,6 +5,7 @@ import { family, type Generator } from './generator';
 import { familyOf, type Monster } from './monster';
 import type { Player } from './player';
 import type { Camera } from './camera';
+import { deathPotionValue, type Death } from './special';
 
 export type MagicSource = 'used' | 'shot';
 
@@ -27,12 +28,23 @@ export function detonate(
   camera: Camera,
   events: EventBus,
   score: (n: number, reason: string) => void,
+  deaths: readonly Death[] = [],
 ): void {
   const st = player.stats;
   const vsMon = source === 'used' ? st.magicVsMonsters : st.potionShotVsMonsters;
   const vsGen = source === 'used' ? st.magicVsGenerators : st.potionShotVsGenerators;
 
   let strongest = 0;
+
+  // Death dies to ANY potion, however feeble the caster — even Thor's. The payout is
+  // whatever the shoot-to-cycle game has left it on, which is why shooting it exactly
+  // six times first is worth 8000 instead of 1000.
+  for (const d of deaths) {
+    if (!d.alive || !camera.contains(d.x, d.y)) continue;
+    d.alive = false;
+    score(deathPotionValue(d), 'death by potion');
+    events.emit({ t: 'deathVanished', x: d.x, y: d.y });
+  }
 
   for (const m of monsters) {
     if (!m.alive || !camera.contains(m.x, m.y)) continue;

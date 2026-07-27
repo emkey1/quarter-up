@@ -1,6 +1,7 @@
 import type { PadProfile } from './gamepad';
 import type { KeyBindings } from './keyboard';
 import type { FireModel } from './input';
+import type { Rules } from '@/data/rules';
 
 const KEY = 'bracer.settings.v1';
 
@@ -11,6 +12,7 @@ export interface Settings {
   analogMovement?: boolean;
   rumble?: boolean;
   scaleOverride?: number | null;
+  rules?: Rules;
 }
 
 export function loadSettings(): Settings {

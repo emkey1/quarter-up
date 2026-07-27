@@ -13,11 +13,16 @@ import {
   drawGenerator,
   drawProjectile,
   drawItem,
+  drawDeath,
+  drawThief,
 } from '@/render/entities';
 import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
 import { PadTest } from './padtest';
+import { SetupScreen } from './setup';
+import { cloneRules, DEFAULT_RULES, tierOf } from '@/data/rules';
+import { loadSettings } from '@/engine/storage';
 
 const FIRE_CYCLE: FireModel[] = ['arcade', 'feathered', 'free', 'twinstick'];
 
@@ -27,6 +32,7 @@ export class PlayScreen implements LoopHost {
   private tilemap: TilemapRenderer;
   private hud = new Hud();
   private padTest = new PadTest();
+  private setup: SetupScreen;
   private fireModel: FireModel;
   private classId: ClassId;
   private seed = 0x5eed;
@@ -44,7 +50,8 @@ export class PlayScreen implements LoopHost {
     this.classId = classId;
     this.campaign = CAMPAIGN;
     this.fireModel = defaultFireModel(input.lastDevice);
-    this.run = new Run(this.campaign, classId, this.seed);
+    this.setup = new SetupScreen(cloneRules(loadSettings().rules ?? DEFAULT_RULES));
+    this.run = new Run(this.campaign, classId, this.seed, 0, this.setup.rules);
     this.run.world.fireModel = this.fireModel;
     this.tilemap = new TilemapRenderer(theme('stone'), display.layout.pxPerWu);
     display.onLayoutChange((l) => this.tilemap.onLayoutChange(theme('stone'), l.pxPerWu));
@@ -72,8 +79,20 @@ export class PlayScreen implements LoopHost {
         this.padTest.update(this.input);
         return;
       }
+      if (kb.wasCodePressed('Tab')) this.setup.toggle();
+      if (this.setup.open) {
+        this.setup.update(this.input);
+        return;
+      }
+      // Rules changed while the screen was open: rebuild the level under them, because
+      // a disabled monster family has to actually stop existing.
+      if (this.setup.dirty) {
+        this.setup.dirty = false;
+        this.run.applyRules(cloneRules(this.setup.rules));
+        this.run.world.fireModel = this.fireModel;
+      }
       this.devHotkeys();
-    } else if (this.padTest.open) {
+    } else if (this.padTest.open || this.setup.open) {
       return;
     }
 
@@ -111,7 +130,7 @@ export class PlayScreen implements LoopHost {
   }
 
   private reset(): void {
-    this.run = new Run(this.campaign, this.classId, this.seed);
+    this.run = new Run(this.campaign, this.classId, this.seed, 0, this.setup.rules);
     this.run.world.fireModel = this.fireModel;
   }
 
@@ -168,6 +187,12 @@ export class PlayScreen implements LoopHost {
     }
     if (!drewPlayer) drawPlayer(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
 
+    for (const d of this.world.deaths) {
+      if (d.alive) drawDeath(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
+    }
+    for (const t of this.world.thieves) {
+      if (t.alive) drawThief(ctx, t, toX(t.x), toY(t.y), px, this.animFrame);
+    }
     for (const pr of this.world.projectiles) {
       if (pr.alive) drawProjectile(ctx, pr, toX(pr.x), toY(pr.y), px);
     }
@@ -195,8 +220,34 @@ export class PlayScreen implements LoopHost {
     });
 
     if (this.paused) this.drawPaused(ctx, layout.playfield, layout.uiScale);
+    this.drawTierBadge(ctx, layout);
     this.drawPadHint(ctx, layout);
     this.padTest.draw(ctx, layout, this.input);
+    this.setup.draw(ctx, layout);
+  }
+
+  /** An altered run must never be able to look like a real one, so the tier is shown
+   *  in-game whenever it is not Arcade. Derived, never stored. */
+  private drawTierBadge(
+    ctx: CanvasRenderingContext2D,
+    layout: import('@/engine/display').Layout,
+  ): void {
+    if (this.setup.open || this.padTest.open) return;
+    const tier = tierOf(this.setup.rules);
+    if (tier === 'arcade') return;
+    const s = layout.uiScale;
+    const pf = layout.playfield;
+    const msg = tier === 'tagged' ? 'TAGGED RUN' : 'RULES ALTERED';
+    ctx.save();
+    ctx.font = `700 ${9 * s}px ui-sans-serif, system-ui, sans-serif`;
+    const w = ctx.measureText(msg).width + 16 * s;
+    ctx.fillStyle = tier === 'tagged' ? 'rgba(232,195,74,.22)' : 'rgba(255,107,94,.22)';
+    ctx.fillRect(pf.x + 8 * s, pf.y + 8 * s, w, 18 * s);
+    ctx.fillStyle = tier === 'tagged' ? '#e8c34a' : '#ff6b5e';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(msg, pf.x + 16 * s, pf.y + 17 * s);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
   }
 
   /** Always-visible hint, because the debug flank disappears on narrow windows and a

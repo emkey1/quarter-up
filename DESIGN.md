@@ -3,7 +3,7 @@
 A browser-based, single-player dungeon crawler that closely mimics the mechanics, feel, and
 presentation of Atari Games' **Gauntlet** (arcade, 1985).
 
-**Status:** design v2 — **M0, M1 and M2 implemented** (§12). Full monster roster next.
+**Status:** design v2 — **M0–M3 implemented** (§12), including the setup screen (§6.6). Presentation next.
 **Target:** modern desktop browsers, keyboard **or gamepad**, 60 Hz fixed-step simulation,
 HTML5 Canvas, art at 2× the original's resolution.
 
@@ -221,6 +221,7 @@ Each entry: **what changes**, and **why**.
 | 4.10 | 7 intro levels with numbered skip-exits | **Kept.** They double as the solo player's difficulty/depth selector. | Faithful *and* good single-player design. |
 | 4.11 | Death-on-level-N conditioning (next game starts at N as level 8) | **Kept as an option**, off by default; on the score table a run is tagged "cold start" or not. | It's a real, well-known arcade behaviour; leaderboards distinguish them. |
 | 4.12 | No pause, no save | **Pause (P)** and **resume-from-level save** in `localStorage`. Saving marks the run non-leaderboard-eligible unless it's a clean continue. | Browser games get interrupted. |
+| 4.13 | Operator DIP switches inside the cabinet, set once by the arcade owner | A **setup screen** (§6.6) exposing rules as toggles: individual monster types, Death, the Thief, the health drain, the rank curve, and the reconstructed mechanics. | This is the descendant of the DIP switches, not an invention — the cabinet shipped with difficulty, starting health and monster-speed switches an operator could set. Moving them in front of the player is the single-player equivalent, and it also serves accessibility and the §13 fidelity work. |
 
 Everything else — health drain, damage numbers, stat tables, generator rules, door timers, the
 180 s wall-to-exit trick, the rank system, the Death potion-value cycle — is preserved exactly.
@@ -401,7 +402,8 @@ information with room to spare:
    `FIND THE HIDDEN POTION!` when the level has an upgrade. Beat of ~2.5 s, skippable.
 4. **Play**.
 5. **Game over** — final score, credits used, score-per-credit, deepest level, initials entry.
-6. **Options / Controls / About**.
+6. **Setup** — rules and feature toggles (§6.6).
+7. **Options / Controls / About**.
 
 ### 6.4 Art plan (upgraded)
 
@@ -478,6 +480,69 @@ browsers with no voices installed. Trigger table:
 | level with an upgrade potion | `A potion lies hidden here.` |
 
 ---
+
+### 6.6 Setup screen — rules and feature toggles
+
+A screen that turns individual game systems on and off: each monster family, Death, the
+Thief, the health drain, the rank curve, and the mechanics reconstructed from inference.
+
+**Why this exists**, in order of weight:
+
+1. **It is the DIP switches.** The cabinet shipped with operator switches for difficulty,
+   starting health and monster speed. Nothing about a rules screen is foreign to
+   Gauntlet; the only change is who holds the screwdriver.
+2. **Accessibility.** Death and the continuous drain are the two things that most often
+   end a new player's run before they have learned anything. Being able to switch off a
+   single monster is a far better answer than a global "easy mode" that changes
+   everything at once.
+3. **It is the harness for §13.** Every constant tagged `[i]` is a guess. Being able to
+   flip corner assist, diagonal normalisation or the corner-squeeze rule at runtime and
+   A/B them against a reference recording is how those guesses get settled. This screen
+   is a development instrument that happens to also be a player feature.
+4. **Authoring.** Isolating one monster type is the fastest way to tune it, and level
+   design needs that constantly.
+
+**Leaderboard integrity.** The same three-tier scheme the fire models use (§5.2):
+
+| Tier | Meaning |
+| --- | --- |
+| **Arcade** | Every rule at its faithful default. Fully eligible. |
+| **Tagged** | Deviations that change feel but not difficulty in an obvious direction (e.g. Feathered fire, diagonal normalisation). Eligible, marked on the score table. |
+| **Ineligible** | Anything that removes pressure: a disabled monster, no drain, no rank curve, free-fire, twin-stick. |
+
+The tier is computed from the rules, not stored, so it can never drift from what is
+actually enabled. The active tier is shown on the HUD whenever it is not Arcade — an
+easier run should never be able to quietly look like a real one.
+
+**The toggles.**
+
+| Group | Toggle | Default | Tier if changed |
+| --- | --- | --- | --- |
+| Monsters | Ghosts, Grunts, Demons, Sorcerers, Lobbers | on | Ineligible |
+| Monsters | **Death** | on | Ineligible |
+| Monsters | **Thief** | on | Ineligible |
+| Pressure | Health drain (1/sec) | on | Ineligible |
+| Pressure | Rank curve (food starves as score climbs) | on | Ineligible |
+| Pressure | Generators inert off-screen | on | Ineligible |
+| Mechanics | Corner-squeeze cover rule | on | Tagged |
+| Mechanics | Full inventory blocks movement | on | Tagged |
+| Mechanics | Doors auto-open on the stalemate timer | on | Tagged |
+| Mechanics | Walls become exits after 180 s | on | Tagged |
+| Mechanics | Corner assist on movement | on | Tagged |
+| Movement | Diagonals run at full speed per axis | on | Tagged |
+| Input | Fire model, analog stick, rumble | §5.2/§5.3 | per §5.2 |
+
+**Disabling a monster removes its generators.** A level whose centrepiece is a ghost nest
+becomes a quiet room. The alternative — substituting another family — was rejected
+because it silently rewrites the level designer's intent while appearing to respect it.
+Removal is honest and visible.
+
+**Presets**: *Arcade* (all defaults), *Modern* (the §4.8 softening: more health, gentler
+rank curve, unlimited continues), *Sandbox* (a scratchpad for experimenting), and
+*Custom* whenever the player edits anything.
+
+**Rules are part of the simulation**, not of presentation: they are captured in the run
+state and in replays, so a recorded run replays under the rules it was played with.
 
 ## 7. Technical architecture
 

@@ -4,6 +4,7 @@ import { MONSTER_COLOURS, familyOf, type Monster } from '@/game/monster';
 import type { Generator } from '@/game/generator';
 import type { Projectile } from '@/game/projectile';
 import type { Item } from '@/game/items';
+import type { Death, Thief } from '@/game/special';
 
 /**
  * M0 placeholder art, drawn procedurally.
@@ -93,7 +94,8 @@ export function drawMonster(
   ctx.save();
   ctx.translate(sx, sy);
   // spawn fade-in, so a monster popping out of a generator is legible
-  ctx.globalAlpha = Math.min(1, m.age / 12);
+  // A phased-out sorcerer is a shimmer you cannot shoot.
+  ctx.globalAlpha = Math.min(1, m.age / 12) * (m.visible ? 1 : 0.22);
 
   ctx.fillStyle = 'rgba(0,0,0,.4)';
   ctx.beginPath();
@@ -192,6 +194,17 @@ export function drawProjectile(
 ): void {
   const r = Math.max(px * 1.2, p.half * px);
   ctx.save();
+
+  // A rock in flight is above the maze; its shadow on the floor is the tell that lets
+  // you read where it will land while there is still time to move.
+  if (p.kind === 'rock' && p.flight > 0) {
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    sy -= p.z * 14 * px;
+  }
+
   ctx.translate(sx, sy);
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.6);
   g.addColorStop(0, p.fromPlayer ? 'rgba(255,255,220,.95)' : 'rgba(255,160,120,.95)');
@@ -200,10 +213,84 @@ export function drawProjectile(
   ctx.beginPath();
   ctx.arc(0, 0, r * 2.6, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = p.fromPlayer ? '#fffce0' : '#ffd0a0';
+  ctx.fillStyle = p.kind === 'rock' ? '#b9a98a' : p.fromPlayer ? '#fffce0' : '#ffd0a0';
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Death: a hooded figure with nothing inside. Deliberately unlike any monster —
+ *  mistaking it for one is fatal. */
+export function drawDeath(
+  ctx: CanvasRenderingContext2D,
+  d: Death,
+  sx: number,
+  sy: number,
+  px: number,
+  frame: number,
+): void {
+  const size = 16 * px;
+  const drift = Math.sin(frame * 0.06) * px * 0.8;
+  ctx.save();
+  ctx.translate(sx, sy + drift);
+
+  const glow = ctx.createRadialGradient(0, 0, size * 0.1, 0, 0, size * 0.9);
+  glow.addColorStop(0, 'rgba(120,40,180,.5)');
+  glow.addColorStop(1, 'rgba(120,40,180,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(-size, -size, size * 2, size * 2);
+
+  ctx.fillStyle = d.hurtFlash > 0 ? '#e8d8ff' : '#1a1024';
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.42);
+  ctx.quadraticCurveTo(size * 0.36, -size * 0.3, size * 0.3, size * 0.42);
+  ctx.lineTo(-size * 0.3, size * 0.42);
+  ctx.quadraticCurveTo(-size * 0.36, -size * 0.3, 0, -size * 0.42);
+  ctx.fill();
+
+  ctx.fillStyle = '#d24bff';
+  ctx.beginPath();
+  ctx.arc(-size * 0.1, -size * 0.16, size * 0.055, 0, Math.PI * 2);
+  ctx.arc(size * 0.1, -size * 0.16, size * 0.055, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** The Thief: unmistakably not a monster, and visibly carrying once he has robbed you. */
+export function drawThief(
+  ctx: CanvasRenderingContext2D,
+  t: Thief,
+  sx: number,
+  sy: number,
+  px: number,
+  frame: number,
+): void {
+  const size = 16 * px;
+  const scurry = Math.sin(frame * 0.5) * px * 0.8;
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.beginPath();
+  ctx.ellipse(0, size * 0.4, size * 0.24, size * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = t.hurtFlash > 0 ? '#ffffff' : '#2f2a44';
+  roundRect(ctx, -size * 0.22, -size * 0.18 + scurry * 0.1, size * 0.44, size * 0.52, size * 0.1);
+  ctx.fill();
+  ctx.fillStyle = '#59527a';
+  ctx.beginPath();
+  ctx.arc(0, -size * 0.28 + scurry * 0.1, size * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (t.carrying) {
+    ctx.fillStyle = '#e8c860';
+    ctx.beginPath();
+    ctx.arc(size * 0.26, size * 0.04, size * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

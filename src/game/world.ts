@@ -22,7 +22,7 @@ import {
   type MonsterKind,
   type MonsterLevel,
 } from './monster';
-import { FACE_DX, FACE_DY, Player } from './player';
+import { FACE_DX, FACE_DY, facingFrom as facingOf, Player } from './player';
 import {
   makeShot,
   moveProjectile,
@@ -33,6 +33,19 @@ import {
 import { cullFood } from './rank';
 import { roll } from './stats';
 import { Terrain, Tile } from './terrain';
+import * as MOVE from './collision';
+import { DEFAULT_RULES, monsterAllowed, type Rules } from '@/data/rules';
+import {
+  chooseTheft,
+  deathPotionValue,
+  makeDeath,
+  makeThief,
+  shootDeath,
+  type Death,
+  type Thief,
+} from './special';
+import { makeRock } from './projectile';
+import { targetable } from './monster';
 
 /**
  * The simulation. See DESIGN.md §7.4 for the entity model and the fixed update order.
@@ -52,6 +65,11 @@ export class World {
   generators: Generator[] = [];
   projectiles: Projectile[] = [];
   items: Item[] = [];
+  deaths: Death[] = [];
+  thieves: Thief[] = [];
+
+  /** Feature toggles. Part of the simulation, so replays honour them (DESIGN.md §6.6). */
+  rules: Rules = { ...DEFAULT_RULES };
 
   frame = 0;
   depth = 1;
@@ -75,7 +93,14 @@ export class World {
   private grid = new SpatialGrid<Monster>();
   private scratch: Monster[] = [];
 
-  constructor(level: LevelData, classId: ClassId, seed: number, carry?: RunState) {
+  constructor(
+    level: LevelData,
+    classId: ClassId,
+    seed: number,
+    carry?: RunState,
+    rules: Rules = DEFAULT_RULES,
+  ) {
+    this.rules = { ...rules };
     this.level = level;
     this.terrain = buildTerrain(level);
     this.rng = new Rng(seed);
@@ -90,7 +115,7 @@ export class World {
 
     // Rank culling runs after the score is known: the richer you are, the less food
     // this level will contain.
-    cullFood(this.items, level.id, this.player.score);
+    if (this.rules.rankCurve) cullFood(this.items, level.id, this.player.score);
   }
 
   /* ------------------------------------------------------------------ run state */
@@ -125,15 +150,26 @@ export class World {
     for (const o of this.level.objects) {
       const [wx, wy] = cellCentre(o.x, o.y);
       switch (o.t) {
-        case 'gen':
-          this.generators.push(
-            makeGenerator((o.kind ?? 'grunt') as MonsterKind, o.lvl ?? 1, o.x, o.y),
-          );
+        case 'gen': {
+          // Disabling a monster family removes its generators outright. Substituting
+          // another family would silently rewrite the level's intent while appearing to
+          // respect it; removal is honest and visible (DESIGN.md §6.6).
+          const kind = (o.kind ?? 'grunt') as MonsterKind;
+          if (!monsterAllowed(this.rules, kind)) break;
+          this.generators.push(makeGenerator(kind, o.lvl ?? 1, o.x, o.y));
           break;
-        case 'mon':
-          this.monsters.push(
-            makeMonster((o.kind ?? 'grunt') as MonsterKind, (o.lvl ?? 1) as MonsterLevel, wx, wy),
-          );
+        }
+        case 'mon': {
+          const kind = (o.kind ?? 'grunt') as MonsterKind;
+          if (!monsterAllowed(this.rules, kind)) break;
+          this.monsters.push(makeMonster(kind, (o.lvl ?? 1) as MonsterLevel, wx, wy));
+          break;
+        }
+        case 'death':
+          if (this.rules.death) this.deaths.push(makeDeath(wx, wy));
+          break;
+        case 'thief':
+          if (this.rules.thief) this.thieves.push(makeThief(wx, wy));
           break;
         case 'food':
           this.items.push(makeItem('food', wx, wy, { breakable: o.breakable ?? false }));
@@ -181,14 +217,17 @@ export class World {
       return;
     }
 
-    this.player.step(this.terrain, a, this.fireModel);
+    this.player.step(this.terrain, a, this.fireModel, this.rules);
     this.resolveItemBlocking();
+    this.resolveGeneratorBlocking();
     this.grid.rebuild(this.monsters, (m) => m.alive);
 
     this.fire(a);
     this.melee(a);
     this.stepProjectiles();
     this.stepMonsters();
+    this.stepDeaths();
+    this.stepThieves();
     this.stepGenerators();
     this.stepTerrain(a);
     this.pickups();
@@ -204,6 +243,7 @@ export class World {
   }
 
   private reachable(pr: Projectile, tx: number, ty: number): boolean {
+    if (!this.rules.cornerSqueeze) return true;
     return projectileCanReach(this.terrain, pr, tx, ty, T.TILE, T.CORNER_SQUEEZE_MAX);
   }
 
@@ -221,7 +261,16 @@ export class World {
     if (a.magicPressed && p.potions > 0) {
       p.potions--;
       this.engage();
-      detonate(p, 'used', this.monsters, this.generators, this.camera, this.events, this.addScore);
+      detonate(
+        p,
+        'used',
+        this.monsters,
+        this.generators,
+        this.camera,
+        this.events,
+        this.addScore,
+        this.deaths,
+      );
     }
 
     if (!a.fire || p.shotAlive) return;
@@ -255,12 +304,12 @@ export class World {
       const res = moveProjectile(this.terrain, pr);
 
       if (pr.fromPlayer) {
+        if (this.shotHitDeath(pr)) continue;
+        if (this.shotHitThief(pr)) continue;
         if (this.shotHitMonster(pr)) continue;
         if (this.shotHitGenerator(pr)) continue;
         if (this.shotHitItem(pr)) continue;
-      } else if (projectileHits(pr, this.player.x, this.player.y, this.player.half)) {
-        if (!this.godMode) damagePlayer(this.player, pr.damage, this.events);
-        pr.alive = false;
+      } else if (this.enemyProjectile(pr, res)) {
         continue;
       }
 
@@ -275,13 +324,88 @@ export class World {
     }
   }
 
+  /**
+   * Enemy fire hurts everything, not just you.
+   *
+   * Demon fireballs and lobber rocks damage other monsters, generators and breakable
+   * items indiscriminately — which is why "train their shots onto the generator" is a
+   * real tactic rather than a figure of speech. Rocks are the stronger version: they
+   * destroy bone generators outright, where blocks are merely weakened.
+   */
+  private enemyProjectile(pr: Projectile, res: { hitWall: boolean }): boolean {
+    // A rock only interacts on landing; in flight it is over everyone's heads.
+    if (pr.flight > 0) return false;
+    const landed = pr.kind === 'rock' && res.hitWall;
+
+    if (projectileHits(pr, this.player.x, this.player.y, this.player.half)) {
+      if (!this.godMode) damagePlayer(this.player, pr.damage, this.events);
+      pr.alive = false;
+      return true;
+    }
+
+    for (const m of this.monsters) {
+      if (m === pr.owner) continue; // never hit your own shooter
+      if (!m.alive || !projectileHits(pr, m.x, m.y, m.half)) continue;
+      damageMonster(m, pr.damage, 'shot', this.events, () => {}); // no score for their friendly fire
+      pr.alive = false;
+      return true;
+    }
+
+    for (const g of this.generators) {
+      if (!g.alive || !projectileHits(pr, g.x, g.y, T.TILE / 2)) continue;
+      const bone = g.kind === 'ghost';
+      // Bones shatter; blocks only crack.
+      damageGenerator(g, bone ? g.level : 1, this.events, this.addScore);
+      pr.alive = false;
+      return true;
+    }
+
+    for (const it of this.items) {
+      if (!it.alive || !it.breakable || !projectileHits(pr, it.x, it.y, it.half)) continue;
+      it.alive = false;
+      pr.alive = false;
+      this.events.emit({ t: 'foodDestroyed', x: it.x, y: it.y });
+      return true;
+    }
+
+    if (landed) {
+      pr.alive = false;
+      this.events.emit({ t: 'shotHitWall', x: pr.x, y: pr.y });
+      return true;
+    }
+    return false;
+  }
+
   private shotHitMonster(pr: Projectile): boolean {
     for (const m of this.monsters) {
-      if (!m.alive || !projectileHits(pr, m.x, m.y, m.half)) continue;
+      // A phased-out sorcerer is simply not there as far as your shot is concerned.
+      if (!targetable(m) || !projectileHits(pr, m.x, m.y, m.half)) continue;
       if (!this.reachable(pr, m.x, m.y)) continue;
       damageMonster(m, pr.damage, 'shot', this.events, this.addScore);
       pr.alive = false;
       this.engage();
+      return true;
+    }
+    return false;
+  }
+
+  private shotHitDeath(pr: Projectile): boolean {
+    for (const d of this.deaths) {
+      if (!d.alive || !projectileHits(pr, d.x, d.y, d.half)) continue;
+      if (!this.reachable(pr, d.x, d.y)) continue;
+      this.addScore(shootDeath(d), 'death shot');
+      pr.alive = false; // absorbed, not deflected
+      return true;
+    }
+    return false;
+  }
+
+  private shotHitThief(pr: Projectile): boolean {
+    for (const t of this.thieves) {
+      if (!t.alive || !projectileHits(pr, t.x, t.y, t.half)) continue;
+      if (!this.reachable(pr, t.x, t.y)) continue;
+      this.killThief(t);
+      pr.alive = false;
       return true;
     }
     return false;
@@ -319,6 +443,7 @@ export class World {
           this.camera,
           this.events,
           this.addScore,
+          this.deaths,
         );
       } else {
         this.events.emit({ t: 'foodDestroyed', x: it.x, y: it.y });
@@ -384,16 +509,57 @@ export class World {
       if (m.attackCd > 0) m.attackCd--;
 
       const neighbours = this.grid.query(m.x, m.y, T.TILE * 1.5, this.scratch);
-      const blockers: Blocker[] = neighbours as Blocker[];
+      const blockers: Blocker[] = (neighbours as Blocker[]).concat(this.nearbyGenerators(m.x, m.y));
+
+      // --- sorcerers phase in and out. While out, shots pass through them, which also
+      // leaves their generator less defended and lets your fire reach what is behind.
+      if (m.kind === 'sorcerer') {
+        if (--m.phaseCd <= 0) {
+          m.visible = !m.visible;
+          m.phaseCd = m.visible ? T.SORCERER_VISIBLE_F : T.SORCERER_INVISIBLE_F;
+        }
+      }
+
+      if (m.rangedCd > 0) m.rangedCd--;
+
+      const distX = p.x - m.x;
+      const distY = p.y - m.y;
+      const dist = Math.hypot(distX, distY);
 
       if (invisible) {
-        // Invisibility does not freeze them: they carry on in their last direction,
-        // which is why walking through a crowd still works and standing in one does not.
+        // Player invisibility does not freeze them: they carry on in their last
+        // direction, which is why walking through a crowd works and standing in one
+        // does not.
         const dx = FACE_DX[m.facing];
         const dy = FACE_DY[m.facing];
         chase(this.terrain, m, m.x + dx * 64, m.y + dy * 64, monsterSpeed(m), blockers);
+      } else if (m.kind === 'lobber') {
+        // Cowards: they shell you from range and run the moment you close.
+        const flee = dist < T.LOBBER_FLEE_BLOCKS * T.TILE;
+        chase(this.terrain, m, p.x, p.y, monsterSpeed(m), blockers, flee);
+        if (!flee && m.rangedCd <= 0) {
+          m.rangedCd = T.LOBBER_COOLDOWN_F;
+          this.projectiles.push(
+            makeRock(m.x, m.y, p.x, p.y, p.lastVX, p.lastVY, T.ROCK_DMG, m),
+          );
+        }
       } else {
         chase(this.terrain, m, p.x, p.y, monsterSpeed(m), blockers);
+        // --- demons fire along an axis whenever roughly lined up, WITHOUT checking
+        // what is in the way. That is exactly what makes training their fire onto a
+        // generator possible.
+        if (m.kind === 'demon' && m.rangedCd <= 0 && dist < T.DEMON_RANGE_WU) {
+          let dx = 0;
+          let dy = 0;
+          if (Math.abs(distY) < T.DEMON_ALIGN_WU) dx = Math.sign(distX);
+          else if (Math.abs(distX) < T.DEMON_ALIGN_WU) dy = Math.sign(distY);
+          if (dx !== 0 || dy !== 0) {
+            m.rangedCd = T.DEMON_FIRE_COOLDOWN_F;
+            this.projectiles.push(
+              makeShot(m.x, m.y, dx, dy, 2.2, 3, T.FIREBALL_DMG, false, 'fireball', m),
+            );
+          }
+        }
       }
 
       const r = m.half + p.half;
@@ -419,6 +585,168 @@ export class World {
     }
   }
 
+  /* ------------------------------------------------------------------ Death */
+
+  /**
+   * Death: never generated, only placed, and immune to everything but a potion.
+   *
+   * Shooting it does one point and *cycles the value a potion will pay* — which is why
+   * the optimal play is the deeply strange one of shooting it exactly six times before
+   * throwing a potion, for 8000 instead of 1000.
+   *
+   * On contact it drains fast and ignores armour entirely, up to a 200 cap, then
+   * vanishes. Breaking contact stops the drain, so outrunning it is a real option for
+   * anyone who is not the Warrior.
+   */
+  private stepDeaths(): void {
+    const p = this.player;
+    for (const d of this.deaths) {
+      if (!d.alive) continue;
+      if (d.hurtFlash > 0) d.hurtFlash--;
+
+      const dx = p.x - d.x;
+      const dy = p.y - d.y;
+      const step = T.DEATH_SPEED;
+      // Walks the maze like everything else; it is merely unkillable, not incorporeal.
+      const body = { x: d.x, y: d.y, half: d.half };
+      const { moveBody } = MOVE;
+      moveBody(this.terrain, body, Math.sign(dx) * step, 0);
+      moveBody(this.terrain, body, 0, Math.sign(dy) * step);
+      d.x = body.x;
+      d.y = body.y;
+
+      const r = d.half + p.half;
+      if (Math.abs(p.x - d.x) < r && Math.abs(p.y - d.y) < r) {
+        const remaining = T.DEATH_TOTAL_DRAIN - d.drained;
+        const bite = Math.min(T.DEATH_DRAIN_PER_FRAME, remaining);
+        // godMode must not let Death spend its 200 on an invulnerable player and
+        // politely vanish — nothing should progress while damage is off.
+        if (bite > 0 && !this.godMode) {
+          d.drained += bite;
+          // ignoreArmor: no class is protected from Death.
+          damagePlayer(p, bite, this.events, true);
+          this.engage();
+        }
+        if (d.drained >= T.DEATH_TOTAL_DRAIN) {
+          d.alive = false;
+          this.events.emit({ t: 'deathVanished', x: d.x, y: d.y });
+        }
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ Thief */
+
+  /**
+   * The Thief: fast, fragile, and the only enemy whose damage is measured in progress
+   * rather than health. He takes an upgrade if you have one — and even killing him only
+   * returns it as an ordinary potion, so the permanent boost is gone either way.
+   */
+  private stepThieves(): void {
+    const p = this.player;
+    for (const t of this.thieves) {
+      if (!t.alive) continue;
+      if (t.hurtFlash > 0) t.hurtFlash--;
+      if (--t.patience <= 0) {
+        t.alive = false;
+        continue;
+      }
+
+      const { moveBody } = MOVE;
+      const body = { x: t.x, y: t.y, half: t.half };
+      let tx = p.x;
+      let ty = p.y;
+      if (t.fleeing) {
+        const exits = this.terrain.cellsOf(Tile.Exit);
+        if (exits.length) {
+          const [ex, ey] = exits[0];
+          tx = ex * T.TILE + T.TILE / 2;
+          ty = ey * T.TILE + T.TILE / 2;
+        } else {
+          tx = t.x - (p.x - t.x);
+          ty = t.y - (p.y - t.y);
+        }
+      }
+      const sx = Math.sign(tx - t.x) * T.THIEF_SPEED;
+      const sy = Math.sign(ty - t.y) * T.THIEF_SPEED;
+      moveBody(this.terrain, body, sx, 0);
+      moveBody(this.terrain, body, 0, sy);
+      t.x = body.x;
+      t.y = body.y;
+      t.facing = facingOf(sx, sy, t.facing);
+
+      // Reached the exit while carrying: gone, and so is your property.
+      if (t.fleeing && this.terrain.at(Math.floor(t.x / T.TILE), Math.floor(t.y / T.TILE)) === Tile.Exit) {
+        t.alive = false;
+        this.events.emit({ t: 'thiefEscaped' });
+        continue;
+      }
+
+      const r = t.half + p.half;
+      if (!t.fleeing && Math.abs(p.x - t.x) < r && Math.abs(p.y - t.y) < r) {
+        if (!this.godMode) damagePlayer(p, T.THIEF_DMG, this.events);
+        const stolen = chooseTheft({
+          upgrades: [...p.upgrades],
+          potions: p.potions,
+          keys: p.keys,
+          score: p.score,
+        });
+        switch (stolen.kind) {
+          case 'upgrade':
+            p.upgrades.delete(stolen.upgrade!);
+            break;
+          case 'potion':
+            p.potions--;
+            break;
+          case 'key':
+            p.keys--;
+            break;
+          case 'score':
+            p.score = Math.max(0, p.score - (stolen.amount ?? 0));
+            break;
+          case 'nothing':
+            break;
+        }
+        t.carrying = stolen;
+        t.fleeing = true;
+        this.engage();
+        this.events.emit({ t: 'thiefStole', what: stolen.kind });
+      }
+    }
+  }
+
+  /** Kill a thief: drop a jewel bag and hand back what he took — downgraded. */
+  private killThief(t: Thief): void {
+    t.alive = false;
+    this.addScore(T.SCORE.thiefShot, 'thief');
+    this.items.push(makeItem('treasure', t.x, t.y));
+    const p = this.player;
+    const c = t.carrying;
+    if (c) {
+      // An upgrade always comes back as a plain potion. Killing him limits the damage;
+      // it does not undo it.
+      if (c.kind === 'upgrade' || c.kind === 'potion') {
+        if (!p.inventoryFull) p.potions++;
+      } else if (c.kind === 'key') {
+        if (!p.inventoryFull) p.keys++;
+      } else if (c.kind === 'score') {
+        p.score += c.amount ?? 0;
+      }
+    }
+    this.events.emit({ t: 'thiefKilled', x: t.x, y: t.y });
+  }
+
+  /** Live generators near a point, as movement blockers. */
+  private nearbyGenerators(x: number, y: number): Blocker[] {
+    const out: Blocker[] = [];
+    for (const g of this.generators) {
+      if (!g.alive) continue;
+      if (Math.abs(g.x - x) > T.TILE * 2 || Math.abs(g.y - y) > T.TILE * 2) continue;
+      out.push(g);
+    }
+    return out;
+  }
+
   /* ------------------------------------------------------------------ generators */
 
   private stepGenerators(): void {
@@ -427,7 +755,10 @@ export class World {
       if (!g.alive) continue;
       if (g.hurtFlash > 0) g.hurtFlash--;
 
-      if (!this.camera.contains(g.x, g.y, T.GEN_OFFSCREEN_MARGIN)) {
+      if (
+        this.rules.offscreenGenerators &&
+        !this.camera.contains(g.x, g.y, T.GEN_OFFSCREEN_MARGIN)
+      ) {
         g.charge = 0;
         continue;
       }
@@ -475,13 +806,17 @@ export class World {
     // --- doors give up on their own. Holding keys doubles the wait, so hoarding them
     // costs you time as well as inventory space.
     const limit = (p.keys > 0 ? T.DOOR_AUTO_OPEN_SEC_WITH_KEYS : T.DOOR_AUTO_OPEN_SEC) * T.STEP_HZ;
-    if (this.engagementFrames >= limit) {
+    if (this.rules.doorAutoOpen && this.engagementFrames >= limit) {
       if (this.terrain.openAllDoors() > 0) this.events.emit({ t: 'doorsOpened', all: true });
       this.engagementFrames = 0;
     }
 
     // --- the 180s stand-still trick
-    if (!this.wallsAreExits && p.stillFrames >= T.WALLS_BECOME_EXITS_SEC * T.STEP_HZ) {
+    if (
+      this.rules.wallsBecomeExits &&
+      !this.wallsAreExits &&
+      p.stillFrames >= T.WALLS_BECOME_EXITS_SEC * T.STEP_HZ
+    ) {
       this.wallsAreExits = true;
       this.terrain.convertWallsToExits();
       this.events.emit({ t: 'wallsBecameExits' });
@@ -570,7 +905,7 @@ export class World {
   /** Items you cannot pick up are solid — a full inventory barricades you. */
   private resolveItemBlocking(): void {
     const p = this.player;
-    if (!p.inventoryFull) return;
+    if (!this.rules.inventoryBlocks || !p.inventoryFull) return;
     for (const it of this.items) {
       if (!it.alive || !usesInventorySlot(it.kind)) continue;
       const r = it.half + p.half;
@@ -580,6 +915,27 @@ export class World {
       // push out along the shallower axis
       if (Math.abs(dx) > Math.abs(dy)) p.x = it.x + Math.sign(dx || 1) * r;
       else p.y = it.y + Math.sign(dy || 1) * r;
+    }
+  }
+
+  /**
+   * Generators are solid. They are blocks and bone piles, not decals — you cannot walk
+   * through one, and neither can a monster. Without this a player could stand inside a
+   * generator, which trivialises point-blank work and makes lobber rocks unable to land
+   * on one while you are next to it.
+   */
+  private resolveGeneratorBlocking(): void {
+    const p = this.player;
+    for (const g of this.generators) {
+      if (!g.alive) continue;
+      const r = g.half + p.half;
+      const dx = p.x - g.x;
+      const dy = p.y - g.y;
+      if (Math.abs(dx) >= r || Math.abs(dy) >= r) continue;
+      const pushX = r - Math.abs(dx);
+      const pushY = r - Math.abs(dy);
+      if (pushX < pushY) p.x = g.x + Math.sign(dx || 1) * r;
+      else p.y = g.y + Math.sign(dy || 1) * r;
     }
   }
 

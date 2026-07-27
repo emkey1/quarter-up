@@ -199,6 +199,10 @@ const levels = [];
       { t: 'gen', x: 12, y: 20, kind: 'ghost', lvl: 2 },
       { t: 'gen', x: 20, y: 20, kind: 'ghost', lvl: 3 },
       { t: 'gen', x: 28, y: 20, kind: 'ghost', lvl: 1 },
+      // Lobbers behind the galleries: unreachable by shots, so their rocks must be
+      // trained onto the bone generators instead.
+      { t: 'mon', x: 6, y: 8, kind: 'lobber', lvl: 1 },
+      { t: 'mon', x: 22, y: 8, kind: 'lobber', lvl: 2 },
       { t: 'food', x: 4, y: 29, breakable: true },
       { t: 'food', x: 12, y: 29 },
       { t: 'food', x: 20, y: 29, breakable: true },
@@ -292,7 +296,11 @@ const levels = [];
       { t: 'tele', x: 29, y: 2 },
       { t: 'gen', x: 8, y: 8, kind: 'ghost', lvl: 2 },
       { t: 'gen', x: 23, y: 8, kind: 'grunt', lvl: 3 },
-      { t: 'gen', x: 24, y: 24, kind: 'grunt', lvl: 2 },
+      { t: 'gen', x: 24, y: 24, kind: 'sorcerer', lvl: 2 },
+      { t: 'gen', x: 8, y: 24, kind: 'demon', lvl: 2 },
+      // Death guards the corridor to the exit; the Thief comes for your upgrade.
+      { t: 'death', x: 27, y: 16 },
+      { t: 'thief', x: 16, y: 4 },
       { t: 'key', x: 16, y: 20 },
       { t: 'key', x: 12, y: 16 },
       { t: 'potion', x: 20, y: 16 },

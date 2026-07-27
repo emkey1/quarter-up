@@ -27,7 +27,11 @@ export type GameEvent =
   | { t: 'trapTriggered'; x: number; y: number }
   | { t: 'teleported'; x: number; y: number }
   | { t: 'wallsBecameExits' }
-  | { t: 'exitReached' };
+  | { t: 'exitReached' }
+  | { t: 'deathVanished'; x: number; y: number }
+  | { t: 'thiefStole'; what: string }
+  | { t: 'thiefKilled'; x: number; y: number }
+  | { t: 'thiefEscaped' };
 
 export type KillSource = 'shot' | 'melee' | 'magic' | 'contact';
 
