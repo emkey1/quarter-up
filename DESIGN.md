@@ -3,7 +3,7 @@
 A browser-based, single-player dungeon crawler that closely mimics the mechanics, feel, and
 presentation of Atari Games' **Gauntlet** (arcade, 1985).
 
-**Status:** design v2 — **M0 implemented** (§12). Combat begins at M1.
+**Status:** design v2 — **M0 and M1 implemented** (§12). Items and level flow next.
 **Target:** modern desktop browsers, keyboard **or gamepad**, 60 Hz fixed-step simulation,
 HTML5 Canvas, art at 2× the original's resolution.
 
@@ -651,21 +651,35 @@ Monsters use the same routine, so they also jam at corners, which is what produc
 traffic-jam tactic. Monster–monster overlap is **blocking**, resolved by the same slide code with
 a small separation impulse to prevent lockups.
 
-### 8.2 The diagonal-seam shot rule
+### 8.2 The diagonal-corner shot rule
 
-The signature "shoot through a diagonal corner" trick falls out naturally if shot-vs-wall uses an
-inflated point test:
+> **Corrected during M1.** The v2 description of this rule was geometrically wrong. It claimed an
+> *orthogonal* shot could thread the seam between two diagonally adjacent blocks. It cannot: a
+> shot travelling east along the boundary between rows 0 and 1 is stopped by whichever of the two
+> blocks occupies the cell it is entering, regardless of its size. The trick only works for a
+> **diagonal** shot passing through the corner point the two blocks share — which means shots are
+> **8-directional**, matching the 8-way facing. Implemented and tested as follows.
 
-- The shot is blocked if any solid tile overlaps `[centre − halfSize, centre + halfSize]`.
-- `halfSize`: **Small = 1 px** (Elf), **Medium = 3 px** (Valkyrie, Wizard), **Large = 6 px** (Warrior).
-- Two diagonally adjacent wall blocks leave a zero-width seam along the tile boundary. A shot
-  travelling *exactly along that boundary* has its centre on the seam, so a 1–3 px shot threads
-  it while a 6 px shot is stopped — and a 12 px monster never can.
-- Since the shot spawns at the player's centre on the perpendicular axis, the player must be
-  aligned to the seam within a pixel or two. This *is* the "precision positioning" the strategy
-  guides talk about, and it comes free.
+- Wall tests use the projectile's **centre cell**, stepped in sub-tile increments so a cell is
+  never skipped. Size therefore does not act through raw overlap.
+- On a **diagonal cell transition**, the two flanking cells are examined. If *both* are solid, the
+  shot is threading the corner where two diagonally adjacent blocks meet, and passes only if
+  `half <= CORNER_SQUEEZE_MAX` (3). Small (Elf) and Medium (Valkyrie, Wizard) pass; Large
+  (Warrior) does not. Monsters, moving by full AABB, never can.
+- If only one flank is solid the shot is merely clipping a corner with open floor beyond, and
+  passes at any size.
+- **Reachability is checked separately from overlap.** A shot stopped against a wall still sits
+  within its own hit radius of a target in the diagonally adjacent cell — combined half-extents
+  reach ~14 wu, most of a tile. Without a guard, a Large shot damages a generator straight through
+  the corner that just blocked it, silently erasing the whole mechanic. `projectileCanReach()`
+  applies the same corner rule to hit tests. This was a real bug caught by the M1 acceptance test.
+- Shot velocity is normalised, so a diagonal shot is not 1.41× faster than an orthogonal one.
 
-Flag for validation (§13): the exact `halfSize` values are our reconstruction.
+The proving level places a generator at (25,5) where the only straight line to it threads the
+corner between blocks (24,5) and (25,6) — the acceptance test fires from (22,8) and asserts all
+four classes land on the right side of the rule.
+
+Flag for validation (§13): `CORNER_SQUEEZE_MAX` and the `SHOT_HALF` values are our reconstruction.
 
 ### 8.3 Firing
 
@@ -686,7 +700,12 @@ Flag for validation (§13): the exact `halfSize` values are our reconstruction.
 ### 8.4 Melee
 
 Walking into a monster with a non-zero relative velocity triggers a melee swing on an ~8-frame
-cadence. Wider hit arc than a shot (a `20×12` box in the facing direction), which is why melee is
+cadence. **This gate is load-bearing, not decorative:** implemented without it (proximity alone),
+a stationary player silently kills anything that wanders adjacent — which trivialises the game and,
+in M1 testing, quietly ate every monster the generators produced, making them look broken. Melee
+requires live movement *input* rather than actual displacement, so it still works when you are
+pressed against a monster and cannot move; and it is suppressed while the fire model has you
+rooted, since you cannot shoulder forward and stand still at once. Wider hit arc than a shot (a `20×12` box in the facing direction), which is why melee is
 the escape tool when surrounded. Cannot hit ghosts (they self-destruct on contact first). Against
 generators it does a flat 1 HP with a per-class miss chance (Wizard/Elf always miss).
 

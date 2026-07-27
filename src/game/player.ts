@@ -25,7 +25,9 @@ export class Player implements Body {
   upgrades = new Set<UpgradeId>();
 
   facing = 2; // south, like every sprite sheet's idle frame
-  health = T.START_HEALTH;
+  // Explicit annotation: T is `as const`, so the initialiser's type is the literal 700
+  // and would not widen on its own.
+  health: number = T.START_HEALTH;
   score = 0;
   credits = 1;
 
@@ -37,6 +39,16 @@ export class Player implements Body {
   /** True while the fire model is suppressing translation — surfaced to the HUD/debug
    *  so the rooting is visible rather than feeling like dropped input. */
   rooted = false;
+
+  /** Frames until the next melee swing may land. */
+  meleeCd = 0;
+  /** Brief grace after taking a hit, so a ghost stream cannot delete you in three
+   *  frames. [i] — the arcade may not have had this; flagged for the fidelity pass. */
+  invulnFrames = 0;
+  /** Render-only feedback. */
+  damageFlash = 0;
+  /** Set while a shot of ours is alive: the one-shot-on-screen rule. */
+  shotAlive = false;
 
   /** Sub-frame accumulator for the 1 hp/sec drain. */
   private drainAcc = 0;
@@ -112,6 +124,10 @@ export class Player implements Body {
     // displacement — you may shoot and turn freely while waiting it out.
     if (a.moveX !== 0 || a.moveY !== 0) this.stillFrames = 0;
     else this.stillFrames++;
+
+    if (this.meleeCd > 0) this.meleeCd--;
+    if (this.invulnFrames > 0) this.invulnFrames--;
+    if (this.damageFlash > 0) this.damageFlash--;
 
     // --- the clock that makes Gauntlet Gauntlet
     this.drainAcc += T.HEALTH_DRAIN_PER_SEC / T.STEP_HZ;

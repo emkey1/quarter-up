@@ -12,14 +12,15 @@ original; "Gauntlet" is a trademark of its respective owner.
 
 ## Status
 
-**M0 complete** — engine skeleton, input, collision, camera, autotiled rendering.
-Combat arrives in M1. See DESIGN.md §12 for the milestone plan.
+**M1 complete** — combat core: 8-directional shots with the diagonal-corner rule, melee,
+ghosts and grunts, generators with off-screen gating, armour and damage, magic.
+Items and level flow arrive in M2. See DESIGN.md §12 for the milestone plan.
 
 | Milestone | State |
 | --- | --- |
 | M0 skeleton | done |
-| M1 combat core | next |
-| M2 items, terrain, level flow | |
+| M1 combat core | done |
+| M2 items, terrain, level flow | next |
 | M3 full monster roster | |
 | M4 presentation | |
 | M5 content + editor | |

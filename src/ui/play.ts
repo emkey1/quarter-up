@@ -6,7 +6,7 @@ import type { LoopHost } from '@/engine/loop';
 import type { Loop } from '@/engine/loop';
 import { World } from '@/game/world';
 import type { LevelData } from '@/game/level';
-import { drawPlayer } from '@/render/entities';
+import { drawPlayer, drawMonster, drawGenerator, drawProjectile } from '@/render/entities';
 import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
@@ -117,15 +117,37 @@ export class PlayScreen implements LoopHost {
     const px = layout.pxPerWu;
     const camX = Math.round(this.world.camera.x * px);
     const camY = Math.round(this.world.camera.y * px);
-    drawPlayer(
-      ctx,
-      p,
-      pf.x + Math.round(p.x * px) - camX,
-      pf.y + Math.round(p.y * px) - camY,
-      px,
-      this.animFrame,
-    );
+    const toX = (wx: number) => pf.x + Math.round(wx * px) - camX;
+    const toY = (wy: number) => pf.y + Math.round(wy * px) - camY;
+
+    for (const g of this.world.generators) {
+      if (g.alive) drawGenerator(ctx, g, toX(g.x), toY(g.y), px, this.animFrame);
+    }
+
+    // Depth-sort entities by y so overlaps read correctly.
+    const sorted = this.world.monsters.filter((m) => m.alive).sort((a, b) => a.y - b.y);
+    let drewPlayer = false;
+    for (const m of sorted) {
+      if (!drewPlayer && m.y > p.y) {
+        drawPlayer(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+        drewPlayer = true;
+      }
+      drawMonster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
+    }
+    if (!drewPlayer) drawPlayer(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+
+    for (const pr of this.world.projectiles) {
+      if (pr.alive) drawProjectile(ctx, pr, toX(pr.x), toY(pr.y), px);
+    }
     ctx.restore();
+
+    if (p.damageFlash > 0) {
+      ctx.save();
+      ctx.globalAlpha = (p.damageFlash / 8) * 0.35;
+      ctx.fillStyle = '#ff2020';
+      ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
+      ctx.restore();
+    }
 
     // playfield border, so the locked gameplay viewport is visible as a deliberate frame
     ctx.strokeStyle = 'rgba(255,255,255,.10)';

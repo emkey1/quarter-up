@@ -51,6 +51,13 @@ export const T = {
   DEATH_HALF: 7,
   ITEM_HALF: 8,
   SHOT_HALF: { small: 1, medium: 3, large: 6 }, // [i]
+  /** Largest shot half-size that can thread the corner where two diagonally adjacent
+   *  wall blocks meet. Small (Elf) and Medium (Valkyrie, Wizard) pass; Large (Warrior)
+   *  does not — the signature "attack from behind cover" asymmetry. [i] */
+  CORNER_SQUEEZE_MAX: 3,
+  /** Shots live at most this long, so one that escapes down a corridor still frees the
+   *  one-shot-on-screen slot. [i] */
+  SHOT_LIFETIME_F: 240,
 
   // ---------------------------------------------------------------- health
   START_HEALTH: 700,

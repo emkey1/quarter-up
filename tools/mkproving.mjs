@@ -97,6 +97,26 @@ const level = {
     { t: 'tele', x: 15, y: 2 },
     { t: 'tele', x: 16, y: 29 },
     { t: 'exit', x: 28, y: 28, skipTo: null },
+
+    // SE room: a generator nest behind a door — the level's centrepiece problem.
+    // Mixed families so both bone (ghost) and block (grunt) behaviour is exercised.
+    { t: 'gen', x: 21, y: 21, kind: 'grunt', lvl: 2 },
+    { t: 'gen', x: 26, y: 21, kind: 'ghost', lvl: 1 },
+    { t: 'gen', x: 21, y: 26, kind: 'ghost', lvl: 2 },
+    { t: 'gen', x: 26, y: 26, kind: 'grunt', lvl: 3 },
+
+    // NE diagonal-pair field: a lone generator placed so the ONLY straight line to it
+    // threads the corner between the diagonally adjacent blocks (24,5) and (25,6).
+    // Firing north-east from around (22,8), an Elf or Wizard shot squeezes through and
+    // a Warrior's does not — the corner-squeeze rule made directly testable in-level.
+    // Any other cell here is reachable without threading a corner, which is why the
+    // exact coordinate matters.
+    { t: 'gen', x: 25, y: 5, kind: 'grunt', lvl: 3 },
+
+    // A few loose monsters for melee and shot testing without generator pressure.
+    { t: 'mon', x: 8, y: 20, kind: 'grunt', lvl: 1 },
+    { t: 'mon', x: 11, y: 23, kind: 'grunt', lvl: 2 },
+    { t: 'mon', x: 5, y: 26, kind: 'ghost', lvl: 1 },
   ],
 };
 
