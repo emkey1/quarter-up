@@ -115,6 +115,8 @@ export const T = {
   THIEF_SCORE_THEFT: 1000, // [i]
   DEATH_SPEED: 0.55, // [i] slow but relentless
   TELEPORT_COOLDOWN_F: 30,
+  /** Treasure rooms are on a clock: grab what you can and get out. [i] */
+  TREASURE_ROOM_SEC: 30,
 
   // ---------------------------------------------------------------- scoring
   SCORE: {

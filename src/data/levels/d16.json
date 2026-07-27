@@ -1,7 +1,7 @@
 {
-  "id": "d04",
-  "name": "Vault",
-  "theme": "stone",
+  "id": "d16",
+  "name": "Grindstone",
+  "theme": "iron",
   "type": "normal",
   "start": [
     3,
@@ -47,7 +47,7 @@
       "x": 8,
       "y": 8,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "gen",
@@ -61,14 +61,14 @@
       "x": 8,
       "y": 22,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "gen",
       "x": 24,
       "y": 22,
-      "kind": "grunt",
-      "lvl": 1
+      "kind": "ghost",
+      "lvl": 3
     },
     {
       "t": "key",

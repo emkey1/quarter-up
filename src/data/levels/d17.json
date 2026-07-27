@@ -1,7 +1,7 @@
 {
-  "id": "d05",
-  "name": "Crossroads",
-  "theme": "stone",
+  "id": "d17",
+  "name": "Hollow",
+  "theme": "iron",
   "type": "normal",
   "start": [
     15,
@@ -47,21 +47,21 @@
       "x": 21,
       "y": 21,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 26,
       "y": 21,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "gen",
       "x": 21,
       "y": 26,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "potion",

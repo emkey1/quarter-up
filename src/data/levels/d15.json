@@ -1,7 +1,7 @@
 {
-  "id": "d03",
-  "name": "Bone Yard",
-  "theme": "stone",
+  "id": "d15",
+  "name": "The Weir",
+  "theme": "iron",
   "type": "normal",
   "start": [
     3,
@@ -54,14 +54,14 @@
       "x": 28,
       "y": 12,
       "kind": "demon",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 25,
       "y": 20,
       "kind": "demon",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "food",
@@ -72,12 +72,6 @@
       "t": "exit",
       "x": 29,
       "y": 3
-    },
-    {
-      "t": "upgrade",
-      "x": 3,
-      "y": 2,
-      "kind": "armor"
     }
   ]
 }

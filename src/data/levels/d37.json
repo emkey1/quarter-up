@@ -1,7 +1,7 @@
 {
-  "id": "d01",
-  "name": "Threshold",
-  "theme": "stone",
+  "id": "d37",
+  "name": "Bellows",
+  "theme": "bone",
   "type": "normal",
   "start": [
     3,
@@ -47,21 +47,21 @@
       "x": 19,
       "y": 7,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 26,
       "y": 7,
       "kind": "grunt",
-      "lvl": 2
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 19,
       "y": 14,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "food",

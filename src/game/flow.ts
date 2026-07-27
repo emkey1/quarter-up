@@ -57,14 +57,27 @@ export class Run {
     private readonly seed: number,
     startIndex = 0,
     public rules: Rules = DEFAULT_RULES,
+    /**
+     * Index the endless loop returns to. Wrapping with plain modulo over the whole
+     * campaign would drop a player who has survived forty levels back into the
+     * tutorial, which is absurd — so the loop starts after the intro.
+     */
+    private readonly loopStart = 0,
   ) {
     this.state = newRunState(classId);
     this.levelIndex = startIndex;
     this.world = this.build();
   }
 
+  /** Campaign entry for a depth, looping past the authored levels. */
+  private levelAt(index: number): LevelData {
+    if (index < this.campaign.length) return this.campaign[index];
+    const span = Math.max(1, this.campaign.length - this.loopStart);
+    return this.campaign[this.loopStart + ((index - this.loopStart) % span)];
+  }
+
   private build(): World {
-    const level = this.campaign[this.levelIndex % this.campaign.length];
+    const level = this.levelAt(this.levelIndex);
     const w = new World(
       level,
       this.state.classId,
@@ -82,13 +95,21 @@ export class Run {
   }
 
   get levelName(): string {
-    return this.campaign[this.levelIndex % this.campaign.length].name;
+    return this.levelAt(this.levelIndex).name;
   }
 
   /** Called when the world reports the exit was reached. */
   advance(): void {
+    const skipTo = this.world.exitSkipTo;
     this.state = this.world.exportState();
-    this.levelIndex++;
+    // A numbered exit jumps to a chosen DEPTH. depth is levelIndex + 1, so landing on
+    // depth `skipTo` means levelIndex = skipTo - 1 — and the ordinary increment must be
+    // skipped entirely, or the jump overshoots by one.
+    if (skipTo !== null && skipTo > this.depth) {
+      this.levelIndex = skipTo - 1;
+    } else {
+      this.levelIndex++;
+    }
     this.state.deepestLevel = Math.max(this.state.deepestLevel, this.depth);
     this.world = this.build();
     this.justAdvanced = 90;

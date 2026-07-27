@@ -1,7 +1,7 @@
 {
-  "id": "d01",
-  "name": "Threshold",
-  "theme": "stone",
+  "id": "d13",
+  "name": "Deadfall",
+  "theme": "crypt",
   "type": "normal",
   "start": [
     3,
@@ -47,7 +47,7 @@
       "x": 19,
       "y": 7,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "gen",
@@ -61,7 +61,7 @@
       "x": 19,
       "y": 14,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 2
     },
     {
       "t": "food",

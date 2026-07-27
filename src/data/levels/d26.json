@@ -1,7 +1,7 @@
 {
-  "id": "d02",
-  "name": "The Cistern",
-  "theme": "stone",
+  "id": "d26",
+  "name": "Reliquary",
+  "theme": "ember",
   "type": "normal",
   "start": [
     3,
@@ -47,14 +47,14 @@
       "x": 19,
       "y": 26,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 27,
       "y": 25,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "food",
@@ -70,6 +70,12 @@
       "t": "exit",
       "x": 3,
       "y": 29
+    },
+    {
+      "t": "upgrade",
+      "x": 3,
+      "y": 2,
+      "kind": "magic"
     }
   ]
 }

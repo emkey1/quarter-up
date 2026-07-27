@@ -310,7 +310,7 @@ describe('rank curve', () => {
 
 describe('level flow', () => {
   it('carries health, score, inventory and upgrades across a transition', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1);
+    const r = new Run(miniCampaign(), 'elf', 1);
     r.world.godMode = true;
     r.world.player.health = 412;
     r.world.player.score = 1234;
@@ -330,7 +330,7 @@ describe('level flow', () => {
   });
 
   it('does NOT refill health between levels — the drain is one continuous clock', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1);
+    const r = new Run(miniCampaign(), 'elf', 1);
     r.world.player.health = 200;
     r.world.exitReached = true;
     r.step();
@@ -338,17 +338,18 @@ describe('level flow', () => {
   });
 
   it('loops past the authored campaign with increasing depth', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1);
-    for (let i = 0; i < CAMPAIGN.length + 2; i++) {
+    const campaign = miniCampaign(4);
+    const r = new Run(campaign, 'elf', 1);
+    for (let i = 0; i < campaign.length + 2; i++) {
       r.world.exitReached = true;
       r.step();
     }
-    expect(r.depth).toBe(CAMPAIGN.length + 3);
+    expect(r.depth).toBe(campaign.length + 3);
     expect(r.world).toBeTruthy(); // still a valid level after wrapping
   });
 
   it('counts a credit and restores health on continue', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1);
+    const r = new Run(miniCampaign(), 'elf', 1);
     r.world.player.health = 0;
     r.world.player.score = 5000;
     r.useCredit();
@@ -358,7 +359,7 @@ describe('level flow', () => {
   });
 
   it('applies depth to generator pressure', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1);
+    const r = new Run(miniCampaign(), 'elf', 1);
     expect(r.world.depth).toBe(1);
     r.world.exitReached = true;
     r.step();
@@ -368,6 +369,32 @@ describe('level flow', () => {
 
 /* ------------------------------------------------------------------ acceptance */
 
+/**
+ * A purpose-built mini campaign.
+ *
+ * These tests are about the TRANSITION CHAIN, not about shipped content. Running them
+ * against the real campaign made them fragile in a way that hid nothing useful: intro
+ * level 7 has numbered skip exits, so walking north jumps you to depth 12 and a test
+ * asserting "depth increased by one" fails on entirely correct behaviour.
+ */
+function miniCampaign(n = 5): LevelData[] {
+  return Array.from({ length: n }, (_, i) => ({
+    ...arena(
+      // A few things to pick up, so "collects as it goes" is actually testable.
+      [
+        { t: 'food', x: 12, y: 14 },
+        { t: 'treasure', x: 20, y: 14 },
+        { t: 'key', x: 12, y: 18 },
+      ],
+      (rows) => {
+        rows[16][24] = 'E';
+      },
+    ),
+    id: `mini${i}`,
+    name: `Mini ${i + 1}`,
+  }));
+}
+
 describe('M2 acceptance: a full run is playable', () => {
   it('clears all five levels via the walls-become-exits route', () => {
     // Not a pathfinding bot. It finishes each level the way the 180-second trick lets
@@ -376,10 +403,11 @@ describe('M2 acceptance: a full run is playable', () => {
     //
     // The 180s wait itself has its own stopwatch test above, so here the stillness
     // counter is fast-forwarded rather than burning 900 seconds of simulation.
-    const r = new Run(CAMPAIGN, 'elf', 99);
+    const campaign = miniCampaign();
+    const r = new Run(campaign, 'elf', 99);
     const idle = emptyActions();
 
-    for (let level = 0; level < CAMPAIGN.length; level++) {
+    for (let level = 0; level < campaign.length; level++) {
       const start = r.depth;
       r.world.godMode = true;
 
@@ -398,18 +426,19 @@ describe('M2 acceptance: a full run is playable', () => {
       expect(r.depth, `level ${start} should have been left`).toBe(start + 1);
     }
 
-    expect(r.depth).toBe(CAMPAIGN.length + 1);
+    expect(r.depth).toBe(campaign.length + 1);
     expect(r.world.player.dead).toBe(false);
   });
 
   it('carries a real run through five levels collecting as it goes', () => {
     // A cruder check that the whole loop survives ordinary play: sweep back and forth
     // through each level picking things up, then leave via the same route.
-    const r = new Run(CAMPAIGN, 'elf', 7);
+    const campaign = miniCampaign(3);
+    const r = new Run(campaign, 'elf', 7);
     const a = emptyActions();
     let picked = 0;
 
-    for (let level = 0; level < CAMPAIGN.length; level++) {
+    for (let level = 0; level < campaign.length; level++) {
       r.world.godMode = true;
       const before = r.world.items.filter((i) => i.alive).length;
       for (let f = 0; f < 20 * SEC; f++) {
@@ -434,7 +463,7 @@ describe('M2 acceptance: a full run is playable', () => {
       }
     }
 
-    expect(r.depth).toBeGreaterThan(CAMPAIGN.length);
+    expect(r.depth).toBeGreaterThan(campaign.length);
     expect(picked, 'should have collected something along the way').toBeGreaterThan(0);
     expect(r.world.player.score).toBeGreaterThan(0);
   });

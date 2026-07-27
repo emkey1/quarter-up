@@ -1,5 +1,5 @@
 import type { ClassId } from '@/data/classes';
-import { CAMPAIGN, PROVING } from '@/data/campaign';
+import { CAMPAIGN, LOOP_START, PROVING } from '@/data/campaign';
 import { cloneRules, DEFAULT_RULES } from '@/data/rules';
 import type { Display } from '@/engine/display';
 import type { Input } from '@/engine/input';
@@ -60,7 +60,7 @@ export class App implements LoopHost {
 
     const kb = (code: string) => this.input.keyboard.wasCodePressed(code);
 
-    this.run = new Run(CAMPAIGN, this.classId, this.seed, 0, this.setup.rules);
+    this.run = new Run(CAMPAIGN, this.classId, this.seed, 0, this.setup.rules, LOOP_START);
     this.play = new PlayScreen(display, input, this.audio, this.speech, this.fx, this.setup, () =>
       this.run,
     );
@@ -101,7 +101,7 @@ export class App implements LoopHost {
   private startRun(cls: ClassId): void {
     this.classId = cls;
     this.continuesLeft = 3;
-    this.run = new Run(CAMPAIGN, cls, this.seed, 0, cloneRules(this.setup.rules));
+    this.run = new Run(CAMPAIGN, cls, this.seed, 0, cloneRules(this.setup.rules), LOOP_START);
     this.run.world.fireModel = this.play.fireModel;
     this.lastLevelIndex = 0;
     this.play.onRunChanged();

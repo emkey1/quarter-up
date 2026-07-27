@@ -1,7 +1,7 @@
 {
-  "id": "d02",
-  "name": "The Cistern",
-  "theme": "stone",
+  "id": "d38",
+  "name": "Catacomb",
+  "theme": "bone",
   "type": "normal",
   "start": [
     3,
@@ -47,14 +47,14 @@
       "x": 19,
       "y": 26,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 27,
       "y": 25,
       "kind": "ghost",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "food",

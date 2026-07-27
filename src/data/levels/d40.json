@@ -1,7 +1,7 @@
 {
-  "id": "d04",
-  "name": "Vault",
-  "theme": "stone",
+  "id": "d40",
+  "name": "Last Light",
+  "theme": "bone",
   "type": "normal",
   "start": [
     3,
@@ -46,29 +46,29 @@
       "t": "gen",
       "x": 8,
       "y": 8,
-      "kind": "ghost",
-      "lvl": 1
+      "kind": "grunt",
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 24,
       "y": 8,
       "kind": "ghost",
-      "lvl": 2
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 8,
       "y": 22,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "gen",
       "x": 24,
       "y": 22,
       "kind": "grunt",
-      "lvl": 1
+      "lvl": 3
     },
     {
       "t": "key",

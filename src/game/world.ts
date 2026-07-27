@@ -78,6 +78,16 @@ export class World {
 
   /** Set when the player steps on an exit; the Run picks it up and advances. */
   exitReached = false;
+  /** Which exit was used, if it names a destination. Intro levels use this for the
+   *  numbered skip exits that let a solo player choose their starting depth. */
+  exitSkipTo: number | null = null;
+
+  /**
+   * Treasure rooms run on a clock rather than a threat: there is nothing to fight,
+   * only a limited time to be greedy in. Frames remaining, or -1 in a normal level.
+   */
+  treasureTimer = -1;
+  treasureTaken = 0;
 
   /**
    * Frames since the player last engaged: fired, was hit, dealt damage, or picked
@@ -116,6 +126,12 @@ export class World {
     // Rank culling runs after the score is known: the richer you are, the less food
     // this level will contain.
     if (this.rules.rankCurve) cullFood(this.items, level.id, this.player.score);
+
+    if (level.type === 'treasure') this.treasureTimer = T.TREASURE_ROOM_SEC * T.STEP_HZ;
+  }
+
+  get isTreasureRoom(): boolean {
+    return this.level.type === 'treasure';
   }
 
   /* ------------------------------------------------------------------ run state */
@@ -231,6 +247,7 @@ export class World {
     this.stepGenerators();
     this.stepTerrain(a);
     this.pickups();
+    this.stepTreasureTimer();
     this.checkExit();
 
     this.camera.follow(this.player.x, this.player.y);
@@ -973,6 +990,7 @@ export class World {
           break;
         case 'treasure':
           this.addScore(out.score, 'treasure');
+          this.treasureTaken++;
           break;
         case 'upgrade':
           p.upgrades.add(out.upgrade);
@@ -994,10 +1012,34 @@ export class World {
     const p = this.player;
     const cx = Math.floor(p.x / T.TILE);
     const cy = Math.floor(p.y / T.TILE);
-    if (this.terrain.at(cx, cy) === Tile.Exit) {
-      this.exitReached = true;
-      this.events.emit({ t: 'exitReached' });
-    }
+    if (this.terrain.at(cx, cy) !== Tile.Exit) return;
+
+    // An exit may name a destination — that is how the intro levels let you choose
+    // how deep to start, which is the arcade's level-select in disguise.
+    const named = this.level.objects.find(
+      (o) => o.t === 'exit' && o.x === cx && o.y === cy && typeof o.skipTo === 'number',
+    );
+    this.exitSkipTo = (named?.skipTo as number | undefined) ?? null;
+
+    if (this.isTreasureRoom) this.awardTreasureRoom();
+    this.exitReached = true;
+    this.events.emit({ t: 'exitReached' });
+  }
+
+  /** Leaving a treasure room pays 50 per treasure collected, per DESIGN.md §3.6. */
+  private awardTreasureRoom(): void {
+    const bonus = this.treasureTaken * T.SCORE.treasureRoomPerTreasure;
+    if (bonus > 0) this.addScore(bonus, 'treasure room bonus');
+  }
+
+  /** The timer expiring ends the room exactly as reaching the exit would. */
+  private stepTreasureTimer(): void {
+    if (this.treasureTimer < 0) return;
+    if (--this.treasureTimer > 0) return;
+    this.treasureTimer = 0;
+    this.awardTreasureRoom();
+    this.exitReached = true;
+    this.events.emit({ t: 'exitReached' });
   }
 
   /* ------------------------------------------------------------------ upkeep */
