@@ -296,8 +296,12 @@ for (let d = 1; d <= 40; d++) {
     const kinds = ['shotPower', 'speed', 'magic', 'armor', 'shotSpeed', 'fightPower'];
     obj(g, { t: 'upgrade', x: out.start[0], y: Math.max(2, out.start[1] - 2), kind: kinds[d % kinds.length] });
   }
-  // The thief starts turning up once there is something worth stealing.
-  if (d >= 12 && d % 7 === 0) obj(g, { t: 'thief', x: out.start[0], y: out.start[1] });
+  // The thief starts turning up once there is something worth stealing — but across the
+  // map, not on top of you. Spawned at the start it robs you on frame one, before the
+  // player has had a single frame to react, which is not difficulty, it is a coin flip.
+  if (d >= 12 && d % 7 === 0) {
+    obj(g, { t: 'thief', x: 31 - out.start[0], y: 31 - out.start[1] });
+  }
 
   levels.push(
     finish(g, {

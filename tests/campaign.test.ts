@@ -5,6 +5,8 @@ import { World } from '@/game/world';
 import { Run } from '@/game/flow';
 import { Tile } from '@/game/terrain';
 import { emptyActions } from '@/engine/actions';
+import { analyseLevel } from '@/game/analyse';
+import { PROVING } from '@/data/campaign';
 
 describe('campaign content', () => {
   it('ships seven intro levels and forty-plus dungeon levels', () => {
@@ -57,6 +59,64 @@ describe('campaign content', () => {
     const withUpgrade = CAMPAIGN.filter((l) => l.objects.some((o) => o.t === 'upgrade'));
     expect(withUpgrade.length).toBeGreaterThan(3);
     expect(withUpgrade.length).toBeLessThan(CAMPAIGN.length / 3);
+  });
+});
+
+describe('playability analysis', () => {
+  // This is the same function the level editor runs live on every edit. Keeping it under
+  // test here is what stops the editor and the build from disagreeing about what
+  // "playable" means — an editor that blesses a level CI rejects is worse than no editor.
+  it('passes every campaign level, with no warnings either', () => {
+    for (const lvl of CAMPAIGN) {
+      const r = analyseLevel(lvl);
+      expect(r.errors, `${lvl.id} (${lvl.name})`).toEqual([]);
+      expect(r.warnings, `${lvl.id} (${lvl.name})`).toEqual([]);
+    }
+  });
+
+  it('leaves the proving ground playable, warnings aside', () => {
+    // The systems proving ground is a dev harness, not content: it deliberately has no
+    // food because nobody is meant to survive on it, only to test mechanics. Warnings
+    // are allowed here — but structural errors are not, and it earns no exemption from
+    // the analyser itself, which is where an exemption would do real damage.
+    expect(analyseLevel(PROVING).errors).toEqual([]);
+  });
+
+  it('catches a sealed exit', () => {
+    const base = CAMPAIGN[0];
+    const walled = {
+      ...base,
+      // Wall off the start cell entirely: the exit becomes unreachable by construction.
+      tiles: base.tiles.map((row, y) =>
+        row
+          .split('')
+          .map((g, x) => {
+            const [sx, sy] = base.start;
+            if (x === sx && y === sy) return '.';
+            return Math.abs(x - sx) <= 1 && Math.abs(y - sy) <= 1 ? 'X' : g;
+          })
+          .join(''),
+      ),
+    };
+    const r = analyseLevel(walled);
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => e.includes('exit'))).toBe(true);
+  });
+
+  it('does not call a trap-opened vault sealed', () => {
+    // The bug this guards against shipped once: eighteen treasures behind a wall the
+    // trap opens, reported as broken, then "fixed" with a validator exemption that hid
+    // a genuinely sealed vault later. Traps get fired, not excused.
+    const lvl = {
+      ...CAMPAIGN[0],
+      objects: [
+        ...CAMPAIGN[0].objects.filter((o) => o.t !== 'trap'),
+        { t: 'trap', x: CAMPAIGN[0].start[0], y: CAMPAIGN[0].start[1], opens: [[1, 1]] as [number, number][] },
+        { t: 'treasure', x: 1, y: 1 },
+      ],
+    };
+    const r = analyseLevel(lvl);
+    expect(r.errors).toEqual([]);
   });
 });
 

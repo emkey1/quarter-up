@@ -12,12 +12,10 @@ original; "Gauntlet" is a trademark of its respective owner.
 
 ## Status
 
-**M4 complete** — presentation: synthesised audio, the announcer with captions,
-lighting and particles, the full screen flow (attract, character select, level intro,
-game over with the arcade continue countdown, and a local high-score table ranked on
-score per credit), and procedurally generated **pixel art** — real indexed-palette
-sprites and masonry tiles authored at native 32×32, not vector shapes. Content and the
-level editor are M5. See DESIGN.md §12.
+**M5 complete** — the campaign: 7 intro levels teaching one idea each and ending on the
+arcade's numbered level-select, 40 dungeon levels, treasure rooms every 12, an endless
+loop that restarts *after* the intro, and a browser **level editor** with live
+playability validation and playtest-in-the-real-game. Polish is M6. See DESIGN.md §12.
 
 | Milestone | State |
 | --- | --- |
@@ -25,9 +23,9 @@ level editor are M5. See DESIGN.md §12.
 | M1 combat core | done |
 | M2 items, terrain, level flow | done |
 | M3 full monster roster | done |
-| M4 presentation | next |
-| M5 content + editor | next |
-| M6 polish | |
+| M4 presentation | done |
+| M5 content + editor | done |
+| M6 polish | next |
 
 ## Running it
 
@@ -44,15 +42,39 @@ npm run typecheck # tsc --noEmit
 npm run build     # typecheck + production bundle
 ```
 
-Regenerate the development levels:
+## Levels
 
-```bash
-node tools/mklevels.mjs
-```
+Two ways to make one, and they share a definition of "playable".
 
-Both level scripts validate what they produce — reachability from the start, no object
-stranded behind a wall, and every trap tile actually reachable and actually opening
-something. A level that cannot be finished fails the build rather than shipping.
+**The editor** — open http://localhost:5173/editor.html. Paint terrain, drop objects,
+load any shipped level as a starting point, export JSON. Two things make it worth using
+rather than editing JSON by hand:
+
+- **Validation runs on every edit**, with the verdict always on screen and unreachable
+  floor tinted red directly on the grid. Sealed rooms are visible, not discovered.
+- **Playtest opens the real game** with your level as a one-level campaign — not a
+  preview of the game, which would only teach you to trust a lie.
+
+**The generator** — `node tools/mkcampaign.mjs` rebuilds the whole 50-level campaign
+from recipes written against the design vocabulary in `tools/levelkit.mjs` (`nest`,
+`keyDoorGate`, `coverLattice`, `lobberGallery`, `deathCorridor`, `foodGauntlet`,
+`treasureVault`, …). Being straight about what that is: **parameterised hand-design**.
+The patterns and where they go are chosen deliberately, level by level; the grain inside
+a pattern is generated. That is a long way from noise, and a long way from forty
+individually hand-drawn mazes.
+
+The authority on "playable" is `analyseLevel()` in `src/game/analyse.ts`: reachability
+from the start with traps *fired* rather than exempted, nothing stranded behind a wall,
+food present on any level where health drains. The editor shows its verdict live, and a
+test runs it over every shipped level — so the editor cannot bless a level CI rejects.
+The generator carries its own pre-flight check for fast feedback while writing, but that
+test is the gate: a level that cannot be finished fails the build instead of shipping.
+
+The trap-firing matters more than it sounds. A vault whose only door is opened by a
+pressure plate looks sealed to a naive flood fill, and the tempting fix — an exemption
+for "sealed by design" — is exactly what hid a genuinely sealed vault, eighteen
+treasures and an upgrade behind it, for a whole milestone. Nothing is exempt; the plate
+is simulated instead.
 
 ## Controls
 

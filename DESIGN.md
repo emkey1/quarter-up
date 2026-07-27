@@ -3,7 +3,7 @@
 A browser-based, single-player dungeon crawler that closely mimics the mechanics, feel, and
 presentation of Atari Games' **Gauntlet** (arcade, 1985).
 
-**Status:** design v2 — **M0–M4 implemented** (§12), including the setup screen (§6.6). Content and editor next.
+**Status:** design v2 — **M0–M5 implemented** (§12), including the setup screen (§6.6), the 50-level campaign (§11) and the level editor (§11.1). Polish (M6) next.
 **Target:** modern desktop browsers, keyboard **or gamepad**, 60 Hz fixed-step simulation,
 HTML5 Canvas, art at 2× the original's resolution.
 
@@ -668,7 +668,7 @@ scene graph, tweening, and physics would be fought, not used.
     campaign.ts            level order, themes, upgrade-potion placement
   /ui
     attract.ts charselect.ts levelintro.ts gameover.ts options.ts highscores.ts
-/tools/leveledit           browser level editor (separate Vite entry)
+/tools/editor              browser level editor (separate Vite entry, editor.html)
 /tests                     Vitest unit tests + replay fixtures
 ```
 
@@ -1112,9 +1112,40 @@ Shipping content:
   exit bonus `50 × treasures`.
 - **Endless loop** past 40: replay the 40 with a depth multiplier applied to generator rates and
   generator levels, so it genuinely gets harder, matching the original's loop-forever structure.
-- A **browser level editor** (`/tools/leveledit`) — paint tiles, place objects, playtest in place,
-  export the JSON. This is the difference between shipping 40 good levels and 12 mediocre ones,
-  so it is a milestone, not a stretch goal.
+- A **browser level editor** (`/tools/editor`, served as `editor.html`) — paint tiles, place
+  objects, playtest in place, export the JSON. This is the difference between shipping 40 good
+  levels and 12 mediocre ones, so it is a milestone, not a stretch goal.
+
+### 11.1 The editor
+
+*(Implemented. `npm run dev` then open `/editor.html`.)*
+
+The editor exists for one reason: **feedback latency**. The gap between a good level and a
+mediocre one is how quickly the author finds out that a room is sealed, an item is buried, or
+the exit cannot be reached. So:
+
+- **Validation runs on every single edit** and its verdict is always on screen. You never have
+  to ask whether the level is broken.
+- **Unreachable floor is tinted red** directly on the grid. Sealed rooms are visible rather than
+  discovered.
+- **Playtest opens the real game**, not a preview of it, with the edited level as a
+  one-level campaign. Anything that behaves differently in the editor's preview than in the game
+  is a lie the author will believe, so there is no preview.
+
+The verdict comes from `analyseLevel()` in `src/game/analyse.ts`, which is the *same* function a
+test runs over every shipped level. This matters more than it looks: an editor that blesses a
+level CI later rejects is worse than no editor, because it teaches the author to trust it. One
+definition of "playable", used by both.
+
+`analyseLevel` fires traps rather than exempting them — a vault opened by a pressure plate is
+reachable, and it proves this by simulating the plate, re-flooding, and repeating until nothing
+new opens. The alternative (an "sealed by design" exemption) was tried, and it hid a genuinely
+sealed vault with eighteen treasures and an upgrade behind it for an entire milestone.
+
+Handoff to the game is via `localStorage` plus a `?playtest` marker in the URL. The marker is
+what decides: without it the stored level is ignored entirely, so a stale handoff can never
+hijack an ordinary game. The level is re-validated on the way in — the editor is a tool, not a
+trusted source.
 
 ---
 

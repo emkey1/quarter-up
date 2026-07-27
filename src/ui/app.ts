@@ -1,5 +1,6 @@
 import type { ClassId } from '@/data/classes';
 import { CAMPAIGN, LOOP_START, PROVING } from '@/data/campaign';
+import type { LevelData } from '@/game/level';
 import { cloneRules, DEFAULT_RULES } from '@/data/rules';
 import type { Display } from '@/engine/display';
 import type { Input } from '@/engine/input';
@@ -41,6 +42,14 @@ export class App implements LoopHost {
   private attract: AttractScreen;
 
   private run: Run;
+  /**
+   * The level list this shell runs. Normally the shipped campaign; in playtest mode a
+   * single level handed over by the editor (tools/editor), so a level under construction
+   * is exercised by the real game rather than by an approximation of it.
+   */
+  private readonly campaign: readonly LevelData[];
+  private readonly loopStart: number;
+  private readonly playtesting: boolean;
   private classId: ClassId = 'elf';
   private seed = 0x5eed;
   private lastLevelIndex = 0;
@@ -53,14 +62,19 @@ export class App implements LoopHost {
   constructor(
     private readonly display: Display,
     private readonly input: Input,
+    playtest: LevelData | null = null,
   ) {
     const settings = loadSettings();
     this.setup = new SetupScreen(cloneRules(settings.rules ?? DEFAULT_RULES));
     if (prefersReducedMotion()) this.fx.motionEnabled = false;
 
+    this.playtesting = playtest !== null;
+    this.campaign = playtest ? [playtest] : CAMPAIGN;
+    this.loopStart = playtest ? 0 : LOOP_START;
+
     const kb = (code: string) => this.input.keyboard.wasCodePressed(code);
 
-    this.run = new Run(CAMPAIGN, this.classId, this.seed, 0, this.setup.rules, LOOP_START);
+    this.run = new Run(this.campaign, this.classId, this.seed, 0, this.setup.rules, this.loopStart);
     this.play = new PlayScreen(display, input, this.audio, this.speech, this.fx, this.setup, () =>
       this.run,
     );
@@ -76,7 +90,9 @@ export class App implements LoopHost {
     this.gameOver = new GameOverScreen(
       kb,
       () => this.useContinue(),
-      () => this.go('attract'),
+      // Playtesting has no attract mode to return to — the point is another go at the
+      // level you are editing, so bounce straight back to the character select.
+      () => this.go(this.playtesting ? 'charselect' : 'attract'),
       () => this.continuesLeft > 0,
     );
 
@@ -87,7 +103,7 @@ export class App implements LoopHost {
       play: this.play,
       gameover: this.gameOver,
     };
-    this.current = this.attract;
+    this.current = this.playtesting ? this.charSelect : this.attract;
     this.current.enter?.();
   }
 
@@ -101,7 +117,7 @@ export class App implements LoopHost {
   private startRun(cls: ClassId): void {
     this.classId = cls;
     this.continuesLeft = 3;
-    this.run = new Run(CAMPAIGN, cls, this.seed, 0, cloneRules(this.setup.rules), LOOP_START);
+    this.run = new Run(this.campaign, cls, this.seed, 0, cloneRules(this.setup.rules), this.loopStart);
     this.run.world.fireModel = this.play.fireModel;
     this.lastLevelIndex = 0;
     this.play.onRunChanged();
