@@ -2,6 +2,7 @@ import type { Layout } from '@/engine/display';
 import type { Input } from '@/engine/input';
 import type { ActionName } from '@/engine/actions';
 import { padUsable, buttonPressed, buttonValue, type PadSource } from '@/engine/gamepad';
+import { shapeOf } from '@/engine/padlog';
 import { saveSettings } from '@/engine/storage';
 
 const BINDABLE: { action: ActionName; label: string }[] = [
@@ -121,8 +122,29 @@ export class PadTest {
     return true;
   }
 
+  /**
+   * A diagnostic that crashes when the thing it is diagnosing is unusual is worse than
+   * useless — it looks like "no controller detected". Any render error is caught and
+   * shown instead of blanking the screen.
+   */
   draw(ctx: CanvasRenderingContext2D, layout: Layout, input: Input): void {
     if (!this.open) return;
+    try {
+      this.drawInner(ctx, layout, input);
+    } catch (e) {
+      ctx.restore();
+      const s = layout.uiScale;
+      ctx.fillStyle = 'rgba(5,6,9,.96)';
+      ctx.fillRect(0, 0, layout.canvasW, layout.canvasH);
+      ctx.fillStyle = BAD;
+      ctx.font = `600 ${13 * s}px ui-monospace, Menlo, monospace`;
+      ctx.fillText('Controller setup failed to render:', 24 * s, 40 * s);
+      ctx.fillText(String((e as Error)?.message ?? e).slice(0, 120), 24 * s, 60 * s);
+      ctx.fillText('This is a bug — please report it.', 24 * s, 90 * s);
+    }
+  }
+
+  private drawInner(ctx: CanvasRenderingContext2D, layout: Layout, input: Input): void {
     const s = layout.uiScale;
     const gp = input.gamepad;
     const pads = gp.allPads();
@@ -183,27 +205,23 @@ export class PadTest {
     row('Secure context', String(window.isSecureContext), window.isSecureContext ? OK : WARN);
 
     for (const p of connected) {
-      row(
-        `  [${p.index}]`,
-        `${p.id.slice(0, 40)}`,
-        p.index === gp.status.index ? OK : FG,
-      );
+      // Every property here is treated as possibly absent. A pad reporting `buttons`,
+      // `axes` or `id` as undefined used to throw and blank this whole screen.
+      const buttons: readonly unknown[] = (p.buttons as readonly unknown[] | undefined) ?? [];
+      const axes: readonly number[] = (p.axes as readonly number[] | undefined) ?? [];
+      const id = typeof p.id === 'string' && p.id ? p.id : '(unnamed)';
+      row(`  [${p.index ?? '?'}]`, id.slice(0, 40), p.index === gp.status.index ? OK : FG);
       row(
         '       mapping',
-        `${p.mapping || 'non-standard'}  axes ${p.axes.length}  btns ${p.buttons.length}`,
+        `${p.mapping || 'non-standard'}  axes ${axes.length}  btns ${buttons.length}`,
         p.mapping === 'standard' ? OK : WARN,
       );
       // What shape does this engine return for a button? Engines have shipped objects
       // and plain numbers; reading the wrong one makes every button look un-pressed.
-      const b0: unknown = p.buttons[0];
-      const shape =
-        typeof b0 === 'number'
-          ? 'number (non-spec)'
-          : b0 && typeof b0 === 'object'
-            ? `object{${Object.keys(b0).slice(0, 3).join(',')}}`
-            : String(b0);
-      row('       button shape', shape, typeof b0 === 'object' ? OK : WARN);
-      row('       max value now', buttonValue(maxButton(p)).toFixed(2), FG);
+      row('       button shape', shapeOf(buttons[0]), typeof buttons[0] === 'object' ? OK : WARN);
+      let maxNow = 0;
+      for (const b of buttons) maxNow = Math.max(maxNow, buttonValue(b));
+      row('       max value now', maxNow.toFixed(2), maxNow > 0 ? OK : DIM);
     }
 
     if (!connected.length) {
@@ -224,13 +242,40 @@ export class PadTest {
       }
     }
 
+    /* ------------------------------------------------- history (survives reloads) */
+    const sightings = Object.values(gp.log.sightings);
+    if (sightings.length) {
+      head('ever seen  (persisted across reloads)');
+      for (const sg of sightings) {
+        row(`  ${sg.id.slice(0, 26)}`, `${sg.mapping}  ${sg.buttons}btn/${sg.axes}ax`, FG);
+        row(
+          '       input ever seen',
+          sg.inputSeen
+            ? `YES  btn ${sg.maxButtonEver.toFixed(2)}  axis ${sg.maxAxisEver.toFixed(2)}`
+            : 'NEVER — no button or axis has ever moved',
+          sg.inputSeen ? OK : BAD,
+        );
+      }
+      if (gp.log.events.length) {
+        for (const e of gp.log.events.slice(0, 5)) {
+          mono(`${new Date(e.t).toLocaleTimeString()}  ${e.text.slice(0, 64)}`, 9, DIM, x);
+          y += 12 * s;
+        }
+      }
+      y += 4 * s;
+      mono('bracer.padReport() in the console prints all of this as copyable text', 9, DIM, x);
+      y += 14 * s;
+    }
+
     /* ---------------------------------------------------------------- live input */
     const pad = gp.activePad() ?? connected[0] ?? null;
     if (pad) {
-      head(`live input — pad ${pad.index}`);
+      head(`live input — pad ${pad.index ?? '?'}`);
 
       const barW = 120 * s;
-      pad.axes.forEach((v, i) => {
+      const liveAxes: readonly number[] = (pad.axes as readonly number[] | undefined) ?? [];
+      const liveButtons: readonly unknown[] = (pad.buttons as readonly unknown[] | undefined) ?? [];
+      liveAxes.forEach((v, i) => {
         mono(`axis ${i}`, 10, DIM, x);
         const bx = x + 60 * s;
         ctx.fillStyle = 'rgba(255,255,255,.08)';
@@ -246,7 +291,7 @@ export class PadTest {
       mono('buttons', 10, DIM, x);
       const bx0 = x + 60 * s;
       const cell = 17 * s;
-      pad.buttons.forEach((b, i) => {
+      liveButtons.forEach((b, i) => {
         const cx = bx0 + (i % 12) * cell;
         const cy = y - 9 * s + Math.floor(i / 12) * cell;
         const on = buttonPressed(b);
@@ -258,7 +303,7 @@ export class PadTest {
         ctx.fillText(String(i), cx + (cell - 3 * s) / 2, cy + (cell - 3 * s) * 0.68);
         ctx.textAlign = 'left';
       });
-      y += cell * Math.ceil(pad.buttons.length / 12) + 4 * s;
+      y += cell * Math.ceil(liveButtons.length / 12) + 4 * s;
     }
 
     /* ---------------------------------------------------------------- action map */
@@ -312,20 +357,6 @@ export class PadTest {
 
     ctx.restore();
   }
-}
-
-/** The most-pressed button right now, so "is anything arriving at all?" is one glance. */
-function maxButton(p: Gamepad): unknown {
-  let best: unknown = 0;
-  let bestV = -1;
-  for (const b of p.buttons) {
-    const v = buttonValue(b);
-    if (v > bestV) {
-      bestV = v;
-      best = b;
-    }
-  }
-  return best;
 }
 
 function describe(s: PadSource): string {

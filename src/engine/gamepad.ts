@@ -1,5 +1,6 @@
 import { T } from '@/data/tuning';
 import type { ActionName } from './actions';
+import { PadLog } from './padlog';
 
 /* ------------------------------------------------------------------ stick quantisation */
 
@@ -219,9 +220,35 @@ export class GamepadInput {
     return false;
   }
 
-  /** Called exactly once per rendered frame. */
+  /** Survives reloads, so a pad that appears briefly and vanishes is still evidence. */
+  readonly log = new PadLog();
+
+  /** Set once if a malformed pad ever made polling throw; surfaced in the diagnostic. */
+  pollError = '';
+
+  /**
+   * Called exactly once per rendered frame.
+   *
+   * Must never throw. This runs before step() and draw(), so an exception here freezes
+   * the whole game behind a stale canvas — which reads as "everything is broken",
+   * not "one controller is odd".
+   */
   poll(): void {
+    try {
+      this.pollInner();
+    } catch (e) {
+      if (!this.pollError) {
+        this.pollError = String((e as Error)?.message ?? e);
+        console.error('[bracer] gamepad poll failed; input from pads disabled:', e);
+      }
+      this.moveX = this.moveY = this.aimX = this.aimY = 0;
+      this.held = new Map();
+    }
+  }
+
+  private pollInner(): void {
     const pads = this.pads();
+    this.log.observe(pads);
 
     // Pick the pad the player is actually touching; fall back to the first connected.
     let pad = this.activeIndex >= 0 ? pads[this.activeIndex] : null;
@@ -276,8 +303,8 @@ export class GamepadInput {
       this.moveY = (this.held.get('down') ? 1 : 0) - (this.held.get('up') ? 1 : 0);
       this.moveOct = null;
     } else if (this.profile.moveStick) {
-      const ax = pad.axes[this.profile.moveStick.x] ?? 0;
-      const ay = pad.axes[this.profile.moveStick.y] ?? 0;
+      const ax = padAxes(pad)[this.profile.moveStick.x] ?? 0;
+      const ay = padAxes(pad)[this.profile.moveStick.y] ?? 0;
       const r = this.analogMovement
         ? analogStick(ax, ay)
         : quantiseStick(ax, ay, this.moveOct);
@@ -289,8 +316,8 @@ export class GamepadInput {
     }
 
     if (this.profile.aimStick) {
-      const ax = pad.axes[this.profile.aimStick.x] ?? 0;
-      const ay = pad.axes[this.profile.aimStick.y] ?? 0;
+      const ax = padAxes(pad)[this.profile.aimStick.x] ?? 0;
+      const ay = padAxes(pad)[this.profile.aimStick.y] ?? 0;
       const r = quantiseStick(ax, ay, this.aimOct);
       this.aimX = r.dx;
       this.aimY = r.dy;
@@ -325,7 +352,7 @@ export class GamepadInput {
   beginDetect(): void {
     this.detectBaseline = new Map();
     for (const p of this.pads()) {
-      if (padUsable(p)) this.detectBaseline.set(p.index, Array.from(p.axes));
+      if (padUsable(p)) this.detectBaseline.set(p.index, Array.from(padAxes(p)));
     }
   }
 
@@ -333,16 +360,18 @@ export class GamepadInput {
     for (const pad of this.pads()) {
       if (!padUsable(pad)) continue;
 
-      for (let i = 0; i < pad.buttons.length; i++) {
-        if (buttonPressed(pad.buttons[i])) {
+      const btns = padButtons(pad);
+      for (let i = 0; i < btns.length; i++) {
+        if (buttonPressed(btns[i])) {
           this.activeIndex = pad.index;
           return { padId: pad.id, padIndex: pad.index, source: { kind: 'button', index: i } };
         }
       }
 
       const base = this.detectBaseline?.get(pad.index);
-      for (let i = 0; i < pad.axes.length; i++) {
-        const v = pad.axes[i] ?? 0;
+      const axs = padAxes(pad);
+      for (let i = 0; i < axs.length; i++) {
+        const v = axs[i] ?? 0;
         const rest = base?.[i] ?? 0;
         if (Math.abs(v - rest) < 0.3) continue;
         // An axis *returning to centre* is a large change but not a deflection. Without
@@ -454,23 +483,32 @@ export function padUsable(p: Gamepad | null | undefined): p is Gamepad {
   return !!p && (p as { connected?: unknown }).connected !== false;
 }
 
+/** Missing or short arrays are normal in the wild; never index them blind. */
+export function padButtons(p: Gamepad): readonly unknown[] {
+  return (p.buttons as readonly unknown[] | undefined) ?? [];
+}
+
+export function padAxes(p: Gamepad): readonly number[] {
+  return (p.axes as readonly number[] | undefined) ?? [];
+}
+
 function readSource(pad: Gamepad, s: PadSource): boolean {
   switch (s.kind) {
     case 'button':
-      return buttonPressed(pad.buttons[s.index]);
+      return buttonPressed(padButtons(pad)[s.index]);
     case 'axis': {
-      const v = pad.axes[s.index] ?? 0;
+      const v = padAxes(pad)[s.index] ?? 0;
       return v * s.sign >= (s.threshold ?? T.PAD_DEADZONE);
     }
     case 'hat': {
-      const v = pad.axes[s.index] ?? 0;
+      const v = padAxes(pad)[s.index] ?? 0;
       return Math.abs(v - s.value) <= (s.epsilon ?? 0.08);
     }
   }
 }
 
 function hasActivity(pad: Gamepad): boolean {
-  for (const b of pad.buttons) if (buttonPressed(b)) return true;
-  for (const a of pad.axes) if (Math.abs(a) >= T.PAD_DEADZONE) return true;
+  for (const b of padButtons(pad)) if (buttonPressed(b)) return true;
+  for (const a of padAxes(pad)) if (Math.abs(a) >= T.PAD_DEADZONE) return true;
   return false;
 }

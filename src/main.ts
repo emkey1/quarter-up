@@ -37,8 +37,22 @@ function boot(): void {
 
   document.getElementById('boot')?.remove();
 
-  // Expose for console poking during development.
-  Object.assign(window as unknown as Record<string, unknown>, { bracer: { display, input, screen, loop } });
+  // Expose for console poking during development. padReport() prints the persisted
+  // controller history as copyable text — canvas text cannot be selected.
+  Object.assign(window as unknown as Record<string, unknown>, {
+    bracer: {
+      display,
+      input,
+      screen,
+      loop,
+      padReport: () => {
+        const txt = input.gamepad.log.report();
+        console.log(txt);
+        return txt;
+      },
+      padReset: () => input.gamepad.log.clear(),
+    },
+  });
 }
 
 boot();
