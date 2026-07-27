@@ -19,7 +19,15 @@ export type GameEvent =
   | { t: 'playerHurt'; amount: number; x: number; y: number }
   | { t: 'playerDied' }
   | { t: 'magic'; strength: number }
-  | { t: 'score'; amount: number; reason: string };
+  | { t: 'score'; amount: number; reason: string }
+  | { t: 'pickup'; kind: string; x: number; y: number }
+  | { t: 'foodDestroyed'; x: number; y: number }
+  | { t: 'upgradeTaken'; upgrade: string }
+  | { t: 'doorsOpened'; all: boolean }
+  | { t: 'trapTriggered'; x: number; y: number }
+  | { t: 'teleported'; x: number; y: number }
+  | { t: 'wallsBecameExits' }
+  | { t: 'exitReached' };
 
 export type KillSource = 'shot' | 'melee' | 'magic' | 'contact';
 

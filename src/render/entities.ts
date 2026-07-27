@@ -3,6 +3,7 @@ import { FACE_DX, FACE_DY, type Player } from '@/game/player';
 import { MONSTER_COLOURS, familyOf, type Monster } from '@/game/monster';
 import type { Generator } from '@/game/generator';
 import type { Projectile } from '@/game/projectile';
+import type { Item } from '@/game/items';
 
 /**
  * M0 placeholder art, drawn procedurally.
@@ -229,4 +230,97 @@ function shade(hex: string, k: number): string {
   const g = Math.min(255, Math.round(((n >> 8) & 255) * k));
   const b = Math.min(255, Math.round((n & 255) * k));
   return `rgb(${r},${g},${b})`;
+}
+
+/** M2 placeholder item art. Each kind must be identifiable at a glance mid-fight —
+ *  mistaking a key for a potion costs an inventory slot you cannot easily free. */
+export function drawItem(
+  ctx: CanvasRenderingContext2D,
+  it: Item,
+  sx: number,
+  sy: number,
+  px: number,
+  frame: number,
+): void {
+  const size = 16 * px;
+  const bob = Math.sin(frame * 0.08 + it.x * 0.05) * px * 0.7;
+
+  ctx.save();
+  ctx.translate(sx, sy + bob);
+
+  switch (it.kind) {
+    case 'food': {
+      ctx.fillStyle = '#c8783c';
+      ctx.beginPath();
+      ctx.ellipse(0, size * 0.06, size * 0.28, size * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0c060';
+      ctx.beginPath();
+      ctx.ellipse(0, -size * 0.04, size * 0.22, size * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // breakable jugs carry the classic double-cross warning
+      if (it.breakable) {
+        ctx.strokeStyle = '#3a2410';
+        ctx.lineWidth = Math.max(1, px * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(-size * 0.1, -size * 0.1);
+        ctx.lineTo(-size * 0.02, -size * 0.02);
+        ctx.moveTo(-size * 0.02, -size * 0.1);
+        ctx.lineTo(-size * 0.1, -size * 0.02);
+        ctx.moveTo(size * 0.04, -size * 0.1);
+        ctx.lineTo(size * 0.12, -size * 0.02);
+        ctx.moveTo(size * 0.12, -size * 0.1);
+        ctx.lineTo(size * 0.04, -size * 0.02);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'key': {
+      ctx.fillStyle = '#e8c860';
+      ctx.beginPath();
+      ctx.arc(-size * 0.12, 0, size * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-size * 0.04, -size * 0.05, size * 0.32, size * 0.1);
+      ctx.fillRect(size * 0.2, 0, size * 0.06, size * 0.14);
+      break;
+    }
+    case 'potion': {
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.5);
+      glow.addColorStop(0, 'rgba(110,200,245,.45)');
+      glow.addColorStop(1, 'rgba(110,200,245,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-size * 0.5, -size * 0.5, size, size);
+      ctx.fillStyle = it.breakable ? '#6bc8f5' : '#f5a03c';
+      ctx.beginPath();
+      ctx.arc(0, size * 0.06, size * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-size * 0.06, -size * 0.22, size * 0.12, size * 0.16);
+      break;
+    }
+    case 'treasure': {
+      ctx.fillStyle = '#b8862c';
+      ctx.fillRect(-size * 0.24, -size * 0.12, size * 0.48, size * 0.28);
+      ctx.fillStyle = '#e8c860';
+      ctx.fillRect(-size * 0.24, -size * 0.18, size * 0.48, size * 0.08);
+      ctx.fillStyle = '#6b4a12';
+      ctx.fillRect(-size * 0.04, -size * 0.12, size * 0.08, size * 0.28);
+      break;
+    }
+    case 'upgrade': {
+      const pulse = 0.55 + Math.sin(frame * 0.12) * 0.45;
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.7);
+      glow.addColorStop(0, `rgba(200,140,255,${0.6 * pulse})`);
+      glow.addColorStop(1, 'rgba(200,140,255,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-size * 0.7, -size * 0.7, size * 1.4, size * 1.4);
+      ctx.fillStyle = '#c88cff';
+      ctx.beginPath();
+      ctx.arc(0, size * 0.06, size * 0.19, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-size * 0.07, -size * 0.24, size * 0.14, size * 0.18);
+      break;
+    }
+  }
+
+  ctx.restore();
 }

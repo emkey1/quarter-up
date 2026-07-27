@@ -4,6 +4,7 @@ import type { Layout, Rect } from '@/engine/display';
 import type { Input } from '@/engine/input';
 import { FIRE_MODELS, type FireModel } from '@/engine/input';
 import type { World } from '@/game/world';
+import type { Run } from '@/game/flow';
 
 export interface HudDebug {
   fps: number;
@@ -24,16 +25,24 @@ export class Hud {
     ctx: CanvasRenderingContext2D,
     layout: Layout,
     world: World,
+    run: Run,
     input: Input,
     fireModel: FireModel,
     dbg: HudDebug,
   ): void {
-    if (layout.rightPanel) this.drawStatus(ctx, layout.rightPanel, layout, world);
-    if (layout.leftPanel) this.drawDebug(ctx, layout.leftPanel, layout, world, input, fireModel, dbg);
+    if (layout.rightPanel) this.drawStatus(ctx, layout.rightPanel, layout, world, run);
+    if (layout.leftPanel)
+      this.drawDebug(ctx, layout.leftPanel, layout, world, run, input, fireModel, dbg);
     this.drawToast(ctx, layout, input);
   }
 
-  private drawStatus(ctx: CanvasRenderingContext2D, r: Rect, layout: Layout, world: World): void {
+  private drawStatus(
+    ctx: CanvasRenderingContext2D,
+    r: Rect,
+    layout: Layout,
+    world: World,
+    run: Run,
+  ): void {
     const p = world.player;
     const cls = CLASSES[p.classId];
     const s = layout.uiScale;
@@ -64,8 +73,8 @@ export class Hud {
 
     ctx.textBaseline = 'alphabetic';
     title('BRACER', 15, 'rgba(215,219,224,.35)');
-    label('Level');
-    value('1');
+    label(run.levelName);
+    value(String(run.depth));
     y += 6 * s;
 
     title(cls.name.toUpperCase(), 15, cls.colour);
@@ -147,6 +156,7 @@ export class Hud {
     r: Rect,
     layout: Layout,
     world: World,
+    run: Run,
     input: Input,
     fireModel: FireModel,
     dbg: HudDebug,
@@ -197,6 +207,12 @@ export class Hud {
     line('rollover', String(input.keyboard.concurrentKeys()));
 
     head('sim');
+    line('level', `${run.depth} ${run.levelName}`);
+    line('monsters', String(world.liveMonsters));
+    line('generators', String(world.generators.filter((g) => g.alive).length));
+    line('items', String(world.items.filter((i) => i.alive).length));
+    line('doors in', `${Math.max(0, doorSecs(world) - world.engagementFrames / T.STEP_HZ).toFixed(0)}s`);
+    line('walls->exit', `${Math.max(0, T.WALLS_BECOME_EXITS_SEC - world.player.stillFrames / T.STEP_HZ).toFixed(0)}s`);
     line('frame', String(world.frame));
     line('elapsed', `${world.elapsed.toFixed(1)}s`);
     line('pos wu', `${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
@@ -219,9 +235,9 @@ export class Hud {
       'move  arrows / WASD / pad',
       'fire  space / A / RT',
       'magic shift / B / LT',
-      'O     cycle fire model',
-      '1-4   switch class',
-      'R     reset  •  [ ] scale',
+      'O  fire model   G  controller',
+      '1-4 class   N next level',
+      'T  proving ground   R reset',
     ]) {
       ctx.fillText(t, r.x + pad, y);
       y += 12 * s;
@@ -260,4 +276,9 @@ export class Hud {
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
   }
+}
+
+/** Seconds before the doors give up, which doubles while holding keys. */
+function doorSecs(w: World): number {
+  return w.player.keys > 0 ? T.DOOR_AUTO_OPEN_SEC_WITH_KEYS : T.DOOR_AUTO_OPEN_SEC;
 }

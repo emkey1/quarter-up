@@ -12,16 +12,17 @@ original; "Gauntlet" is a trademark of its respective owner.
 
 ## Status
 
-**M1 complete** — combat core: 8-directional shots with the diagonal-corner rule, melee,
-ghosts and grunts, generators with off-screen gating, armour and damage, magic.
-Items and level flow arrive in M2. See DESIGN.md §12 for the milestone plan.
+**M2 complete** — items and the 12-slot inventory, doors with their 18/36-second
+timers, traps, teleporters, breakable walls, the 180-second walls-become-exits trick,
+level flow across a 5-level campaign, and the rank curve that starves out food as your
+score climbs. The full monster roster arrives in M3. See DESIGN.md §12.
 
 | Milestone | State |
 | --- | --- |
 | M0 skeleton | done |
 | M1 combat core | done |
-| M2 items, terrain, level flow | next |
-| M3 full monster roster | |
+| M2 items, terrain, level flow | done |
+| M3 full monster roster | next |
 | M4 presentation | |
 | M5 content + editor | |
 | M6 polish | |
@@ -41,11 +42,15 @@ npm run typecheck # tsc --noEmit
 npm run build     # typecheck + production bundle
 ```
 
-Regenerate the development level:
+Regenerate the development levels:
 
 ```bash
-node tools/mkproving.mjs
+node tools/mklevels.mjs
 ```
+
+Both level scripts validate what they produce — reachability from the start, no object
+stranded behind a wall, and every trap tile actually reachable and actually opening
+something. A level that cannot be finished fails the build rather than shipping.
 
 ## Controls
 
@@ -57,8 +62,9 @@ node tools/mkproving.mjs
 | Face lock | `Alt` / `L` | `X` |
 | Pause | `P` / `Esc` | `Start` |
 
-Development hotkeys: `G` opens controller setup, `O` cycles the fire model, `1`–`4`
-switch class, `R` resets, `[` `]` change scale, `F` toggles fullscreen.
+Development hotkeys: `G` controller setup, `O` cycles the fire model, `1`–`4` switch
+class, `N` next level, `T` toggles the proving ground, `R` resets, `[` `]` change
+scale, `F` fullscreen.
 
 ### Controller not working?
 

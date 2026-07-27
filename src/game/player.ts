@@ -23,6 +23,8 @@ export class Player implements Body {
 
   classId: ClassId;
   upgrades = new Set<UpgradeId>();
+  /** Temporary invisibility; carries into the next level, per the original. */
+  invisibleFrames = 0;
 
   facing = 2; // south, like every sprite sheet's idle frame
   // Explicit annotation: T is `as const`, so the initialiser's type is the literal 700

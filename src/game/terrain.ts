@@ -127,4 +127,73 @@ export class Terrain {
   solidAt(wx: number, wy: number): boolean {
     return this.solidAtCell(Math.floor(wx / T.TILE), Math.floor(wy / T.TILE));
   }
+
+  isDoorClosed(cx: number, cy: number): boolean {
+    return this.at(cx, cy) === Tile.Door && (this.flagsAt(cx, cy) & TileFlag.DoorOpen) === 0;
+  }
+
+  /**
+   * Open every door tile touching (cx, cy).
+   *
+   * One key opens a whole door, however many tiles it spans — which is what makes a
+   * door a flood-control gate rather than a toll booth. Orthogonal connectivity only.
+   */
+  openDoorGroup(cx: number, cy: number): number {
+    if (!this.isDoorClosed(cx, cy)) return 0;
+    const stack: [number, number][] = [[cx, cy]];
+    let opened = 0;
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      if (!this.isDoorClosed(x, y)) continue;
+      this.setFlag(x, y, TileFlag.DoorOpen);
+      opened++;
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    return opened;
+  }
+
+  /** The 18s / 36s stalemate timer firing: every door in the level gives up at once. */
+  openAllDoors(): number {
+    let opened = 0;
+    for (let cy = 0; cy < T.GRID; cy++) {
+      for (let cx = 0; cx < T.GRID; cx++) {
+        if (this.isDoorClosed(cx, cy)) {
+          this.setFlag(cx, cy, TileFlag.DoorOpen);
+          opened++;
+        }
+      }
+    }
+    return opened;
+  }
+
+  destroyBreakable(cx: number, cy: number): boolean {
+    if (this.at(cx, cy) !== Tile.Breakable) return false;
+    this.set(cx, cy, Tile.Floor);
+    return true;
+  }
+
+  /** The 180-second stand-still trick: every wall in the level becomes an exit. */
+  convertWallsToExits(): number {
+    let n = 0;
+    for (let cy = 0; cy < T.GRID; cy++) {
+      for (let cx = 0; cx < T.GRID; cx++) {
+        if (this.at(cx, cy) === Tile.Wall) {
+          this.set(cx, cy, Tile.Exit);
+          this.setFlag(cx, cy, TileFlag.WallBecameExit);
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  cellsOf(tile: Tile): [number, number][] {
+    const out: [number, number][] = [];
+    for (let cy = 0; cy < T.GRID; cy++) {
+      for (let cx = 0; cx < T.GRID; cx++) {
+        if (this.at(cx, cy) === tile) out.push([cx, cy]);
+      }
+    }
+    return out;
+  }
 }

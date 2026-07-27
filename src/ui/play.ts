@@ -4,9 +4,16 @@ import type { Input } from '@/engine/input';
 import { defaultFireModel, type FireModel } from '@/engine/input';
 import type { LoopHost } from '@/engine/loop';
 import type { Loop } from '@/engine/loop';
-import { World } from '@/game/world';
+import { Run } from '@/game/flow';
 import type { LevelData } from '@/game/level';
-import { drawPlayer, drawMonster, drawGenerator, drawProjectile } from '@/render/entities';
+import { CAMPAIGN, PROVING } from '@/data/campaign';
+import {
+  drawPlayer,
+  drawMonster,
+  drawGenerator,
+  drawProjectile,
+  drawItem,
+} from '@/render/entities';
 import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
@@ -15,7 +22,8 @@ import { PadTest } from './padtest';
 const FIRE_CYCLE: FireModel[] = ['arcade', 'feathered', 'free', 'twinstick'];
 
 export class PlayScreen implements LoopHost {
-  private world: World;
+  private run: Run;
+  private campaign: readonly LevelData[];
   private tilemap: TilemapRenderer;
   private hud = new Hud();
   private padTest = new PadTest();
@@ -31,15 +39,20 @@ export class PlayScreen implements LoopHost {
   constructor(
     private readonly display: Display,
     private readonly input: Input,
-    private readonly level: LevelData,
     classId: ClassId = 'elf',
   ) {
     this.classId = classId;
+    this.campaign = CAMPAIGN;
     this.fireModel = defaultFireModel(input.lastDevice);
-    this.world = new World(level, classId, this.seed);
-    this.world.fireModel = this.fireModel;
-    this.tilemap = new TilemapRenderer(theme(level.theme), display.layout.pxPerWu);
-    display.onLayoutChange((l) => this.tilemap.onLayoutChange(theme(level.theme), l.pxPerWu));
+    this.run = new Run(this.campaign, classId, this.seed);
+    this.run.world.fireModel = this.fireModel;
+    this.tilemap = new TilemapRenderer(theme('stone'), display.layout.pxPerWu);
+    display.onLayoutChange((l) => this.tilemap.onLayoutChange(theme('stone'), l.pxPerWu));
+  }
+
+  /** The active simulation. Kept as a getter so level transitions are transparent. */
+  get world() {
+    return this.run.world;
   }
 
   poll(): void {
@@ -68,6 +81,8 @@ export class PlayScreen implements LoopHost {
     if (this.paused) return;
 
     this.world.step(a);
+    this.world.fireModel = this.fireModel;
+    this.run.step();
   }
 
   private devHotkeys(): void {
@@ -85,6 +100,8 @@ export class PlayScreen implements LoopHost {
       }
     }
     if (kb.wasCodePressed('KeyR')) this.reset();
+    if (kb.wasCodePressed('KeyN')) this.skipLevel();
+    if (kb.wasCodePressed('KeyT')) this.toggleProving();
     if (kb.wasCodePressed('BracketRight')) this.display.cycleScale(1);
     if (kb.wasCodePressed('BracketLeft')) this.display.cycleScale(-1);
     if (kb.wasCodePressed('KeyF')) {
@@ -94,8 +111,20 @@ export class PlayScreen implements LoopHost {
   }
 
   private reset(): void {
-    this.world = new World(this.level, this.classId, this.seed);
-    this.world.fireModel = this.fireModel;
+    this.run = new Run(this.campaign, this.classId, this.seed);
+    this.run.world.fireModel = this.fireModel;
+  }
+
+  /** Dev: jump straight to the next level without finding the exit. */
+  private skipLevel(): void {
+    this.run.advance();
+    this.run.world.fireModel = this.fireModel;
+  }
+
+  /** Dev: swap to the systems-testing proving ground and back. */
+  private toggleProving(): void {
+    this.campaign = this.campaign === CAMPAIGN ? [PROVING] : CAMPAIGN;
+    this.reset();
   }
 
   draw(): void {
@@ -120,6 +149,9 @@ export class PlayScreen implements LoopHost {
     const toX = (wx: number) => pf.x + Math.round(wx * px) - camX;
     const toY = (wy: number) => pf.y + Math.round(wy * px) - camY;
 
+    for (const it of this.world.items) {
+      if (it.alive) drawItem(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
+    }
     for (const g of this.world.generators) {
       if (g.alive) drawGenerator(ctx, g, toX(g.x), toY(g.y), px, this.animFrame);
     }
@@ -154,7 +186,7 @@ export class PlayScreen implements LoopHost {
     ctx.lineWidth = Math.max(1, layout.dpr);
     ctx.strokeRect(pf.x + 0.5, pf.y + 0.5, pf.w - 1, pf.h - 1);
 
-    this.hud.draw(ctx, layout, this.world, this.input, this.fireModel, {
+    this.hud.draw(ctx, layout, this.world, this.run, this.input, this.fireModel, {
       fps: this.loop?.stats.fps ?? 0,
       steps: this.loop?.stats.stepsLastFrame ?? 0,
       frameMs: this.loop?.stats.frameMs ?? 0,
