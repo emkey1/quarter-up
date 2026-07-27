@@ -40,7 +40,14 @@ export class PadTest {
     this.awaiting = null;
   }
 
-  /** Returns true if it consumed the input (so the world should not step). */
+  /**
+   * Navigation and rebinding only.
+   *
+   * Deliberately does NOT handle the toggle key: the caller owns that. Handling it in
+   * both places made one press open and close the overlay inside a single frame.
+   *
+   * Returns true if it consumed the input (so the world should not step).
+   */
   update(input: Input): boolean {
     if (!this.open) return false;
     const kb = input.keyboard;
@@ -72,7 +79,7 @@ export class PadTest {
         saveSettings({ padProfiles: input.gamepad.profiles });
       }
     }
-    if (kb.wasCodePressed('Escape') || kb.wasCodePressed('KeyG')) this.open = false;
+    if (kb.wasCodePressed('Escape')) this.open = false;
     return true;
   }
 
@@ -129,6 +136,13 @@ export class PadTest {
       document.visibilityState === 'visible' ? OK : BAD,
     );
     row('Pads reported', String(connected.length), connected.length ? OK : WARN);
+    row('Raw slots', String(gp.rawSlotCount), gp.rawSlotCount ? FG : WARN);
+    row(
+      'Connect events',
+      gp.connectEvents ? `${gp.connectEvents}  ${gp.lastEventId.slice(0, 30)}` : 'none yet',
+      gp.connectEvents ? OK : WARN,
+    );
+    row('Secure context', String(window.isSecureContext), window.isSecureContext ? OK : WARN);
 
     for (const p of connected) {
       row(

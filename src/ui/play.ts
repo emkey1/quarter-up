@@ -50,8 +50,15 @@ export class PlayScreen implements LoopHost {
     const a = this.input.sample(stepIndex);
 
     if (stepIndex === 0) {
-      if (this.input.keyboard.wasCodePressed('KeyG') && !this.padTest.open) this.padTest.toggle();
-      if (this.padTest.update(this.input)) return;
+      // The toggle key is owned HERE and nowhere else. Handling it in both the caller
+      // and PadTest.update() meant a single press opened and closed the overlay within
+      // one frame, so it appeared completely dead.
+      const kb = this.input.keyboard;
+      if (kb.wasCodePressed('KeyG') || kb.wasCodePressed('F1')) this.padTest.toggle();
+      if (this.padTest.open) {
+        this.padTest.update(this.input);
+        return;
+      }
       this.devHotkeys();
     } else if (this.padTest.open) {
       return;

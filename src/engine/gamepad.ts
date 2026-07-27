@@ -162,15 +162,29 @@ export class GamepadInput {
     window.removeEventListener('gamepaddisconnected', this.onDisconnect);
   }
 
+  /** Diagnostics: has the browser ever fired a connect event for anything? */
+  connectEvents = 0;
+  lastEventId = '';
+
   private onConnect = (e: GamepadEvent): void => {
     if (this.activeIndex < 0) this.activeIndex = e.gamepad.index;
+    this.connectEvents++;
+    this.lastEventId = e.gamepad.id;
     this.statusChangedAt = performance.now();
   };
 
   private onDisconnect = (e: GamepadEvent): void => {
     if (this.activeIndex === e.gamepad.index) this.activeIndex = -1;
+    this.lastEventId = `disconnected: ${e.gamepad.id}`;
     this.statusChangedAt = performance.now();
   };
+
+  /** How many slots getGamepads() returns, regardless of how many are populated.
+   *  Chrome returns 4 nulls when it has the API but has not been shown a pad yet;
+   *  an empty array means something quite different. */
+  get rawSlotCount(): number {
+    return this.pads().length;
+  }
 
   private pads(): (Gamepad | null)[] {
     return typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
