@@ -571,6 +571,45 @@ The tier is computed from the rules, not stored, so it can never drift from what
 actually enabled. The active tier is shown on the HUD whenever it is not Arcade — an
 easier run should never be able to quietly look like a real one.
 
+### 6.7 Difficulty
+
+*(Implemented.)* A five-rung ladder, and the setting that changes the game most, so it
+sits at the top of the setup screen rather than buried under sixteen toggles. It lives in
+`Rules`, which means it is captured in run state and replays and recorded on the score
+table.
+
+| | Max health | Generator warm-up | Spawn period | Crowd cap |
+| --- | --- | --- | --- | --- |
+| Apprentice | 2400 | 4.0 s | ×1.5 | ×0.6 |
+| Squire | 1900 | 2.5 s | ×1.2 | ×0.8 |
+| **Veteran** (default) | **1500** | 1.2 s | ×0.85 | ×1.0 |
+| Champion | 1100 | 0.5 s | ×0.6 | ×1.35 |
+| Nightmare | 800 | 0.0 s | ×0.4 | ×1.8 |
+
+Three things worth stating plainly:
+
+**The health cap is not a nerf, it is a mechanic.** The original capped health, and the
+cap does real work: once you cannot bank any more, food you walk past is genuinely
+wasted and the drain becomes a clock again rather than an accounting detail. Without one
+a careful player simply accumulates until nothing on the level can threaten them, which
+is exactly what playtesting found.
+
+**The warm-up is spent once per generator, on first sighting** — not on every sighting.
+A per-sighting timer would make peeking in and out of a doorway a free reset, which is a
+worse game than either no warm-up or a long one.
+
+**Veteran is 15% faster than the raw reconstruction** in `tuning.ts`, because the
+reconstructed numbers were too slow to threaten anyone. The arcade values are still the
+arcade values; this scales them, and the multiplier is written down rather than being
+quietly folded into the constants.
+
+Eligibility treats difficulty **asymmetrically**: playing above the default stays fully
+Arcade-eligible, because playing harder is not a way to get an easier score, while
+playing below it is Tagged. Treating both directions as "altered" would punish exactly
+the players doing the hard thing. The score table shows the difficulty on every entry
+regardless, since a Nightmare run sorted in among Apprentice runs with nothing to
+distinguish them makes the table meaningless.
+
 **The toggles.**
 
 | Group | Toggle | Default | Tier if changed |

@@ -146,6 +146,33 @@ describe('intro level-select', () => {
   });
 });
 
+describe('skipping the tutorial', () => {
+  // The character select offers this before the run starts; the last intro level offers
+  // the same jump as a numbered exit. Both must land in the same place, or a returning
+  // player gets a different game depending on which route they took to skip.
+  it('starts the run at the first dungeon level', () => {
+    const r = new Run(CAMPAIGN, 'elf', 1, LOOP_START, undefined, LOOP_START);
+    expect(r.depth).toBe(INTRO.length + 1);
+    expect(r.levelName).toBe(DUNGEONS[0].name);
+    expect(INTRO.map((l) => l.name)).not.toContain(r.levelName);
+  });
+
+  it('agrees with the first numbered exit on the last intro level', () => {
+    const first = INTRO[INTRO.length - 1].objects
+      .filter((o) => o.t === 'exit' && typeof o.skipTo === 'number')
+      .map((o) => o.skipTo as number)
+      .sort((a, b) => a - b)[0];
+    expect(first).toBe(LOOP_START + 1);
+  });
+
+  it('still carries a full complement of health into the dungeon', () => {
+    // Skipping is a shortcut past the tutorial, not a handicap.
+    const skipped = new Run(CAMPAIGN, 'elf', 1, LOOP_START, undefined, LOOP_START);
+    const taught = new Run(CAMPAIGN, 'elf', 1, 0, undefined, LOOP_START);
+    expect(skipped.world.player.health).toBe(taught.world.player.health);
+  });
+});
+
 describe('treasure rooms', () => {
   const room = () => DUNGEONS.find((l) => l.type === 'treasure')!;
 

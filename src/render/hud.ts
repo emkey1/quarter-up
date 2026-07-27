@@ -85,14 +85,19 @@ export class Hud {
     const critical = p.health < T.LOW_HEALTH_WARN;
     value(String(Math.max(0, Math.ceil(p.health))), critical ? '#ff6b5e' : FG);
 
-    // health bar, relative to a full credit
+    // Health bar, scaled to the difficulty's CEILING rather than to a starting credit —
+    // the cap is the number that decides whether the food ahead is worth anything, so it
+    // is the one the bar should be measured against. The tick marks where you started.
     const bw = r.w - pad * 2;
     const bh = 6 * s;
+    const by = y - 18 * s;
+    const max = world.maxHealth;
     ctx.fillStyle = 'rgba(255,255,255,.10)';
-    ctx.fillRect(r.x + pad, y - 18 * s, bw, bh);
-    const frac = Math.max(0, Math.min(1, p.health / T.START_HEALTH));
+    ctx.fillRect(r.x + pad, by, bw, bh);
     ctx.fillStyle = critical ? '#ff6b5e' : cls.colour;
-    ctx.fillRect(r.x + pad, y - 18 * s, bw * frac, bh);
+    ctx.fillRect(r.x + pad, by, bw * Math.max(0, Math.min(1, p.health / max)), bh);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fillRect(r.x + pad + bw * (T.START_HEALTH / max), by, Math.max(1, s), bh);
     y += 12 * s;
 
     label(`Inventory ${p.inventoryUsed}/${T.INVENTORY_SLOTS}`);

@@ -405,9 +405,20 @@ describe('feature toggles', () => {
     expect(r.world.generators.every((g) => g.kind !== 'ghost')).toBe(true);
   });
 
-  it('has metadata for every rule, so none can be invisible in the UI', () => {
-    const keys = Object.keys(DEFAULT_RULES).sort();
-    const documented = RULE_META.map((m) => m.key).sort();
-    expect(documented).toEqual(keys);
+  it('has metadata for every toggle, so none can be invisible in the UI', () => {
+    // Difficulty is deliberately excluded: it is a ladder, not a switch, and the setup
+    // screen gives it its own row rather than an ON/OFF. The point of this test is that
+    // nothing is invisible, so the exclusion is named here rather than being a silent
+    // filter — if a second non-boolean rule ever appears, this test must be revisited.
+    const toggles = Object.entries(DEFAULT_RULES)
+      .filter(([, v]) => typeof v === 'boolean')
+      .map(([k]) => k)
+      .sort();
+    const nonToggles = Object.entries(DEFAULT_RULES)
+      .filter(([, v]) => typeof v !== 'boolean')
+      .map(([k]) => k);
+
+    expect(nonToggles).toEqual(['difficulty']);
+    expect(RULE_META.map((m) => m.key).sort()).toEqual(toggles);
   });
 });

@@ -65,7 +65,9 @@ export class App implements LoopHost {
     playtest: LevelData | null = null,
   ) {
     const settings = loadSettings();
-    this.setup = new SetupScreen(cloneRules(settings.rules ?? DEFAULT_RULES));
+    // Spread over the defaults rather than replacing them: a settings blob saved before
+    // a rule existed is missing that key, and `undefined` is not a valid difficulty.
+    this.setup = new SetupScreen(cloneRules({ ...DEFAULT_RULES, ...(settings.rules ?? {}) }));
     if (prefersReducedMotion()) this.fx.motionEnabled = false;
 
     this.playtesting = playtest !== null;
@@ -83,9 +85,10 @@ export class App implements LoopHost {
     this.attract = new AttractScreen(kb, () => this.go('charselect'));
     this.charSelect = new CharSelectScreen(
       kb,
-      (cls) => this.startRun(cls),
+      (cls, skipTutorial) => this.startRun(cls, skipTutorial),
       () => this.go('attract'),
     );
+    this.charSelect.skipTutorial = settings.skipTutorial ?? false;
     this.levelIntro = new LevelIntroScreen(kb, () => this.go('play'));
     this.gameOver = new GameOverScreen(
       kb,
@@ -114,18 +117,30 @@ export class App implements LoopHost {
     this.current.enter?.();
   }
 
-  private startRun(cls: ClassId): void {
+  private startRun(cls: ClassId, skipTutorial = false): void {
     this.classId = cls;
     this.continuesLeft = 3;
-    this.run = new Run(this.campaign, cls, this.seed, 0, cloneRules(this.setup.rules), this.loopStart);
+
+    // Skipping starts at the first dungeon level, which is exactly where the last intro
+    // level's first numbered exit lands you — the two routes agree by construction.
+    // Playtesting a single level has no intro to skip, hence the campaign-length guard.
+    const start = skipTutorial ? Math.min(this.loopStart, this.campaign.length - 1) : 0;
+    saveSettings({ rules: this.setup.rules, skipTutorial });
+
+    this.run = new Run(this.campaign, cls, this.seed, start, cloneRules(this.setup.rules), this.loopStart);
     this.run.world.fireModel = this.play.fireModel;
-    this.lastLevelIndex = 0;
+    this.lastLevelIndex = this.run.levelIndex;
     this.play.onRunChanged();
     this.showIntro();
   }
 
   private showIntro(): void {
-    this.levelIntro.show(this.run.depth, this.run.levelName, this.run.world.hasHiddenUpgrade);
+    this.levelIntro.show(
+      this.run.depth,
+      this.run.levelName,
+      this.run.world.hasHiddenUpgrade,
+      this.run.rules.difficulty,
+    );
     this.go('levelintro');
   }
 

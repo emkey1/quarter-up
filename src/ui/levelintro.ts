@@ -1,6 +1,7 @@
 import type { Layout } from '@/engine/display';
 import type { ActionState } from '@/engine/actions';
 import { UI, centred, sans } from '@/render/ui';
+import { DEFAULT_DIFFICULTY, difficultyOf, type DifficultyId } from '@/data/difficulty';
 import { MenuInput, type Screen } from './screen';
 
 /**
@@ -18,6 +19,7 @@ export class LevelIntroScreen implements Screen {
   depth = 1;
   levelName = '';
   hasHiddenUpgrade = false;
+  difficulty: DifficultyId = DEFAULT_DIFFICULTY;
   /** Duration in frames; skippable at any point after a moment. */
   private readonly hold = 150;
 
@@ -26,10 +28,11 @@ export class LevelIntroScreen implements Screen {
     private readonly onDone: () => void,
   ) {}
 
-  show(depth: number, levelName: string, hasHiddenUpgrade: boolean): void {
+  show(depth: number, levelName: string, hasHiddenUpgrade: boolean, difficulty: DifficultyId): void {
     this.depth = depth;
     this.levelName = levelName;
     this.hasHiddenUpgrade = hasHiddenUpgrade;
+    this.difficulty = difficulty;
     this.t = 0;
   }
 
@@ -63,6 +66,20 @@ export class LevelIntroScreen implements Screen {
     centred(ctx, 'LEVEL', cw / 2, ch / 2 - 54 * s, sans(14, s, 600), UI.dim, 6 * s);
     centred(ctx, String(this.depth), cw / 2, ch / 2 + 6 * s, sans(56, s, 800), UI.fg);
     centred(ctx, this.levelName.toUpperCase(), cw / 2, ch / 2 + 34 * s, sans(15, s, 600), UI.dim, 3 * s);
+
+    // The difficulty, on the one screen a player reliably reads. Difficulty changes
+    // the game more than anything else in setup, so it should never be a thing you have
+    // to remember whether you changed.
+    const d = difficultyOf(this.difficulty);
+    centred(
+      ctx,
+      `${d.name.toUpperCase()}  ·  MAX HEALTH ${d.maxHealth}`,
+      cw / 2,
+      ch / 2 + 52 * s,
+      sans(9.5, s, 600),
+      UI.faint,
+      1.6 * s,
+    );
 
     if (this.hasHiddenUpgrade) {
       centred(

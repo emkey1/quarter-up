@@ -1,4 +1,5 @@
 import type { MonsterKind } from '@/game/monster';
+import { DEFAULT_DIFFICULTY, difficultyRank, type DifficultyId } from './difficulty';
 
 /**
  * Feature toggles. See DESIGN.md §6.6.
@@ -10,6 +11,12 @@ import type { MonsterKind } from '@/game/monster';
  * and in replays, so a recorded run replays under the rules it was played with.
  */
 export interface Rules {
+  /**
+   * Difficulty rung. Unlike everything else here this is not a boolean, because
+   * difficulty was never a switch — the cabinet's DIP settings picked a level.
+   */
+  difficulty: DifficultyId;
+
   // --- monster families. Disabling one also removes its generators (§6.6).
   ghosts: boolean;
   grunts: boolean;
@@ -34,6 +41,7 @@ export interface Rules {
 }
 
 export const DEFAULT_RULES: Rules = {
+  difficulty: DEFAULT_DIFFICULTY,
   ghosts: true,
   grunts: true,
   demons: true,
@@ -52,7 +60,12 @@ export const DEFAULT_RULES: Rules = {
   fastDiagonals: true,
 };
 
-export type RuleKey = keyof Rules;
+/**
+ * Only the boolean rules are toggles. Difficulty lives in `Rules` too, but it is a
+ * ladder, not a switch, so keeping it out of this type is what stops the setup screen
+ * from cheerfully assigning `!'veteran'` to it.
+ */
+export type RuleKey = { [K in keyof Rules]: Rules[K] extends boolean ? K : never }[keyof Rules];
 export type Tier = 'arcade' | 'tagged' | 'ineligible';
 
 export interface RuleMeta {
@@ -80,7 +93,7 @@ export const RULE_META: readonly RuleMeta[] = [
 
   { key: 'cornerSqueeze', group: 'Mechanics', label: 'Diagonal cover rule', note: 'Small and medium shots thread diagonal corners; Large cannot.', tier: 'tagged' },
   { key: 'inventoryBlocks', group: 'Mechanics', label: 'Full inventory blocks', note: 'Items you cannot carry are solid and barricade you.', tier: 'tagged' },
-  { key: 'doorAutoOpen', group: 'Mechanics', label: 'Doors give up', note: 'Doors open on their own after 18s (36s holding keys).', tier: 'tagged' },
+  { key: 'doorAutoOpen', group: 'Mechanics', label: 'Doors give up', note: 'Open on their own after 90s with no fighting (180s holding keys).', tier: 'tagged' },
   { key: 'wallsBecomeExits', group: 'Mechanics', label: 'Walls become exits', note: 'Standing still for 180s converts every wall to an exit.', tier: 'tagged' },
   { key: 'cornerAssist', group: 'Mechanics', label: 'Corner assist', note: 'Rounds corners you nearly cleared instead of stopping dead.', tier: 'tagged' },
   { key: 'fastDiagonals', group: 'Mechanics', label: 'Fast diagonals', note: 'Full speed on each axis, so diagonals are ~1.41x faster.', tier: 'tagged' },
@@ -108,6 +121,14 @@ export function monsterAllowed(rules: Rules, kind: MonsterKind): boolean {
  */
 export function tierOf(rules: Rules): Tier {
   let tier: Tier = 'arcade';
+
+  // Difficulty is asymmetric on purpose. Playing ABOVE the default is not a way to get
+  // an easier score, so it stays fully eligible; playing below it is, so it is marked.
+  // Treating both directions as "altered" would punish the players doing the hard thing.
+  if (difficultyRank(rules.difficulty) < difficultyRank(DEFAULT_RULES.difficulty)) {
+    tier = 'tagged';
+  }
+
   for (const m of RULE_META) {
     if (rules[m.key] === DEFAULT_RULES[m.key]) continue;
     if (m.tier === 'ineligible') return 'ineligible';
@@ -125,6 +146,7 @@ export const PRESETS: Record<string, () => Rules> = {
   /** Everything off that hurts: a scratchpad for learning the maps. */
   Sandbox: () => ({
     ...DEFAULT_RULES,
+    difficulty: 'apprentice' as DifficultyId,
     death: false,
     thief: false,
     healthDrain: false,

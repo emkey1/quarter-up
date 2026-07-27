@@ -350,6 +350,44 @@ export function relocateStrays(g, reachable) {
   return moved;
 }
 
+/**
+ * The reachable cell furthest from the start, measured in steps rather than in a
+ * straight line.
+ *
+ * For hiding things. Straight-line distance would happily pick a spot on the far side of
+ * a wall you walk past in the first ten seconds; step distance picks the place you have
+ * to actually go somewhere to reach, which is the whole point of hiding something.
+ *
+ * `avoid` keeps a second hidden object from landing on the first — two upgrade potions
+ * in the same corner is not two secrets.
+ */
+export function remotestCell(g, start, avoid = []) {
+  const solid = new Set(['X', ' ']);
+  const dist = new Map([[start.join(','), 0]]);
+  const queue = [[start[0], start[1]]];
+  let best = [start[0], start[1]];
+  let bestD = -1;
+
+  for (let head = 0; head < queue.length; head++) {
+    const [x, y] = queue[head];
+    const d = dist.get(`${x},${y}`);
+    const clear = avoid.every(([ax, ay]) => Math.abs(ax - x) + Math.abs(ay - y) > 6);
+    if (d > bestD && clear && g.tiles[y][x] === '.') {
+      bestD = d;
+      best = [x, y];
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const k = `${nx},${ny}`;
+      if (!inb(nx, ny) || dist.has(k) || solid.has(g.tiles[ny][nx])) continue;
+      dist.set(k, d + 1);
+      queue.push([nx, ny]);
+    }
+  }
+  return { cell: best, steps: bestD };
+}
+
 export function finish(g, meta) {
   return {
     id: meta.id,

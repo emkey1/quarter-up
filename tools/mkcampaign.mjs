@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import {
   blank, border, box, chamber, corridorCross, coverLattice, deathCorridor, fill,
   finish, foodGauntlet, keyDoorGate, lobberGallery, nest, obj, pillarField,
-  relocateStrays, rng, serpentine, set, treasureVault, vline, analyse,
+  relocateStrays, remotestCell, rng, serpentine, set, treasureVault, vline, analyse,
 } from './levelkit.mjs';
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/levels');
@@ -35,6 +35,8 @@ const NAMES = [
 ];
 
 const levels = [];
+/** Where each hidden upgrade potion ended up, so the report can prove it is hidden. */
+const hidden = [];
 
 /* ================================================================== intro levels */
 /**
@@ -292,9 +294,17 @@ for (let d = 1; d <= 40; d++) {
   }
 
   // Upgrade potions appear on a schedule, so the run has landmarks.
+  //
+  // Placed at the cell FURTHEST from the start by step count, not two tiles above it as
+  // they were — the announcer saying "a potion lies hidden here" about something already
+  // in shot on the first frame is funny exactly once. Furthest-by-steps also beats
+  // furthest-in-a-straight-line, which happily picks a spot on the other side of a wall
+  // you walk past immediately.
   if ([3, 9, 14, 20, 26, 33].includes(d)) {
     const kinds = ['shotPower', 'speed', 'magic', 'armor', 'shotSpeed', 'fightPower'];
-    obj(g, { t: 'upgrade', x: out.start[0], y: Math.max(2, out.start[1] - 2), kind: kinds[d % kinds.length] });
+    const { cell, steps } = remotestCell(g, out.start, [out.exit]);
+    obj(g, { t: 'upgrade', x: cell[0], y: cell[1], kind: kinds[d % kinds.length] });
+    hidden.push({ id: `d${String(d).padStart(2, '0')}`, steps });
   }
   // The thief starts turning up once there is something worth stealing — but across the
   // map, not on top of you. Spawned at the start it robs you on frame one, before the
@@ -373,6 +383,13 @@ for (const lv of levels) {
 
 console.log(report.join('\n'));
 console.log(`\n${levels.length} levels written to ${OUT}  (${totalMoved} objects nudged off walls)`);
+if (hidden.length) {
+  const worst = hidden.reduce((a, b) => (a.steps <= b.steps ? a : b));
+  console.log(
+    `hidden upgrades: ${hidden.map((h) => `${h.id}=${h.steps}`).join(' ')}  ` +
+      `(nearest is ${worst.id} at ${worst.steps} steps from the start)`,
+  );
+}
 if (failures) {
   console.error(`${failures} level(s) failed validation`);
   process.exit(1);

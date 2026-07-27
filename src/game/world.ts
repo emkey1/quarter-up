@@ -1,5 +1,6 @@
 import { T } from '@/data/tuning';
 import type { ClassId, UpgradeId } from '@/data/classes';
+import { difficultyOf, type Difficulty } from '@/data/difficulty';
 import type { ActionState } from '@/engine/actions';
 import type { FireModel } from '@/engine/input';
 import { Rng } from '@/engine/rng';
@@ -134,11 +135,30 @@ export class World {
     return this.level.type === 'treasure';
   }
 
+  /** The difficulty settings this world runs under. Derived from rules, never stored. */
+  get difficulty(): Difficulty {
+    return difficultyOf(this.rules.difficulty);
+  }
+
+  /**
+   * Ceiling on health.
+   *
+   * The original capped it, and the cap does real work: once you cannot bank any more,
+   * food you walk past is genuinely wasted and the drain becomes a clock again rather
+   * than an accounting detail. Without one, a careful player simply accumulates until
+   * nothing on the level can threaten them.
+   */
+  get maxHealth(): number {
+    return this.difficulty.maxHealth;
+  }
+
   /* ------------------------------------------------------------------ run state */
 
   importState(s: RunState): void {
     const p = this.player;
-    p.health = s.health;
+    // Clamped, because difficulty can change between levels: banking 2400 on Apprentice
+    // and then switching to Nightmare must not carry the old ceiling with it.
+    p.health = Math.min(this.maxHealth, s.health);
     p.score = s.score;
     p.credits = s.credits;
     p.keys = s.keys;
@@ -768,28 +788,41 @@ export class World {
 
   private stepGenerators(): void {
     const live = this.liveMonsters;
+    const diff = this.difficulty;
+    const capTotal = Math.round(T.MONSTER_CAP_TOTAL * diff.capScale);
+    const capLocal = Math.max(2, Math.round(T.MONSTER_CAP_LOCAL * diff.capScale));
+
     for (const g of this.generators) {
       if (!g.alive) continue;
       if (g.hurtFlash > 0) g.hurtFlash--;
 
-      if (
-        this.rules.offscreenGenerators &&
-        !this.camera.contains(g.x, g.y, T.GEN_OFFSCREEN_MARGIN)
-      ) {
+      const onScreen = this.camera.contains(g.x, g.y, T.GEN_OFFSCREEN_MARGIN);
+
+      // The warm-up is spent the first time the player sees this generator, and only
+      // then. Scouting a room should be possible at the easier settings; on Nightmare
+      // the warm-up is zero, so a nest seen is a nest already spawning.
+      if (onScreen && !g.seen) {
+        g.seen = true;
+        g.timer = Math.round(diff.warmupSec * T.STEP_HZ);
+      }
+
+      if (this.rules.offscreenGenerators && !onScreen) {
         g.charge = 0;
         continue;
       }
-      if (live >= T.MONSTER_CAP_TOTAL) continue;
+      if (live >= capTotal) continue;
 
-      const period = spawnPeriod(g.level, this.depth);
+      const period = spawnPeriod(g.level, this.depth, diff.periodScale);
       g.timer--;
-      g.charge = 1 - Math.max(0, g.timer) / period;
+      // Clamped because a warm-up longer than one spawn period would otherwise drive
+      // this negative and make the telegraph glow read as "never".
+      g.charge = Math.max(0, Math.min(1, 1 - Math.max(0, g.timer) / period));
       if (g.timer > 0) continue;
 
       const nearby = this.grid.query(g.x, g.y, T.TILE * 3, this.scratch);
       let localCount = 0;
       for (const n of nearby) if (n.alive) localCount++;
-      if (localCount >= T.MONSTER_CAP_LOCAL) {
+      if (localCount >= capLocal) {
         g.timer = Math.round(period / 2);
         continue;
       }
@@ -976,7 +1009,9 @@ export class World {
         case 'none':
           continue;
         case 'food':
-          p.health += out.health;
+          // Capped. Overhealing is silently discarded rather than refused, so food never
+          // becomes an obstacle you have to walk around at full health.
+          p.health = Math.min(this.maxHealth, p.health + out.health);
           this.addScore(out.score, 'food');
           break;
         case 'key':

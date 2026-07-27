@@ -93,8 +93,15 @@ export const T = {
   GEN_PERIOD_DEPTH_SCALE: 0.995, // [i]
 
   // ---------------------------------------------------------------- terrain timers (sec)
-  DOOR_AUTO_OPEN_SEC: 18,
-  DOOR_AUTO_OPEN_SEC_WITH_KEYS: 36,
+  /** Doors give up only on a genuine stalemate.
+   *
+   *  The clock counts frames since the player last *engaged* — fired, was hit, dealt
+   *  damage, took something. Exploring does none of those, so at the old 18s a player
+   *  simply hunting for the key watched every locked door swing open on its own, which
+   *  reads as the mechanic being broken rather than merciful. 90 seconds without firing
+   *  a shot or touching anything is a real stalemate; 18 was just walking. [i] */
+  DOOR_AUTO_OPEN_SEC: 90,
+  DOOR_AUTO_OPEN_SEC_WITH_KEYS: 180,
   WALLS_BECOME_EXITS_SEC: 180,
   INVISIBILITY_SEC: 20,
 

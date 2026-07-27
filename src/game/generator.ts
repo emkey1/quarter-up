@@ -20,6 +20,14 @@ export interface Generator {
    *  the arcade's fixed palette could not do. */
   charge: number;
   spawnOffset: number;
+  /**
+   * Set the first time the player lays eyes on this generator.
+   *
+   * The difficulty warm-up is spent once, here, rather than on every sighting: a timer
+   * that restarted each time the generator left view would turn peeking in and out of a
+   * doorway into a free reset, which is a worse game than either no warm-up or a long one.
+   */
+  seen: boolean;
 }
 
 export function makeGenerator(
@@ -41,6 +49,7 @@ export function makeGenerator(
     hurtFlash: 0,
     charge: 0,
     spawnOffset: 0,
+    seen: false,
   };
 }
 
@@ -48,10 +57,17 @@ export function family(g: Generator): 'bone' | 'block' {
   return familyOf(g.kind);
 }
 
-/** Frames between spawns. Faster at higher generator level and deeper in the dungeon. */
-export function spawnPeriod(level: number, depth: number): number {
+/**
+ * Frames between spawns. Faster at higher generator level, deeper in the dungeon, and
+ * on a higher difficulty.
+ *
+ * `scale` is the difficulty multiplier; the floor of 12 frames stops Nightmare at depth
+ * 50 from collapsing into a monster fountain that spawns faster than anything can be
+ * killed, which is not difficulty, just a wall.
+ */
+export function spawnPeriod(level: number, depth: number, scale = 1): number {
   const base = T.GEN_PERIOD_BASE[Math.max(0, Math.min(2, level - 1))];
-  return Math.max(20, Math.round(base * Math.pow(T.GEN_PERIOD_DEPTH_SCALE, depth)));
+  return Math.max(12, Math.round(base * scale * Math.pow(T.GEN_PERIOD_DEPTH_SCALE, depth)));
 }
 
 export function generatorLevel(g: Generator): MonsterLevel {

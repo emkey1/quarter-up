@@ -86,6 +86,9 @@ is simulated instead.
 | Face lock | `Alt` / `L` | `X` |
 | Pause | `P` / `Esc` | `Start` |
 
+On the character-select screen, `↑` `↓` (or `T`) switches between starting with the
+seven tutorial levels and starting straight in the dungeon. The choice is remembered.
+
 `Tab` opens setup, `G` controller setup, `M` mutes, `[` `]` change scale, `F`
 fullscreen. Development hotkeys: `O` cycles the fire model, `N` skips a level.
 
@@ -108,6 +111,29 @@ The two usual causes:
 
 Rebinding all four directions to stick axes is recognised and promoted back to proper
 8-way octant quantisation, rather than being treated as four independent buttons.
+
+### Difficulty
+
+Five rungs, at the top of the setup screen (`Tab`), left/right to move along it.
+
+| | Max health | Generators wake in | Spawn rate | Crowd cap |
+| --- | --- | --- | --- | --- |
+| Apprentice | 2400 | 4.0 s | ×1.5 | ×0.6 |
+| Squire | 1900 | 2.5 s | ×1.2 | ×0.8 |
+| **Veteran** (default) | **1500** | 1.2 s | ×0.85 | ×1.0 |
+| Champion | 1100 | 0.5 s | ×0.6 | ×1.35 |
+| Nightmare | 800 | 0.0 s | ×0.4 | ×1.8 |
+
+The health cap is a mechanic, not a nerf: once you cannot bank any more, food you walk
+past is genuinely wasted and the drain is a clock again. Without a cap a careful player
+just accumulates until nothing can threaten them.
+
+The generator warm-up is spent the **first** time you see a generator, not every time —
+otherwise peeking in and out of a doorway would be a free reset.
+
+Playing above the default stays fully leaderboard-eligible; playing below it is marked.
+Playing harder is not a way to get an easier score. Either way the difficulty is shown
+on every score-table entry.
 
 ### Setup screen — feature toggles
 

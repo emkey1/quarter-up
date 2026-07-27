@@ -13,6 +13,8 @@ export interface Settings {
   rumble?: boolean;
   scaleOverride?: number | null;
   rules?: Rules;
+  /** Whether the last run chose to skip the intro levels. */
+  skipTutorial?: boolean;
 }
 
 export function loadSettings(): Settings {

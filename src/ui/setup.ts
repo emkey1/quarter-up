@@ -11,6 +11,13 @@ import {
   type Rules,
 } from '@/data/rules';
 import { saveSettings } from '@/engine/storage';
+import {
+  DEFAULT_DIFFICULTY,
+  DIFFICULTIES,
+  difficultyOf,
+  difficultyRank,
+  stepDifficulty,
+} from '@/data/difficulty';
 
 const FG = '#e4e7ec';
 const DIM = 'rgba(215,219,224,.45)';
@@ -21,11 +28,16 @@ const WARN = '#e8c34a';
 type Row =
   | { kind: 'head'; label: string }
   | { kind: 'rule'; meta: RuleMeta }
+  | { kind: 'difficulty' }
   | { kind: 'preset'; label: string }
   | { kind: 'action'; label: string; act: 'close' };
 
 function buildRows(): Row[] {
   const rows: Row[] = [];
+  // Difficulty first: it is the setting that changes the game most, and burying a ladder
+  // under sixteen toggles is how a player concludes the game has only one speed.
+  rows.push({ kind: 'head', label: 'Difficulty' });
+  rows.push({ kind: 'difficulty' });
   let group = '';
   for (const meta of RULE_META) {
     if (meta.group !== group) {
@@ -83,15 +95,28 @@ export class SetupScreen {
 
     const down = kb.wasCodePressed('ArrowDown') || gp.isPressed('down');
     const up = kb.wasCodePressed('ArrowUp') || gp.isPressed('up');
-    const act =
-      kb.wasCodePressed('Enter') ||
-      kb.wasCodePressed('Space') ||
-      gp.isPressed('fire') ||
-      kb.wasCodePressed('ArrowRight') ||
-      kb.wasCodePressed('ArrowLeft');
+    const right = kb.wasCodePressed('ArrowRight') || gp.isPressed('right');
+    const left = kb.wasCodePressed('ArrowLeft') || gp.isPressed('left');
+    const act = kb.wasCodePressed('Enter') || kb.wasCodePressed('Space') || gp.isPressed('fire') || right || left;
 
     if (down) this.moveCursor(1);
     if (up) this.moveCursor(-1);
+
+    // Difficulty is a ladder, so left and right move along it rather than toggling.
+    // Enter, which everything else here uses, steps up and wraps at the top.
+    if (this.rows[this.cursor]?.kind === 'difficulty' && (act || left || right)) {
+      const dir: 1 | -1 = left ? -1 : 1;
+      const next =
+        !left && !right && difficultyRank(this.rules.difficulty) === DIFFICULTIES.length - 1
+          ? DIFFICULTIES[0].id
+          : stepDifficulty(this.rules.difficulty, dir);
+      if (next !== this.rules.difficulty) {
+        this.rules.difficulty = next;
+        this.dirty = true;
+        saveSettings({ rules: this.rules });
+      }
+      return true;
+    }
 
     if (act) {
       const row = this.rows[this.cursor];
@@ -179,7 +204,35 @@ export class SetupScreen {
         ctx.fillRect(cx - 6 * s, y - 11 * s, colW - 20 * s, 30 * s);
       }
 
-      if (row.kind === 'rule') {
+      if (row.kind === 'difficulty') {
+        const d = difficultyOf(this.rules.difficulty);
+        const rank = difficultyRank(this.rules.difficulty);
+        const changed = this.rules.difficulty !== DEFAULT_DIFFICULTY;
+
+        ctx.font = `${selected ? 700 : 600} ${12 * s}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = selected ? FG : 'rgba(228,231,236,.8)';
+        ctx.fillText(`${selected ? '>' : ' '} ${d.name}`, cx, y);
+
+        // A pip ladder, so where you are on the scale is visible without reading names.
+        const px0 = cx + colW - 30 * s - DIFFICULTIES.length * 9 * s;
+        for (let k = 0; k < DIFFICULTIES.length; k++) {
+          ctx.fillStyle = k <= rank ? (k >= 3 ? OFF : k === 2 ? ON : WARN) : 'rgba(255,255,255,.14)';
+          ctx.fillRect(px0 + k * 9 * s, y - 7 * s, 6 * s, 7 * s);
+        }
+
+        ctx.font = `400 ${9 * s}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillStyle = changed ? WARN : 'rgba(215,219,224,.35)';
+        ctx.fillText(d.blurb.slice(0, 66), cx + 12 * s, y + 12 * s);
+
+        // The numbers, because "harder" is not information and these are.
+        ctx.fillStyle = 'rgba(215,219,224,.3)';
+        ctx.fillText(
+          `max health ${d.maxHealth}  ·  generators wake in ${d.warmupSec}s  ·  spawn ×${d.periodScale}`,
+          cx + 12 * s,
+          y + 23 * s,
+        );
+        y += 42 * s;
+      } else if (row.kind === 'rule') {
         const on = this.rules[row.meta.key];
         const changed = on !== DEFAULT_RULES[row.meta.key];
         ctx.font = `${selected ? 600 : 500} ${11 * s}px ui-sans-serif, system-ui, sans-serif`;
@@ -210,16 +263,15 @@ export class SetupScreen {
     }
 
     // what is currently non-default, spelled out
-    const changed = changedRules(this.rules);
+    const changed = changedRules(this.rules).map((m) => m.label);
+    if (this.rules.difficulty !== DEFAULT_DIFFICULTY) {
+      changed.unshift(`Difficulty (${difficultyOf(this.rules.difficulty).name})`);
+    }
     if (changed.length) {
       const by = layout.canvasH - 46 * s;
       ctx.font = `500 ${10 * s}px ui-sans-serif, system-ui, sans-serif`;
       ctx.fillStyle = WARN;
-      ctx.fillText(
-        `Changed: ${changed.map((m) => m.label).join(', ')}`.slice(0, 150),
-        x,
-        by,
-      );
+      ctx.fillText(`Changed: ${changed.join(', ')}`.slice(0, 150), x, by);
     }
 
     ctx.restore();

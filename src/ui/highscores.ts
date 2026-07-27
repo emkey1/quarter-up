@@ -1,5 +1,6 @@
 import type { ClassId } from '@/data/classes';
 import type { Tier } from '@/data/rules';
+import { DEFAULT_DIFFICULTY, type DifficultyId } from '@/data/difficulty';
 
 /**
  * Local high scores.
@@ -9,7 +10,9 @@ import type { Tier } from '@/data/rules';
  * a 200,000 on ten. Raw score is kept and shown, but it does not decide the order.
  *
  * The rules tier rides along with every entry, so a run played with Death switched off
- * can never be mistaken for a straight one.
+ * can never be mistaken for a straight one. Difficulty rides along for the same reason,
+ * separately: it is not a rules deviation, and a Nightmare run deserves to be legible as
+ * one rather than sorted in among the Apprentice runs with nothing to tell them apart.
  */
 export interface ScoreEntry {
   initials: string;
@@ -19,6 +22,8 @@ export interface ScoreEntry {
   deepestLevel: number;
   cls: ClassId;
   tier: Tier;
+  /** Optional so entries saved before difficulty existed still load. */
+  difficulty?: DifficultyId;
   /** ISO date string; display only. */
   date: string;
 }

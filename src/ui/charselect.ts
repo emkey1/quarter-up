@@ -4,6 +4,7 @@ import type { ActionState } from '@/engine/actions';
 import { UI, centred, logo, sans, statBar, blink } from '@/render/ui';
 import { sprites } from '@/render/sprites';
 import { WALK_FRAMES } from '@/render/spritegen';
+import { INTRO } from '@/data/campaign';
 import { MenuInput, type Screen } from './screen';
 
 /**
@@ -24,10 +25,20 @@ export class CharSelectScreen implements Screen {
   private index = 3; // Elf: the strongest solo pick, so it is the sensible default
   private menu = new MenuInput();
   private t = 0;
+  /**
+   * Whether to skip the seven intro levels.
+   *
+   * The arcade put this on the last tutorial level as numbered exits, and it still does
+   * — but that only helps a player who has already walked through the tutorial to reach
+   * it. Somebody on their fifth run wants the choice before it costs them seven levels,
+   * so it is offered here too. Remembered between runs, because a returning player
+   * asking to skip once is telling you something about every run after it.
+   */
+  skipTutorial = false;
 
   constructor(
     private readonly kbPressed: (code: string) => boolean,
-    private readonly onChoose: (cls: ClassId) => void,
+    private readonly onChoose: (cls: ClassId, skipTutorial: boolean) => void,
     private readonly onBack: () => void,
   ) {}
 
@@ -44,9 +55,13 @@ export class CharSelectScreen implements Screen {
     this.menu.read(a, stepIndex, this.kbPressed);
     this.t++;
     const n = CLASS_ORDER.length;
-    if (this.menu.left || this.menu.up) this.index = (this.index + n - 1) % n;
-    if (this.menu.right || this.menu.down) this.index = (this.index + 1) % n;
-    if (this.menu.confirm) this.onChoose(this.selected);
+    // Left/right picks the character; up/down works the start option. They used to both
+    // change the character, which left no free axis for a second choice.
+    if (this.menu.left) this.index = (this.index + n - 1) % n;
+    if (this.menu.right) this.index = (this.index + 1) % n;
+    if (this.menu.up || this.menu.down) this.skipTutorial = !this.skipTutorial;
+    if (this.kbPressed('KeyT')) this.skipTutorial = !this.skipTutorial;
+    if (this.menu.confirm) this.onChoose(this.selected, this.skipTutorial);
     if (this.menu.cancel) this.onBack();
   }
 
@@ -110,10 +125,28 @@ export class CharSelectScreen implements Screen {
 
     centred(ctx, 'lighter bar = with its upgrade potion', cw / 2, y + 6 * s, sans(9, s, 500), UI.faint);
 
+    // --- where the run starts. A row rather than a hint, because a player who does not
+    // know the option exists will replay the tutorial forever.
+    const sy = ch - 62 * s;
+    const label = this.skipTutorial ? 'START IN THE DUNGEON' : 'START WITH THE TUTORIAL';
+    const note = this.skipTutorial
+      ? `skipping ${INTRO.length} intro levels — begins at depth ${INTRO.length + 1}`
+      : `${INTRO.length} short levels, one idea each`;
+    centred(
+      ctx,
+      `↑↓   ${label}`,
+      cw / 2,
+      sy,
+      sans(12, s, 700),
+      this.skipTutorial ? UI.gold : UI.dim,
+      1.2 * s,
+    );
+    centred(ctx, note, cw / 2, sy + 13 * s, sans(9, s, 500), UI.faint);
+
     if (blink()) {
-      centred(ctx, 'ENTER or FIRE to begin', cw / 2, ch - 36 * s, sans(14, s, 800), UI.gold, 1.5 * s);
+      centred(ctx, 'ENTER or FIRE to begin', cw / 2, ch - 30 * s, sans(14, s, 800), UI.gold, 1.5 * s);
     }
-    centred(ctx, '← →  choose      ESC  back', cw / 2, ch - 16 * s, sans(10, s, 500), UI.faint);
+    centred(ctx, '← →  choose      ↑ ↓  start point      ESC  back', cw / 2, ch - 12 * s, sans(10, s, 500), UI.faint);
   }
 
   private card(

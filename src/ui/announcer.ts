@@ -51,10 +51,19 @@ export class Announcer {
   private prevHealth = Infinity;
   private saidThisLevel = new Set<string>();
   private flavourSaidThisLevel = false;
+  /**
+   * Tags that are spent for the whole run, not just the level.
+   *
+   * Advice is only advice the first time. "Remember, don't shoot the food" is genuinely
+   * useful once and is nagging by the third level, which is what it had become — the
+   * per-level reset meant it fired on the start of every single level forever.
+   */
+  private saidThisRun = new Set<string>();
 
   reset(): void {
     this.lastSaid.clear();
     this.saidThisLevel.clear();
+    this.saidThisRun.clear();
     this.flavourSaidThisLevel = false;
     this.prevHealth = Infinity;
   }
@@ -159,7 +168,7 @@ export class Announcer {
     if (s.levelStarted && !this.flavourSaidThisLevel) {
       if (s.hasHiddenUpgrade) {
         out.push({ text: 'A potion lies hidden here.', priority: 'flavour', tag: 'hidden' });
-      } else if (s.frame < 3 * SEC) {
+      } else if (s.frame < 3 * SEC && !this.saidThisRun.has('dontShoot')) {
         out.push({
           text: "Remember, don't shoot the food.",
           priority: 'flavour',
@@ -175,6 +184,7 @@ export class Announcer {
       if (!this.canSay(line.tag, s.frame)) continue;
       this.mark(line.tag, s.frame);
       this.saidThisLevel.add(line.tag);
+      this.saidThisRun.add(line.tag);
       if (line.priority === 'flavour') this.flavourSaidThisLevel = true;
       return line;
     }

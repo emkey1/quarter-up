@@ -2,6 +2,7 @@ import { CLASSES, type ClassId } from '@/data/classes';
 import type { Layout } from '@/engine/display';
 import type { ActionState } from '@/engine/actions';
 import { tierOf, type Rules } from '@/data/rules';
+import { DEFAULT_DIFFICULTY, difficultyOf } from '@/data/difficulty';
 import { UI, centred, panel, sans, mono, blink } from '@/render/ui';
 import { MenuInput, type Screen } from './screen';
 import {
@@ -83,6 +84,7 @@ export class GameOverScreen implements Screen {
       deepestLevel: r.deepestLevel,
       cls: r.cls,
       tier: tierOf(r.rules),
+      difficulty: r.rules.difficulty,
       date: new Date().toISOString().slice(0, 10),
     };
     this.scores = insertScore(this.scores, this.entry);
@@ -261,8 +263,11 @@ export class GameOverScreen implements Screen {
       ctx.fillText(String(e.scorePerCredit), bx + bw * 0.55, ry);
       ctx.font = mono(9, s, 500);
       ctx.fillStyle = UI.faint;
+      // Difficulty gets three letters of its own. Sorting a Nightmare run in among the
+      // Apprentice ones with nothing to distinguish them makes the table meaningless.
+      const diff = difficultyOf(e.difficulty ?? DEFAULT_DIFFICULTY).name.slice(0, 3).toUpperCase();
       ctx.fillText(
-        `${CLASSES[e.cls].name.slice(0, 3)}  L${e.deepestLevel}  ${e.credits}cr${
+        `${CLASSES[e.cls].name.slice(0, 3)}  ${diff}  L${e.deepestLevel}  ${e.credits}cr${
           e.tier === 'arcade' ? '' : e.tier === 'tagged' ? '  *' : '  ✕'
         }`,
         bx + bw,
