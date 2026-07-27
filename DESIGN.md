@@ -460,14 +460,28 @@ multiples cleanly.
   half-res pass per frame.
 - **Particles**: monster dissolve motes, generator explosion debris, rock impact dust, potion
   shockwave ring, footstep puffs. Pooled, capped at 400 live.
-- **Screen effects**: potion white-flash + shake, damage vignette pulse, hit-stop of 2 frames on
-  a generator kill. All respect `prefers-reduced-motion`.
+- **Screen effects**: potion white-flash + shake, damage vignette pulse, and a two-frame camera
+  *punch* on a generator kill.
+
+  > **Correction, M4.** This originally specified *hit-stop*. Hit-stop cannot be used here:
+  > pausing the simulation for two frames would shift the fixed-step clock, and with it the
+  > health drain, every terrain timer, and every recorded replay — a presentation effect
+  > silently changing the game. The camera punch delivers the same impact for free. The
+  > damage vignette is also deliberately **not** gated by `prefers-reduced-motion`: it is
+  > information about your health, not decoration. It simply stops pulsing.
 - **UI**: crisp modern typography for the HUD (a real webfont, not a bitmap font), with the
   arcade's colour language retained. In-world text (level intro, announcer captions) uses a
   pixel font at 2× to stay in register with the art.
 - **Authoring pipeline**: Aseprite → PNG atlases + JSON frame data, imported by Vite. (v1 of this
   doc proposed embedding pixel data in TS source; at 32×32 with 8 facings that is no longer
   reasonable, so we take a real asset-loading step and a loading screen.)
+
+  > **Reality check, recorded during M4.** Hand-drawn art requires a human artist, and this
+  > project does not have one. What is actually shipping is **algorithmically generated art**,
+  > baked into offscreen canvases at startup: better than the M0–M3 placeholders, structured
+  > behind exactly the interface a PNG atlas would use, but not hand-drawn pixel art and not
+  > pretending to be. Dropping in real atlases later is a change of one module. This is a
+  > staffing limitation being stated plainly, not a design decision.
 - **Optional CRT overlay** (scanlines + slight bloom), off by default. It's a garnish now, not
   the look.
 

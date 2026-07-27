@@ -20,6 +20,11 @@ import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
 import { PadTest } from './padtest';
+import { Audio } from '@/engine/audio';
+import { Speech } from '@/engine/speech';
+import { Presentation } from './presentation';
+import { Lighting } from '@/render/lighting';
+import { ScreenFx, prefersReducedMotion } from '@/render/fx';
 import { SetupScreen } from './setup';
 import { cloneRules, DEFAULT_RULES, tierOf } from '@/data/rules';
 import { loadSettings } from '@/engine/storage';
@@ -33,6 +38,12 @@ export class PlayScreen implements LoopHost {
   private hud = new Hud();
   private padTest = new PadTest();
   private setup: SetupScreen;
+  readonly audio = new Audio();
+  readonly speech = new Speech();
+  private readonly fx = new ScreenFx();
+  private readonly lighting = new Lighting();
+  private presentation: Presentation;
+  private lastLevelIndex = 0;
   private fireModel: FireModel;
   private classId: ClassId;
   private seed = 0x5eed;
@@ -53,6 +64,11 @@ export class PlayScreen implements LoopHost {
     this.setup = new SetupScreen(cloneRules(loadSettings().rules ?? DEFAULT_RULES));
     this.run = new Run(this.campaign, classId, this.seed, 0, this.setup.rules);
     this.run.world.fireModel = this.fireModel;
+    this.presentation = new Presentation(this.audio, this.speech, this.fx);
+    if (prefersReducedMotion()) {
+      this.fx.motionEnabled = false;
+      this.presentation.particles.enabled = false;
+    }
     this.tilemap = new TilemapRenderer(theme('stone'), display.layout.pxPerWu);
     display.onLayoutChange((l) => this.tilemap.onLayoutChange(theme('stone'), l.pxPerWu));
   }
@@ -64,6 +80,8 @@ export class PlayScreen implements LoopHost {
 
   poll(): void {
     this.input.poll();
+    // Browsers refuse to start audio without a gesture; the first real input is ours.
+    if (this.input.keyboard.anyActivity() || this.input.gamepad.anyActivity()) this.audio.unlock();
   }
 
   step(stepIndex: number): void {
@@ -102,6 +120,16 @@ export class PlayScreen implements LoopHost {
     this.world.step(a);
     this.world.fireModel = this.fireModel;
     this.run.step();
+
+    if (this.run.levelIndex !== this.lastLevelIndex) {
+      this.lastLevelIndex = this.run.levelIndex;
+      this.presentation.onNewLevel(this.world);
+    }
+    this.presentation.consume(this.world);
+
+    if (this.input.keyboard.wasCodePressed('KeyM')) {
+      this.audio.setMuted(!this.audio.muted);
+    }
   }
 
   private devHotkeys(): void {
@@ -161,6 +189,7 @@ export class PlayScreen implements LoopHost {
     ctx.beginPath();
     ctx.rect(pf.x, pf.y, pf.w, pf.h);
     ctx.clip();
+    ctx.translate(this.fx.offsetX, this.fx.offsetY);
     const p = this.world.player;
     const px = layout.pxPerWu;
     const camX = Math.round(this.world.camera.x * px);
@@ -196,7 +225,12 @@ export class PlayScreen implements LoopHost {
     for (const pr of this.world.projectiles) {
       if (pr.alive) drawProjectile(ctx, pr, toX(pr.x), toY(pr.y), px);
     }
+    this.presentation.particles.draw(ctx, pf, toX, toY, px);
     ctx.restore();
+
+    this.lighting.draw(ctx, pf, this.presentation.collectLights(this.world, toX, toY, px));
+    this.fx.drawOverlays(ctx, layout, pf);
+    this.drawCaptions(ctx, layout, pf);
 
     if (p.damageFlash > 0) {
       ctx.save();
@@ -224,6 +258,35 @@ export class PlayScreen implements LoopHost {
     this.drawPadHint(ctx, layout);
     this.padTest.draw(ctx, layout, this.input);
     this.setup.draw(ctx, layout);
+  }
+
+  /** The announcer's line, always drawn. Captions are the primary channel: voice
+   *  availability varies wildly, and plenty of people play muted (DESIGN.md §6.5). */
+  private drawCaptions(
+    ctx: CanvasRenderingContext2D,
+    layout: import('@/engine/display').Layout,
+    pf: { x: number; y: number; w: number; h: number },
+  ): void {
+    const caps = this.speech.activeCaptions();
+    if (!caps.length) return;
+    const s = layout.uiScale;
+    ctx.save();
+    ctx.textAlign = 'center';
+    let y = pf.y + pf.h - 34 * s;
+    for (let i = caps.length - 1; i >= 0; i--) {
+      const c = caps[i];
+      const fade = Math.min(1, (c.until - performance.now()) / 500);
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.font = `700 ${13 * s}px ui-sans-serif, system-ui, sans-serif`;
+      const w = ctx.measureText(c.text).width + 22 * s;
+      ctx.fillStyle = 'rgba(8,8,12,.78)';
+      ctx.fillRect(pf.x + (pf.w - w) / 2, y - 15 * s, w, 22 * s);
+      ctx.fillStyle = '#ffe9a0';
+      ctx.fillText(c.text, pf.x + pf.w / 2, y);
+      y -= 26 * s;
+    }
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
 
   /** An altered run must never be able to look like a real one, so the tier is shown
