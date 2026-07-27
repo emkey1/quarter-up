@@ -1,0 +1,22 @@
+{
+  "name": "bracer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A single-player, browser-based dungeon crawler in the spirit of Gauntlet (1985).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

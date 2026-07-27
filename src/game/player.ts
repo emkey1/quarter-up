@@ -1,0 +1,128 @@
+import { T } from '@/data/tuning';
+import { CLASSES, type ClassId, type UpgradeId } from '@/data/classes';
+import type { ActionState } from '@/engine/actions';
+import { fireRoots, type FireModel } from '@/engine/input';
+import { moveBody, type Body } from './collision';
+import { resolveStats } from './stats';
+import type { Terrain } from './terrain';
+
+/** 8-way facing, matching the gamepad octants: 0=E, clockwise. */
+export const FACE_DX = [1, 1, 0, -1, -1, -1, 0, 1] as const;
+export const FACE_DY = [0, 1, 1, 1, 0, -1, -1, -1] as const;
+
+export function facingFrom(dx: number, dy: number, fallback: number): number {
+  if (dx === 0 && dy === 0) return fallback;
+  const oct = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) & 7;
+  return oct;
+}
+
+export class Player implements Body {
+  x = 0;
+  y = 0;
+  readonly half = T.PLAYER_HALF;
+
+  classId: ClassId;
+  upgrades = new Set<UpgradeId>();
+
+  facing = 2; // south, like every sprite sheet's idle frame
+  health = T.START_HEALTH;
+  score = 0;
+  credits = 1;
+
+  keys = 0;
+  potions = 0;
+
+  /** Frames the current Fire press has been held, including this one. 0 when up. */
+  fireHeldFrames = 0;
+  /** True while the fire model is suppressing translation — surfaced to the HUD/debug
+   *  so the rooting is visible rather than feeling like dropped input. */
+  rooted = false;
+
+  /** Sub-frame accumulator for the 1 hp/sec drain. */
+  private drainAcc = 0;
+  /** Frames of continuous stillness, for the 180s walls-become-exits rule. */
+  stillFrames = 0;
+
+  moved = false;
+  assisted = false;
+
+  constructor(classId: ClassId) {
+    this.classId = classId;
+  }
+
+  get cls() {
+    return CLASSES[this.classId];
+  }
+
+  get stats() {
+    return resolveStats(this.cls, this.upgrades);
+  }
+
+  get speedWuPerFrame(): number {
+    return this.stats.speed * T.SPEED_UNIT;
+  }
+
+  get inventoryUsed(): number {
+    return this.keys + this.potions;
+  }
+
+  get inventoryFull(): boolean {
+    return this.inventoryUsed >= T.INVENTORY_SLOTS;
+  }
+
+  step(terrain: Terrain, a: Readonly<ActionState>, fireModel: FireModel): void {
+    // --- fire bookkeeping (the shot itself lands in M1)
+    this.fireHeldFrames = a.fire ? this.fireHeldFrames + 1 : 0;
+    this.rooted = fireRoots(fireModel, a.fire, this.fireHeldFrames);
+
+    // --- facing: never suppressed. You can always turn on the spot while firing;
+    // without this, Arcade mode is unplayable rather than merely demanding.
+    if (fireModel === 'twinstick' && (a.aimX !== 0 || a.aimY !== 0)) {
+      this.facing = facingFrom(a.aimX, a.aimY, this.facing);
+    } else if (!a.faceLock && (a.moveX !== 0 || a.moveY !== 0)) {
+      this.facing = facingFrom(a.moveX, a.moveY, this.facing);
+    }
+
+    // --- translation
+    let vx = 0;
+    let vy = 0;
+    if (!this.rooted) {
+      const speed = this.speedWuPerFrame;
+      vx = a.moveX * speed;
+      vy = a.moveY * speed;
+      // [i] The original almost certainly applied each axis independently, making
+      // diagonals ~1.41x faster. Flagged for the fidelity pass; togglable meanwhile.
+      if (T.DIAGONAL_NORMALISE && vx !== 0 && vy !== 0) {
+        const k = Math.SQRT1_2;
+        vx *= k;
+        vy *= k;
+      }
+    }
+
+    if (vx !== 0 || vy !== 0) {
+      const r = moveBody(terrain, this, vx, vy);
+      this.moved = r.movedX !== 0 || r.movedY !== 0;
+      this.assisted = r.assisted;
+    } else {
+      this.moved = false;
+      this.assisted = false;
+    }
+
+    // Stillness for the walls-become-exits trick counts *movement input*, not
+    // displacement — you may shoot and turn freely while waiting it out.
+    if (a.moveX !== 0 || a.moveY !== 0) this.stillFrames = 0;
+    else this.stillFrames++;
+
+    // --- the clock that makes Gauntlet Gauntlet
+    this.drainAcc += T.HEALTH_DRAIN_PER_SEC / T.STEP_HZ;
+    if (this.drainAcc >= 1) {
+      const whole = Math.floor(this.drainAcc);
+      this.drainAcc -= whole;
+      this.health -= whole;
+    }
+  }
+
+  get dead(): boolean {
+    return this.health <= 0;
+  }
+}
