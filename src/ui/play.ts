@@ -2,11 +2,11 @@ import { CLASS_ORDER, type ClassId } from '@/data/classes';
 import type { Display } from '@/engine/display';
 import type { Input } from '@/engine/input';
 import { defaultFireModel, type FireModel } from '@/engine/input';
-import type { LoopHost } from '@/engine/loop';
 import type { Loop } from '@/engine/loop';
-import { Run } from '@/game/flow';
-import type { LevelData } from '@/game/level';
-import { CAMPAIGN, PROVING } from '@/data/campaign';
+import type { Run } from '@/game/flow';
+import { PROVING } from '@/data/campaign';
+import type { Screen } from './screen';
+import type { ActionState } from '@/engine/actions';
 import {
   drawPlayer,
   drawMonster,
@@ -31,22 +31,19 @@ import { loadSettings } from '@/engine/storage';
 
 const FIRE_CYCLE: FireModel[] = ['arcade', 'feathered', 'free', 'twinstick'];
 
-export class PlayScreen implements LoopHost {
-  private run: Run;
-  private campaign: readonly LevelData[];
+export class PlayScreen implements Screen {
+  readonly id = 'play' as const;
   private tilemap: TilemapRenderer;
   private hud = new Hud();
-  private padTest = new PadTest();
-  private setup: SetupScreen;
-  readonly audio = new Audio();
-  readonly speech = new Speech();
-  private readonly fx = new ScreenFx();
   private readonly lighting = new Lighting();
-  private presentation: Presentation;
-  private lastLevelIndex = 0;
-  private fireModel: FireModel;
-  private classId: ClassId;
-  private seed = 0x5eed;
+  readonly presentation: Presentation;
+  /**
+   * Frames since the player died. The run does not end the instant health hits zero —
+   * the death sound, the flash and the last particles need a beat to land, and cutting
+   * straight to a menu on the frame of death reads as a crash.
+   */
+  private deathFrames = -1;
+  fireModel: FireModel;
   private paused = false;
   /** Render-only animation clock; never read by the simulation. */
   private animFrame = 0;
@@ -56,21 +53,40 @@ export class PlayScreen implements LoopHost {
   constructor(
     private readonly display: Display,
     private readonly input: Input,
-    classId: ClassId = 'elf',
+    private readonly audio: Audio,
+    private readonly speech: Speech,
+    private readonly fx: ScreenFx,
+    private readonly setup: SetupScreen,
+    private readonly getRun: () => Run,
   ) {
-    this.classId = classId;
-    this.campaign = CAMPAIGN;
     this.fireModel = defaultFireModel(input.lastDevice);
-    this.setup = new SetupScreen(cloneRules(loadSettings().rules ?? DEFAULT_RULES));
-    this.run = new Run(this.campaign, classId, this.seed, 0, this.setup.rules);
-    this.run.world.fireModel = this.fireModel;
     this.presentation = new Presentation(this.audio, this.speech, this.fx);
-    if (prefersReducedMotion()) {
-      this.fx.motionEnabled = false;
-      this.presentation.particles.enabled = false;
-    }
     this.tilemap = new TilemapRenderer(theme('stone'), display.layout.pxPerWu);
     display.onLayoutChange((l) => this.tilemap.onLayoutChange(theme('stone'), l.pxPerWu));
+  }
+
+  private get run(): Run {
+    return this.getRun();
+  }
+
+  /** The run object was replaced (new run, continue, rules change). */
+  onRunChanged(): void {
+    this.deathFrames = -1;
+    this.paused = false;
+    this.presentation.particles.clear();
+    this.presentation.announcer.reset();
+    this.speech.cancel();
+    this.fx.reset();
+  }
+
+  onNewLevel(): void {
+    this.deathFrames = -1;
+    this.presentation.onNewLevel(this.world);
+  }
+
+  /** Has the death animation had its moment? The app ends the run on this. */
+  get deathSettled(): boolean {
+    return this.deathFrames >= 90;
   }
 
   /** The active simulation. Kept as a getter so level transitions are transparent. */
@@ -78,41 +94,8 @@ export class PlayScreen implements LoopHost {
     return this.run.world;
   }
 
-  poll(): void {
-    this.input.poll();
-    // Browsers refuse to start audio without a gesture; the first real input is ours.
-    if (this.input.keyboard.anyActivity() || this.input.gamepad.anyActivity()) this.audio.unlock();
-  }
-
-  step(stepIndex: number): void {
-    const a = this.input.sample(stepIndex);
-
-    if (stepIndex === 0) {
-      // The toggle key is owned HERE and nowhere else. Handling it in both the caller
-      // and PadTest.update() meant a single press opened and closed the overlay within
-      // one frame, so it appeared completely dead.
-      const kb = this.input.keyboard;
-      if (kb.wasCodePressed('KeyG') || kb.wasCodePressed('F1')) this.padTest.toggle();
-      if (this.padTest.open) {
-        this.padTest.update(this.input);
-        return;
-      }
-      if (kb.wasCodePressed('Tab')) this.setup.toggle();
-      if (this.setup.open) {
-        this.setup.update(this.input);
-        return;
-      }
-      // Rules changed while the screen was open: rebuild the level under them, because
-      // a disabled monster family has to actually stop existing.
-      if (this.setup.dirty) {
-        this.setup.dirty = false;
-        this.run.applyRules(cloneRules(this.setup.rules));
-        this.run.world.fireModel = this.fireModel;
-      }
-      this.devHotkeys();
-    } else if (this.padTest.open || this.setup.open) {
-      return;
-    }
+  step(a: Readonly<ActionState>, stepIndex: number): void {
+    if (stepIndex === 0) this.devHotkeys();
 
     if (a.pausePressed) this.paused = !this.paused;
     if (this.paused) return;
@@ -120,16 +103,11 @@ export class PlayScreen implements LoopHost {
     this.world.step(a);
     this.world.fireModel = this.fireModel;
     this.run.step();
-
-    if (this.run.levelIndex !== this.lastLevelIndex) {
-      this.lastLevelIndex = this.run.levelIndex;
-      this.presentation.onNewLevel(this.world);
-    }
     this.presentation.consume(this.world);
 
-    if (this.input.keyboard.wasCodePressed('KeyM')) {
-      this.audio.setMuted(!this.audio.muted);
-    }
+    // Once dead, the simulation is frozen but the presentation keeps settling: the
+    // flash fades, particles fall, the last sound finishes. Only then does the run end.
+    if (this.world.player.dead) this.deathFrames = Math.max(0, this.deathFrames) + 1;
   }
 
   private devHotkeys(): void {
@@ -140,43 +118,18 @@ export class PlayScreen implements LoopHost {
       this.fireModel = FIRE_CYCLE[(i + 1) % FIRE_CYCLE.length]!;
       this.world.fireModel = this.fireModel;
     }
-    for (let i = 0; i < CLASS_ORDER.length; i++) {
-      if (kb.wasCodePressed(`Digit${i + 1}`)) {
-        this.classId = CLASS_ORDER[i]!;
-        this.reset();
-      }
-    }
-    if (kb.wasCodePressed('KeyR')) this.reset();
     if (kb.wasCodePressed('KeyN')) this.skipLevel();
-    if (kb.wasCodePressed('KeyT')) this.toggleProving();
-    if (kb.wasCodePressed('BracketRight')) this.display.cycleScale(1);
-    if (kb.wasCodePressed('BracketLeft')) this.display.cycleScale(-1);
-    if (kb.wasCodePressed('KeyF')) {
-      if (document.fullscreenElement) void document.exitFullscreen();
-      else void document.documentElement.requestFullscreen().catch(() => {});
-    }
-  }
-
-  private reset(): void {
-    this.run = new Run(this.campaign, this.classId, this.seed, 0, this.setup.rules);
-    this.run.world.fireModel = this.fireModel;
   }
 
   /** Dev: jump straight to the next level without finding the exit. */
   private skipLevel(): void {
     this.run.advance();
     this.run.world.fireModel = this.fireModel;
+    this.onRunChanged();
   }
 
-  /** Dev: swap to the systems-testing proving ground and back. */
-  private toggleProving(): void {
-    this.campaign = this.campaign === CAMPAIGN ? [PROVING] : CAMPAIGN;
-    this.reset();
-  }
-
-  draw(): void {
+  draw(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
     this.animFrame++;
-    const { ctx, layout } = this.display;
     const pf = layout.playfield;
 
     ctx.fillStyle = '#07070a';
@@ -256,8 +209,24 @@ export class PlayScreen implements LoopHost {
     if (this.paused) this.drawPaused(ctx, layout.playfield, layout.uiScale);
     this.drawTierBadge(ctx, layout);
     this.drawPadHint(ctx, layout);
-    this.padTest.draw(ctx, layout, this.input);
-    this.setup.draw(ctx, layout);
+  }
+
+  /**
+   * Advance the live level used as a backdrop behind the menus.
+   *
+   * Deliberately a STEP method, not part of draw(). Ticking the simulation from inside
+   * draw() would break the one rule the whole architecture rests on — draw() never
+   * mutates — and would tie the backdrop's speed to the frame rate rather than to the
+   * fixed timestep.
+   */
+  stepBackdrop(): void {
+    this.world.step(IDLE);
+    this.presentation.consume(this.world);
+  }
+
+  /** The backdrop's rendering is just the ordinary play draw. */
+  drawBackdrop(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
+    this.draw(ctx, layout);
   }
 
   /** The announcer's line, always drawn. Captions are the primary channel: voice
@@ -295,7 +264,6 @@ export class PlayScreen implements LoopHost {
     ctx: CanvasRenderingContext2D,
     layout: import('@/engine/display').Layout,
   ): void {
-    if (this.setup.open || this.padTest.open) return;
     const tier = tierOf(this.setup.rules);
     if (tier === 'arcade') return;
     const s = layout.uiScale;
@@ -316,7 +284,6 @@ export class PlayScreen implements LoopHost {
   /** Always-visible hint, because the debug flank disappears on narrow windows and a
    *  silently-absent controller is otherwise indistinguishable from a broken one. */
   private drawPadHint(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
-    if (this.padTest.open) return;
     const gp = this.input.gamepad;
     const s = layout.uiScale;
     const pf = layout.playfield;
@@ -359,3 +326,11 @@ export class PlayScreen implements LoopHost {
     ctx.textAlign = 'left';
   }
 }
+
+/** No input at all — what the attract-mode backdrop is played with. */
+const IDLE: Readonly<ActionState> = {
+  moveX: 0, moveY: 0, aimX: 0, aimY: 0,
+  fire: false, firePressed: false, magic: false, magicPressed: false,
+  faceLock: false, pausePressed: false, mutePressed: false,
+  confirmPressed: false, cancelPressed: false,
+};

@@ -2,7 +2,7 @@ import { Display } from '@/engine/display';
 import { Input } from '@/engine/input';
 import { Loop } from '@/engine/loop';
 import { loadSettings } from '@/engine/storage';
-import { PlayScreen } from '@/ui/play';
+import { App } from '@/ui/app';
 
 function boot(): void {
   const stage = document.getElementById('stage');
@@ -22,9 +22,9 @@ function boot(): void {
   // gives the document user activation, which some engines also require first.
   window.addEventListener('gamepadconnected', () => input.poll(), { once: false });
 
-  const screen = new PlayScreen(display, input, 'elf');
-  const loop = new Loop(screen);
-  screen.loop = loop;
+  const app = new App(display, input);
+  const loop = new Loop(app);
+  app.loop = loop;
   loop.start();
 
   document.getElementById('boot')?.remove();
@@ -35,7 +35,7 @@ function boot(): void {
     bracer: {
       display,
       input,
-      screen,
+      app,
       loop,
       padReport: () => {
         const txt = input.gamepad.log.report();

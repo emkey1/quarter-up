@@ -3,7 +3,7 @@
 A browser-based, single-player dungeon crawler that closely mimics the mechanics, feel, and
 presentation of Atari Games' **Gauntlet** (arcade, 1985).
 
-**Status:** design v2 — **M0–M3 implemented** (§12), including the setup screen (§6.6). Presentation next.
+**Status:** design v2 — **M0–M4 implemented** (§12), including the setup screen (§6.6). Content and editor next.
 **Target:** modern desktop browsers, keyboard **or gamepad**, 60 Hz fixed-step simulation,
 HTML5 Canvas, art at 2× the original's resolution.
 

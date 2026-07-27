@@ -184,3 +184,84 @@ export const CLASS_ORDER: readonly ClassId[] = ['warrior', 'valkyrie', 'wizard',
 /** The six permanent upgrades. Each may be taken once per run. */
 export const UPGRADES = ['armor', 'magic', 'shotPower', 'shotSpeed', 'speed', 'fightPower'] as const;
 export type UpgradeId = (typeof UPGRADES)[number];
+
+/* ------------------------------------------------------------------ derived display */
+
+export interface StatBar {
+  label: string;
+  base: number;
+  extra: number;
+  max: number;
+  /** Why it matters, for the character-select blurb line. */
+  note: string;
+}
+
+function avg(r: Roll): number {
+  return typeof r === 'number' ? r : (r[0] + r[1]) / 2;
+}
+
+function fam(v: ByFamily): number {
+  return typeof v === 'number' ? v : (v.bone + v.block) / 2;
+}
+
+/**
+ * The six bars shown on the character-select screen.
+ *
+ * Ordered by how much each actually decides a run, not alphabetically. Magic vs
+ * generators is first because it is the single biggest difference between the classes:
+ * the Wizard erases a generator nest with one potion and the Warrior cannot dent it.
+ */
+export function classBars(c: CharacterClass): StatBar[] {
+  return [
+    {
+      label: 'Magic vs generators',
+      base: fam(c.base.magicVsGenerators),
+      extra: fam(c.extra.magicVsGenerators),
+      max: 3,
+      note: 'Whether a potion clears a nest or merely annoys it.',
+    },
+    {
+      label: 'Speed',
+      base: c.base.speed,
+      extra: c.extra.speed,
+      max: 5,
+      note: 'Outrunning a horde is often better than fighting it.',
+    },
+    {
+      label: 'Shot power',
+      base: avg(c.base.shotStrength),
+      extra: avg(c.extra.shotStrength),
+      max: 3,
+      note: 'Hits needed to bring down a level-3 generator.',
+    },
+    {
+      label: 'Armour',
+      base: c.base.armor * 10,
+      extra: c.extra.armor * 10,
+      max: 4,
+      note: 'Percentage of every hit you simply do not take.',
+    },
+    {
+      label: 'Melee',
+      base: avg(c.base.meleeVsMonsters),
+      extra: avg(c.extra.meleeVsMonsters),
+      max: 3,
+      note: 'Your way out when surrounded — useless against ghosts.',
+    },
+    {
+      label: 'Shot speed',
+      base: c.base.shotSpeed,
+      extra: c.extra.shotSpeed,
+      max: 5,
+      note: 'How fast you can fire again from range.',
+    },
+  ];
+}
+
+/** The one-line verdict under each class, drawn from the strategy consensus. */
+export const CLASS_VERDICT: Record<ClassId, string> = {
+  warrior: 'Hardest hitter, worst solo pick — his magic cannot touch a generator.',
+  valkyrie: 'Toughest, and her thin shots thread diagonal cover.',
+  wizard: 'One potion erases a generator nest. Everything else is a liability.',
+  elf: 'Fastest, with near-Wizard magic. The strongest solo choice.',
+};

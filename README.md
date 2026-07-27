@@ -12,9 +12,10 @@ original; "Gauntlet" is a trademark of its respective owner.
 
 ## Status
 
-**M3 complete** — the full monster roster (demons firing through walls, phasing
-sorcerers, lobbers arcing rocks over cover, Death, the Thief), plus a **setup screen**
-for enabling and disabling individual features. Presentation is M4. See DESIGN.md §12.
+**M4 complete** — presentation: synthesised audio, the announcer with captions,
+lighting and particles, and the full screen flow (attract, character select, level
+intro, game over with the arcade continue countdown, and a local high-score table
+ranked on score per credit). Content and the level editor are M5. See DESIGN.md §12.
 
 | Milestone | State |
 | --- | --- |
@@ -23,7 +24,7 @@ for enabling and disabling individual features. Presentation is M4. See DESIGN.m
 | M2 items, terrain, level flow | done |
 | M3 full monster roster | done |
 | M4 presentation | next |
-| M5 content + editor | |
+| M5 content + editor | next |
 | M6 polish | |
 
 ## Running it
@@ -61,9 +62,8 @@ something. A level that cannot be finished fails the build rather than shipping.
 | Face lock | `Alt` / `L` | `X` |
 | Pause | `P` / `Esc` | `Start` |
 
-Development hotkeys: `G` controller setup, `O` cycles the fire model, `1`–`4` switch
-class, `N` next level, `T` toggles the proving ground, `R` resets, `[` `]` change
-scale, `F` fullscreen.
+`Tab` opens setup, `G` controller setup, `M` mutes, `[` `]` change scale, `F`
+fullscreen. Development hotkeys: `O` cycles the fire model, `N` skips a level.
 
 ### Controller not working?
 
