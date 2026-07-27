@@ -150,7 +150,7 @@ export class GamepadInput {
   /** Set for a few seconds after a connect/disconnect so the HUD can toast it. */
   statusChangedAt = -1;
 
-  private detectBaseline: number[] | null = null;
+  private detectBaseline: Map<number, number[]> | null = null;
 
   attach(): void {
     window.addEventListener('gamepadconnected', this.onConnect);
@@ -174,6 +174,28 @@ export class GamepadInput {
 
   private pads(): (Gamepad | null)[] {
     return typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+  }
+
+  /* --------------------------------------------------------------- diagnostics */
+
+  /** Is the Gamepad API present at all? False on very old or locked-down browsers. */
+  get apiAvailable(): boolean {
+    return typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function';
+  }
+
+  /** Raw pad list, for the controller-setup screen. */
+  allPads(): (Gamepad | null)[] {
+    return this.pads();
+  }
+
+  activePad(): Gamepad | null {
+    return this.activeIndex >= 0 ? (this.pads()[this.activeIndex] ?? null) : null;
+  }
+
+  /** Any pad the browser will admit to, active or not. */
+  anyPadConnected(): boolean {
+    for (const p of this.pads()) if (p?.connected) return true;
+    return false;
   }
 
   /** Called exactly once per rendered frame. */
@@ -272,39 +294,71 @@ export class GamepadInput {
   /* --------------------------------------------------------------- binding detection */
 
   /**
-   * Options flow: "press the control you want". Snapshot the resting axis values first
-   * (triggers commonly rest at -1, hats at some odd constant), then report the first
-   * thing that moves. This is what makes arcade sticks and older pads bindable.
+   * Options flow: "press the control you want". Snapshot every pad's resting axis
+   * values first (triggers commonly rest at -1, hats at some odd constant), then report
+   * the first thing that moves. This is what makes arcade sticks and older pads bindable.
+   *
+   * Scans ALL pads, not just the active one — when a controller "does nothing", the
+   * usual cause is that it never became active, so binding must not require it to be.
    */
   beginDetect(): void {
-    const pad = this.activeIndex >= 0 ? this.pads()[this.activeIndex] : null;
-    this.detectBaseline = pad ? Array.from(pad.axes) : null;
+    this.detectBaseline = new Map();
+    for (const p of this.pads()) {
+      if (p?.connected) this.detectBaseline.set(p.index, Array.from(p.axes));
+    }
   }
 
-  detect(): PadSource | null {
-    const pad = this.activeIndex >= 0 ? this.pads()[this.activeIndex] : null;
-    if (!pad) return null;
+  detect(): { padId: string; padIndex: number; source: PadSource } | null {
+    for (const pad of this.pads()) {
+      if (!pad?.connected) continue;
 
-    for (let i = 0; i < pad.buttons.length; i++) {
-      const b = pad.buttons[i];
-      if (b && (b.pressed || b.value >= T.PAD_TRIGGER_THRESHOLD)) {
-        return { kind: 'button', index: i };
+      for (let i = 0; i < pad.buttons.length; i++) {
+        const b = pad.buttons[i];
+        if (b && (b.pressed || b.value >= T.PAD_TRIGGER_THRESHOLD)) {
+          this.activeIndex = pad.index;
+          return { padId: pad.id, padIndex: pad.index, source: { kind: 'button', index: i } };
+        }
       }
-    }
 
-    const base = this.detectBaseline;
-    for (let i = 0; i < pad.axes.length; i++) {
-      const v = pad.axes[i] ?? 0;
-      const rest = base?.[i] ?? 0;
-      if (Math.abs(v - rest) < 0.6) continue;
-      // A hat reports as an axis that snaps to a set of odd constants rather than
-      // sweeping; treat a non-extreme resting-offset value as a hat position.
-      if (Math.abs(v) < 0.98 && Math.abs(v) > 0.02) {
-        return { kind: 'hat', index: i, value: v, epsilon: 0.08 };
+      const base = this.detectBaseline?.get(pad.index);
+      for (let i = 0; i < pad.axes.length; i++) {
+        const v = pad.axes[i] ?? 0;
+        const rest = base?.[i] ?? 0;
+        if (Math.abs(v - rest) < 0.3) continue;
+        // An axis *returning to centre* is a large change but not a deflection. Without
+        // this, binding Right and then releasing the stick immediately re-binds the next
+        // action to that same axis with a meaningless sign.
+        if (Math.abs(v) < 0.35 && Math.abs(rest) > 0.5) continue;
+        this.activeIndex = pad.index;
+        // A hat reports as an axis that snaps to a set of odd constants rather than
+        // sweeping; treat a non-extreme resting-offset value as a hat position.
+        const source: PadSource =
+          Math.abs(v) < 0.98 && Math.abs(v) > 0.02
+            ? { kind: 'hat', index: i, value: v, epsilon: 0.08 }
+            : { kind: 'axis', index: i, sign: v > 0 ? 1 : -1 };
+        return { padId: pad.id, padIndex: pad.index, source };
       }
-      return { kind: 'axis', index: i, sign: v > 0 ? 1 : -1 };
     }
     return null;
+  }
+
+  /** Record a binding into this pad's profile, creating one from the standard map. */
+  bindAction(padId: string, action: ActionName, source: PadSource): void {
+    const existing = this.profiles[padId];
+    const profile: PadProfile = existing ?? {
+      match: padId,
+      label: `Custom — ${padId.slice(0, 28)}`,
+      moveStick: STANDARD_PROFILE.moveStick,
+      aimStick: STANDARD_PROFILE.aimStick,
+      sources: structuredClone(STANDARD_PROFILE.sources),
+    };
+    profile.sources[action] = [source];
+    deriveMoveStick(profile);
+    this.profiles[padId] = profile;
+  }
+
+  resetProfile(padId: string): void {
+    delete this.profiles[padId];
   }
 
   /* --------------------------------------------------------------- rumble */
@@ -324,6 +378,29 @@ export class GamepadInput {
       .catch(() => {
         /* not all browsers support dual-rumble; silently skip */
       });
+  }
+}
+
+/**
+ * If left/right ended up bound to opposite halves of one axis and up/down likewise,
+ * that's a stick, not four buttons — promote it back to `moveStick` so it gets octant
+ * quantisation instead of per-axis thresholding. Per-axis would make the diagonal
+ * wedges twice as wide as the cardinals, which feels nothing like the cabinet.
+ */
+function deriveMoveStick(p: PadProfile): void {
+  const axisOf = (a: ActionName): { index: number; sign: number } | null => {
+    const s = p.sources[a]?.[0];
+    return s && s.kind === 'axis' ? { index: s.index, sign: s.sign } : null;
+  };
+  const l = axisOf('left');
+  const r = axisOf('right');
+  const u = axisOf('up');
+  const d = axisOf('down');
+  if (l && r && u && d && l.index === r.index && u.index === d.index && l.sign !== r.sign) {
+    p.moveStick = { x: r.index, y: d.index };
+  } else {
+    // Bound to buttons or a hat: drive movement from those, not from a stick.
+    p.moveStick = null;
   }
 }
 

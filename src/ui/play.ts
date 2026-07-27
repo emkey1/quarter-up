@@ -10,6 +10,7 @@ import { drawPlayer } from '@/render/entities';
 import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
+import { PadTest } from './padtest';
 
 const FIRE_CYCLE: FireModel[] = ['arcade', 'feathered', 'free', 'twinstick'];
 
@@ -17,6 +18,7 @@ export class PlayScreen implements LoopHost {
   private world: World;
   private tilemap: TilemapRenderer;
   private hud = new Hud();
+  private padTest = new PadTest();
   private fireModel: FireModel;
   private classId: ClassId;
   private seed = 0x5eed;
@@ -47,7 +49,13 @@ export class PlayScreen implements LoopHost {
   step(stepIndex: number): void {
     const a = this.input.sample(stepIndex);
 
-    if (stepIndex === 0) this.devHotkeys();
+    if (stepIndex === 0) {
+      if (this.input.keyboard.wasCodePressed('KeyG') && !this.padTest.open) this.padTest.toggle();
+      if (this.padTest.update(this.input)) return;
+      this.devHotkeys();
+    } else if (this.padTest.open) {
+      return;
+    }
 
     if (a.pausePressed) this.paused = !this.paused;
     if (this.paused) return;
@@ -126,6 +134,37 @@ export class PlayScreen implements LoopHost {
     });
 
     if (this.paused) this.drawPaused(ctx, layout.playfield, layout.uiScale);
+    this.drawPadHint(ctx, layout);
+    this.padTest.draw(ctx, layout, this.input);
+  }
+
+  /** Always-visible hint, because the debug flank disappears on narrow windows and a
+   *  silently-absent controller is otherwise indistinguishable from a broken one. */
+  private drawPadHint(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
+    if (this.padTest.open) return;
+    const gp = this.input.gamepad;
+    const s = layout.uiScale;
+    const pf = layout.playfield;
+    const msg = gp.anyPadConnected()
+      ? gp.status.standard
+        ? null
+        : 'Non-standard controller — press G to set it up'
+      : 'No controller detected — press a button on it, or G for setup';
+    if (!msg) return;
+
+    ctx.save();
+    ctx.font = `500 ${10 * s}px ui-sans-serif, system-ui, sans-serif`;
+    const w = ctx.measureText(msg).width + 20 * s;
+    const h = 22 * s;
+    const x = pf.x + pf.w - w - 10 * s;
+    const y = pf.y + pf.h - h - 10 * s;
+    ctx.fillStyle = 'rgba(10,12,16,.8)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(232,195,74,.9)';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(msg, x + 10 * s, y + h / 2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
   }
 
   private drawPaused(

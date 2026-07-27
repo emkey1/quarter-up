@@ -1,6 +1,7 @@
 import { Display } from '@/engine/display';
 import { Input } from '@/engine/input';
 import { Loop } from '@/engine/loop';
+import { loadSettings } from '@/engine/storage';
 import { validateLevel } from '@/game/level';
 import { PlayScreen } from '@/ui/play';
 import provingJson from '@/data/levels/proving.json';
@@ -18,6 +19,16 @@ function boot(): void {
   const display = new Display(stage);
   const input = new Input();
   input.attach();
+
+  const settings = loadSettings();
+  if (settings.padProfiles) input.gamepad.profiles = settings.padProfiles;
+  if (settings.keyBindings) input.keyboard.deserialise(settings.keyBindings);
+  if (settings.analogMovement !== undefined) input.gamepad.analogMovement = settings.analogMovement;
+  if (settings.rumble !== undefined) input.gamepad.rumbleEnabled = settings.rumble;
+
+  // Browsers only expose gamepads after a button press on a focused page; a click
+  // gives the document user activation, which some engines also require first.
+  window.addEventListener('gamepadconnected', () => input.poll(), { once: false });
 
   const screen = new PlayScreen(display, input, result.data, 'elf');
   const loop = new Loop(screen);

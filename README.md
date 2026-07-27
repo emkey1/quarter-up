@@ -56,8 +56,28 @@ node tools/mkproving.mjs
 | Face lock | `Alt` / `L` | `X` |
 | Pause | `P` / `Esc` | `Start` |
 
-Development hotkeys: `O` cycles the fire model, `1`–`4` switch class, `R` resets,
-`[` `]` change scale, `F` toggles fullscreen.
+Development hotkeys: `G` opens controller setup, `O` cycles the fire model, `1`–`4`
+switch class, `R` resets, `[` `]` change scale, `F` toggles fullscreen.
+
+### Controller not working?
+
+Press **`G`** for the controller setup screen. It reports, in order: whether the
+Gamepad API exists, whether the window is focused and visible, how many pads the
+browser admits to, each pad's id and mapping, and live axis/button readouts — then lets
+you rebind any action by pressing the control you want.
+
+The two usual causes:
+
+1. **The browser hasn't been shown the controller yet.** Browsers hide gamepads until a
+   button is pressed on the pad *while that page has focus*, and never expose them to a
+   background or unfocused tab. Click the page, then press a controller button.
+2. **The pad reports a non-standard mapping.** Arcade sticks and older pads often do,
+   and then the W3C standard button indices are simply wrong for it. The setup screen
+   shows `mapping: non-standard` when this is the case; rebind and it is stored per
+   device id in `localStorage`.
+
+Rebinding all four directions to stick axes is recognised and promoted back to proper
+8-way octant quantisation, rather than being treated as four independent buttons.
 
 ### Fire models
 
