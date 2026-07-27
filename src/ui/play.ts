@@ -7,15 +7,7 @@ import type { Run } from '@/game/flow';
 import { PROVING } from '@/data/campaign';
 import type { Screen } from './screen';
 import type { ActionState } from '@/engine/actions';
-import {
-  drawPlayer,
-  drawMonster,
-  drawGenerator,
-  drawProjectile,
-  drawItem,
-  drawDeath,
-  drawThief,
-} from '@/render/entities';
+import { Sprites } from '@/render/sprites';
 import { Hud } from '@/render/hud';
 import { TilemapRenderer } from '@/render/tilemap';
 import { theme } from '@/render/theme';
@@ -36,6 +28,7 @@ export class PlayScreen implements Screen {
   private tilemap: TilemapRenderer;
   private hud = new Hud();
   private readonly lighting = new Lighting();
+  private readonly sprites = new Sprites();
   readonly presentation: Presentation;
   /**
    * Frames since the player died. The run does not end the instant health hits zero —
@@ -151,10 +144,10 @@ export class PlayScreen implements Screen {
     const toY = (wy: number) => pf.y + Math.round(wy * px) - camY;
 
     for (const it of this.world.items) {
-      if (it.alive) drawItem(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
+      if (it.alive) this.sprites.item(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
     }
     for (const g of this.world.generators) {
-      if (g.alive) drawGenerator(ctx, g, toX(g.x), toY(g.y), px, this.animFrame);
+      if (g.alive) this.sprites.generator(ctx, g, toX(g.x), toY(g.y), px);
     }
 
     // Depth-sort entities by y so overlaps read correctly.
@@ -162,21 +155,21 @@ export class PlayScreen implements Screen {
     let drewPlayer = false;
     for (const m of sorted) {
       if (!drewPlayer && m.y > p.y) {
-        drawPlayer(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+        this.sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
         drewPlayer = true;
       }
-      drawMonster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
+      this.sprites.monster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
     }
-    if (!drewPlayer) drawPlayer(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+    if (!drewPlayer) this.sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
 
     for (const d of this.world.deaths) {
-      if (d.alive) drawDeath(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
+      if (d.alive) this.sprites.death(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
     }
     for (const t of this.world.thieves) {
-      if (t.alive) drawThief(ctx, t, toX(t.x), toY(t.y), px, this.animFrame);
+      if (t.alive) this.sprites.thief(ctx, t, toX(t.x), toY(t.y), px, this.animFrame);
     }
     for (const pr of this.world.projectiles) {
-      if (pr.alive) drawProjectile(ctx, pr, toX(pr.x), toY(pr.y), px);
+      if (pr.alive) this.sprites.projectile(ctx, pr, toX(pr.x), toY(pr.y), px);
     }
     this.presentation.particles.draw(ctx, pf, toX, toY, px);
     ctx.restore();

@@ -54,7 +54,10 @@ export class TilemapRenderer {
 
     const pf = layout.playfield;
     const px = layout.pxPerWu;
-    const tilePx = this.atlas.tilePx;
+    // SOURCE is native (32px); DESTINATION is however many device pixels a 16wu block
+    // occupies. Conflating the two put every tile in the wrong place and off-screen.
+    void this.atlas.tilePx; // source size comes from src() below
+    const dstPx = T.TILE * px;
 
     // Round the camera to whole device pixels; a fractional blit origin makes pixel art
     // shimmer as you walk.
@@ -67,6 +70,7 @@ export class TilemapRenderer {
     const r1 = Math.min(T.GRID - 1, Math.floor((cam.y + T.VIEW_H) / T.TILE));
 
     ctx.save();
+    ctx.imageSmoothingEnabled = false; // pixel art must never be interpolated
     ctx.beginPath();
     ctx.rect(pf.x, pf.y, pf.w, pf.h);
     ctx.clip();
@@ -79,22 +83,22 @@ export class TilemapRenderer {
         const doorOpen = (t.flags[i] & TileFlag.DoorOpen) !== 0;
         const variant = hash32(cx, cy, 'floor') % 4;
 
-        const dx = pf.x + cx * tilePx - camX;
-        const dy = pf.y + cy * tilePx - camY;
+        const dx = pf.x + cx * dstPx - camX;
+        const dy = pf.y + cy * dstPx - camY;
 
         // Everything sits on floor first, so partially transparent tiles (open doors,
         // teleport pads, traps) composite correctly.
         if (tile !== Tile.Wall && tile !== Tile.Void) {
           const [, fc] = [AtlasRow.Floor, variant] as const;
           const [sx, sy, sw, sh] = this.atlas.src(AtlasRow.Floor, fc);
-          ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, tilePx, tilePx);
+          ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, dstPx, dstPx);
         }
 
         if (tile === Tile.Floor) continue;
 
         const [row, col] = tileCell(tile, blob < 0 ? 0 : blob, doorOpen, variant);
         const [sx, sy, sw, sh] = this.atlas.src(row, col);
-        ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, tilePx, tilePx);
+        ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, dstPx, dstPx);
       }
     }
 

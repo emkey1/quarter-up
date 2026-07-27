@@ -478,10 +478,21 @@ multiples cleanly.
 
   > **Reality check, recorded during M4.** Hand-drawn art requires a human artist, and this
   > project does not have one. What is actually shipping is **algorithmically generated art**,
-  > baked into offscreen canvases at startup: better than the M0–M3 placeholders, structured
-  > behind exactly the interface a PNG atlas would use, but not hand-drawn pixel art and not
-  > pretending to be. Dropping in real atlases later is a change of one module. This is a
-  > staffing limitation being stated plainly, not a design decision.
+  > baked into offscreen canvases at startup: structured behind exactly the interface a PNG
+  > atlas would use, but not hand-drawn and not pretending to be. Dropping in real atlases
+  > later is a change of one module. A staffing limitation stated plainly, not a design
+  > decision.
+  >
+  > **M4c correction.** The first attempt at this was worse than it needed to be for a reason
+  > that had nothing to do with the missing artist: it drew with `ctx.arc()` and
+  > `ctx.fillRect()` at *display* resolution, producing anti-aliased vector shapes. That can
+  > never read as pixel art whatever the palette does — it is a technique problem, not a
+  > resolution or staffing problem. M4c replaced it with a real indexed-palette pixel buffer
+  > (`render/pixel.ts`) authored at native 32×32 and blitted nearest-neighbour, applying the
+  > craft rules that actually matter at this size: silhouette first, a hard 1px outline on
+  > everything, one light direction applied as a pass over whole ramps, five shade steps,
+  > dithering for gradients, and stone-course texture on walls. Recolouring is still a palette
+  > swap, so monster levels and class tints cost nothing.
 - **Optional CRT overlay** (scanlines + slight bloom), off by default. It's a garnish now, not
   the look.
 

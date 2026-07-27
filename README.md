@@ -13,9 +13,11 @@ original; "Gauntlet" is a trademark of its respective owner.
 ## Status
 
 **M4 complete** — presentation: synthesised audio, the announcer with captions,
-lighting and particles, and the full screen flow (attract, character select, level
-intro, game over with the arcade continue countdown, and a local high-score table
-ranked on score per credit). Content and the level editor are M5. See DESIGN.md §12.
+lighting and particles, the full screen flow (attract, character select, level intro,
+game over with the arcade continue countdown, and a local high-score table ranked on
+score per credit), and procedurally generated **pixel art** — real indexed-palette
+sprites and masonry tiles authored at native 32×32, not vector shapes. Content and the
+level editor are M5. See DESIGN.md §12.
 
 | Milestone | State |
 | --- | --- |
