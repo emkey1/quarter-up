@@ -134,6 +134,35 @@ export class Sprites {
     ctx.restore();
   }
 
+  /**
+   * A single sprite drawn large, for menus. Scaled by an integer factor with smoothing
+   * off, so a portrait is the same art the game uses rather than a separate drawing
+   * that can drift out of sync with it.
+   */
+  portrait(
+    ctx: CanvasRenderingContext2D,
+    key: string,
+    sx: number,
+    sy: number,
+    scale: number,
+    alpha = 1,
+  ): void {
+    const atlas = this.ensure();
+    const f = atlas.frames.get(key);
+    if (!f) return;
+    const size = Math.round(SPRITE * scale);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(
+      atlas.canvas,
+      f.x, f.y, f.w, f.h,
+      Math.round(sx - size / 2), Math.round(sy - size / 2),
+      size, size,
+    );
+    ctx.restore();
+  }
+
   /** White hit flash: draw the sprite again as a solid silhouette. */
   private flash(ctx: CanvasRenderingContext2D, sx: number, sy: number, px: number): void {
     ctx.save();
@@ -147,4 +176,6 @@ export class Sprites {
   }
 }
 
-void SPRITE;
+/** Shared instance: the atlas is deterministic and identical everywhere, so building
+ *  it twice would only waste memory and time. */
+export const sprites = new Sprites();

@@ -3,7 +3,9 @@ import type { ActionState } from '@/engine/actions';
 import { UI, centred, logo, sans, mono, blink } from '@/render/ui';
 import { MenuInput, type Screen } from './screen';
 import { loadScores, sortScores } from './highscores';
-import { CLASSES } from '@/data/classes';
+import { CLASSES, CLASS_ORDER } from '@/data/classes';
+import { sprites } from '@/render/sprites';
+import { WALK_FRAMES } from '@/render/spritegen';
 
 const TIPS: readonly string[] = [
   'Generators are the real enemy. Kill the source, not the stream.',
@@ -59,70 +61,108 @@ export class AttractScreen implements Screen {
     const cw = layout.canvasW;
     const ch = layout.canvasH;
 
-    // The live level is drawn underneath by the app; darken it heavily so the text
-    // stays legible over whatever chaos is happening back there.
-    ctx.fillStyle = 'rgba(4,5,9,.80)';
+    // The live dungeon is drawn underneath by the app. Darken it and vignette hard, so
+    // it reads as atmosphere behind the type rather than competing with it.
+    ctx.save();
+    ctx.fillStyle = 'rgba(4,5,10,.74)';
     ctx.fillRect(0, 0, cw, ch);
+    const vig = ctx.createRadialGradient(
+      cw / 2, ch / 2, Math.min(cw, ch) * 0.15,
+      cw / 2, ch / 2, Math.max(cw, ch) * 0.62,
+    );
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,.88)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.restore();
 
     if (this.page === 'title') {
-      logo(ctx, cw / 2, ch * 0.34, s);
+      logo(ctx, cw / 2, ch * 0.32, s * 1.35);
       centred(
         ctx,
-        'a single-player dungeon crawl in the spirit of Gauntlet',
+        'A SINGLE-PLAYER DUNGEON CRAWL IN THE SPIRIT OF GAUNTLET',
         cw / 2,
-        ch * 0.34 + 26 * s,
-        sans(11, s, 500),
+        ch * 0.32 + 30 * s,
+        sans(10, s, 600),
         UI.dim,
+        2.5 * s,
       );
 
+      // The four classes, walking, as a strip. Shows what the game looks like before
+      // anyone has pressed anything.
+      const n = CLASS_ORDER.length;
+      const step = Math.min(120 * s, cw / (n + 2));
+      const scale = Math.max(2, Math.round((2.6 * s) / 1.2));
+      const py = ch * 0.5;
+      CLASS_ORDER.forEach((id, i) => {
+        const x = cw / 2 + (i - (n - 1) / 2) * step;
+        const frame = Math.floor((this.t + i * 9) / 8) % WALK_FRAMES;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,.45)';
+        ctx.beginPath();
+        ctx.ellipse(x, py + 15 * scale, 10 * scale * 0.6, 3 * scale * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        sprites.portrait(ctx, `p:${id}:2:${frame}`, x, py + (frame === 1 ? -scale : 0), scale);
+        centred(ctx, CLASSES[id].name.toUpperCase(), x, py + 22 * scale, sans(9, s, 700), CLASSES[id].colour, 1 * s);
+      });
+
       if (blink()) {
-        centred(ctx, 'PRESS ENTER', cw / 2, ch * 0.56, sans(18, s, 800), UI.gold, 2 * s);
+        centred(ctx, 'PRESS ENTER', cw / 2, ch * 0.75, sans(20, s, 800), UI.gold, 2.5 * s);
       }
 
-      centred(ctx, TIPS[this.tipIndex], cw / 2, ch * 0.68, sans(12, s, 600), UI.fg);
+      centred(ctx, TIPS[this.tipIndex], cw / 2, ch * 0.84, sans(12, s, 600), UI.fg);
       centred(
         ctx,
-        'TAB setup   •   G controller   •   arrows or a gamepad to play',
+        'TAB  setup       G  controller       arrows or a gamepad to play',
         cw / 2,
-        ch - 26 * s,
+        ch - 28 * s,
         sans(10, s, 500),
         UI.faint,
       );
     } else {
-      centred(ctx, 'HIGH SCORES', cw / 2, ch * 0.24, sans(16, s, 800), UI.gold, 4 * s);
+      centred(ctx, 'HIGH SCORES', cw / 2, ch * 0.2, sans(22, s, 800), UI.gold, 5 * s);
       centred(
         ctx,
-        'ranked by score per credit, as the cabinet did',
+        'RANKED BY SCORE PER CREDIT, AS THE CABINET DID',
         cw / 2,
-        ch * 0.24 + 20 * s,
-        sans(10, s, 500),
+        ch * 0.2 + 24 * s,
+        sans(9, s, 600),
         UI.faint,
+        2 * s,
       );
 
       const list = sortScores(loadScores()).slice(0, 10);
-      const bw = Math.min(400 * s, cw - 60 * s);
+      const bw = Math.min(460 * s, cw - 80 * s);
       const bx = cw / 2 - bw / 2;
-      let y = ch * 0.24 + 48 * s;
+      let y = ch * 0.2 + 58 * s;
 
       if (!list.length) {
         centred(ctx, 'no scores yet — be the first', cw / 2, y + 20 * s, sans(12, s, 500), UI.dim);
       }
       for (const [i, e] of list.entries()) {
-        ctx.font = mono(12, s, 600);
+        if (i % 2 === 0) {
+          ctx.fillStyle = 'rgba(255,255,255,.035)';
+          ctx.fillRect(bx - 8 * s, y - 12 * s, bw + 16 * s, 20 * s);
+        }
+        ctx.font = mono(14, s, 700);
         ctx.fillStyle = i === 0 ? UI.gold : UI.dim;
-        ctx.fillText(`${String(i + 1).padStart(2)}  ${e.initials}`, bx, y);
-        ctx.textAlign = 'right';
+        ctx.fillText(`${String(i + 1).padStart(2)}`, bx, y);
         ctx.fillStyle = i === 0 ? UI.gold : UI.fg;
-        ctx.fillText(String(e.scorePerCredit), bx + bw * 0.6, y);
-        ctx.font = mono(9, s, 500);
+        ctx.fillText(e.initials, bx + 34 * s, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(String(e.scorePerCredit), bx + bw * 0.62, y);
+        ctx.font = mono(10, s, 500);
+        ctx.fillStyle = CLASSES[e.cls].colour;
+        ctx.fillText(CLASSES[e.cls].name, bx + bw * 0.85, y);
         ctx.fillStyle = UI.faint;
-        ctx.fillText(`${CLASSES[e.cls].name.slice(0, 3)}  L${e.deepestLevel}`, bx + bw, y);
+        ctx.fillText(`L${e.deepestLevel}`, bx + bw, y);
         ctx.textAlign = 'left';
-        y += 19 * s;
+        y += 22 * s;
       }
 
       if (blink()) {
-        centred(ctx, 'PRESS ENTER', cw / 2, ch - 44 * s, sans(15, s, 800), UI.gold, 2 * s);
+        centred(ctx, 'PRESS ENTER', cw / 2, ch - 46 * s, sans(18, s, 800), UI.gold, 2.5 * s);
       }
     }
   }

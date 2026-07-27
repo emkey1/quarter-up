@@ -1,3 +1,4 @@
+import { T } from '@/data/tuning';
 import { CLASS_ORDER, type ClassId } from '@/data/classes';
 import type { Display } from '@/engine/display';
 import type { Input } from '@/engine/input';
@@ -7,9 +8,9 @@ import type { Run } from '@/game/flow';
 import { PROVING } from '@/data/campaign';
 import type { Screen } from './screen';
 import type { ActionState } from '@/engine/actions';
-import { Sprites } from '@/render/sprites';
+import { sprites } from '@/render/sprites';
 import { Hud } from '@/render/hud';
-import { TilemapRenderer } from '@/render/tilemap';
+import { TilemapRenderer, viewOrigin } from '@/render/tilemap';
 import { theme } from '@/render/theme';
 import { PadTest } from './padtest';
 import { Audio } from '@/engine/audio';
@@ -28,7 +29,7 @@ export class PlayScreen implements Screen {
   private tilemap: TilemapRenderer;
   private hud = new Hud();
   private readonly lighting = new Lighting();
-  private readonly sprites = new Sprites();
+
   readonly presentation: Presentation;
   /**
    * Frames since the player died. The run does not end the instant health hits zero —
@@ -121,7 +122,16 @@ export class PlayScreen implements Screen {
     this.onRunChanged();
   }
 
-  draw(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
+  /**
+   * `chrome` draws the HUD, debug panel and hints. The menus pass false: a backdrop is
+   * the dungeon, not a screenshot of the game including its status panel. Leaving it on
+   * put the developer readout and the health bar straight through the menu text.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    layout: import('@/engine/display').Layout,
+    chrome = true,
+  ): void {
     this.animFrame++;
     const pf = layout.playfield;
 
@@ -138,16 +148,18 @@ export class PlayScreen implements Screen {
     ctx.translate(this.fx.offsetX, this.fx.offsetY);
     const p = this.world.player;
     const px = layout.pxPerWu;
-    const camX = Math.round(this.world.camera.x * px);
-    const camY = Math.round(this.world.camera.y * px);
+    // Same origin rule as the tilemap, so entities and terrain never disagree.
+    const { originX, originY } = viewOrigin(this.world.camera, pf, px);
+    const camX = Math.round(originX * px);
+    const camY = Math.round(originY * px);
     const toX = (wx: number) => pf.x + Math.round(wx * px) - camX;
     const toY = (wy: number) => pf.y + Math.round(wy * px) - camY;
 
     for (const it of this.world.items) {
-      if (it.alive) this.sprites.item(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
+      if (it.alive) sprites.item(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
     }
     for (const g of this.world.generators) {
-      if (g.alive) this.sprites.generator(ctx, g, toX(g.x), toY(g.y), px);
+      if (g.alive) sprites.generator(ctx, g, toX(g.x), toY(g.y), px);
     }
 
     // Depth-sort entities by y so overlaps read correctly.
@@ -155,21 +167,21 @@ export class PlayScreen implements Screen {
     let drewPlayer = false;
     for (const m of sorted) {
       if (!drewPlayer && m.y > p.y) {
-        this.sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+        sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
         drewPlayer = true;
       }
-      this.sprites.monster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
+      sprites.monster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
     }
-    if (!drewPlayer) this.sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+    if (!drewPlayer) sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
 
     for (const d of this.world.deaths) {
-      if (d.alive) this.sprites.death(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
+      if (d.alive) sprites.death(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
     }
     for (const t of this.world.thieves) {
-      if (t.alive) this.sprites.thief(ctx, t, toX(t.x), toY(t.y), px, this.animFrame);
+      if (t.alive) sprites.thief(ctx, t, toX(t.x), toY(t.y), px, this.animFrame);
     }
     for (const pr of this.world.projectiles) {
-      if (pr.alive) this.sprites.projectile(ctx, pr, toX(pr.x), toY(pr.y), px);
+      if (pr.alive) sprites.projectile(ctx, pr, toX(pr.x), toY(pr.y), px);
     }
     this.presentation.particles.draw(ctx, pf, toX, toY, px);
     ctx.restore();
@@ -190,6 +202,8 @@ export class PlayScreen implements Screen {
     ctx.strokeStyle = 'rgba(255,255,255,.10)';
     ctx.lineWidth = Math.max(1, layout.dpr);
     ctx.strokeRect(pf.x + 0.5, pf.y + 0.5, pf.w - 1, pf.h - 1);
+
+    if (!chrome) return;
 
     this.hud.draw(ctx, layout, this.world, this.run, this.input, this.fireModel, {
       fps: this.loop?.stats.fps ?? 0,
@@ -217,9 +231,27 @@ export class PlayScreen implements Screen {
     this.presentation.consume(this.world);
   }
 
-  /** The backdrop's rendering is just the ordinary play draw. */
+  /**
+   * The dungeon only — no HUD, no debug readout, no hints — filling the whole canvas.
+   *
+   * Widening the drawn area is safe here precisely because nothing is being played: the
+   * locked 232x240 gameplay viewport exists to bound generator pressure and potion
+   * range, and neither matters in a menu.
+   */
   drawBackdrop(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
-    this.draw(ctx, layout);
+    // Zoomed in relative to play: at 1:1 a full-canvas view needs almost the whole
+    // 512wu level, so any camera offset would expose the map edge. Doubling the scale
+    // needs half the level and looks better besides.
+    const px = layout.pxPerWu * 2;
+    this.draw(
+      ctx,
+      {
+        ...layout,
+        pxPerWu: px,
+        playfield: { x: 0, y: 0, w: layout.canvasW, h: layout.canvasH },
+      },
+      false,
+    );
   }
 
   /** The announcer's line, always drawn. Captions are the primary channel: voice

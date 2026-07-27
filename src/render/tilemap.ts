@@ -59,15 +59,20 @@ export class TilemapRenderer {
     void this.atlas.tilePx; // source size comes from src() below
     const dstPx = T.TILE * px;
 
-    // Round the camera to whole device pixels; a fractional blit origin makes pixel art
-    // shimmer as you walk.
-    const camX = Math.round(cam.x * px);
-    const camY = Math.round(cam.y * px);
+    // Draw into WHATEVER rect we are given, centred on the camera. In play that rect is
+    // exactly the locked gameplay viewport and the extras below are zero; the menus pass
+    // a full-canvas rect so the dungeon fills the screen behind them instead of sitting
+    // in a letterboxed column.
+    const { originX, originY } = viewOrigin(cam, pf, px);
+    const camX = Math.round(originX * px);
+    const camY = Math.round(originY * px);
 
-    const c0 = Math.max(0, Math.floor(cam.x / T.TILE));
-    const c1 = Math.min(T.GRID - 1, Math.floor((cam.x + T.VIEW_W) / T.TILE));
-    const r0 = Math.max(0, Math.floor(cam.y / T.TILE));
-    const r1 = Math.min(T.GRID - 1, Math.floor((cam.y + T.VIEW_H) / T.TILE));
+    const viewWu = pf.w / px;
+    const viewHu = pf.h / px;
+    const c0 = Math.max(0, Math.floor(originX / T.TILE));
+    const c1 = Math.min(T.GRID - 1, Math.floor((originX + viewWu) / T.TILE));
+    const r0 = Math.max(0, Math.floor(originY / T.TILE));
+    const r1 = Math.min(T.GRID - 1, Math.floor((originY + viewHu) / T.TILE));
 
     ctx.save();
     ctx.imageSmoothingEnabled = false; // pixel art must never be interpolated
@@ -104,4 +109,25 @@ export class TilemapRenderer {
 
     ctx.restore();
   }
+}
+
+/**
+ * Top-left of the world region a rect should show, in world units.
+ *
+ * In play the rect is exactly the locked gameplay viewport and this returns the camera
+ * unchanged. The menus pass a bigger rect; clamping to the level bounds is what stops a
+ * widened view sliding off the edge of the map and showing black margins.
+ */
+export function viewOrigin(
+  cam: { x: number; y: number },
+  pf: { w: number; h: number },
+  px: number,
+): { originX: number; originY: number } {
+  const viewWu = pf.w / px;
+  const viewHu = pf.h / px;
+  const clamp = (v: number, hi: number) => Math.max(0, Math.min(Math.max(0, hi), v));
+  return {
+    originX: clamp(cam.x + T.VIEW_W / 2 - viewWu / 2, T.WORLD - viewWu),
+    originY: clamp(cam.y + T.VIEW_H / 2 - viewHu / 2, T.WORLD - viewHu),
+  };
 }
