@@ -125,7 +125,10 @@ export interface PadStatus {
   id: string;
   label: string;
   standard: boolean;
+  /** The pad's self-reported index. Display only. */
   index: number;
+  /** Where it actually sits in getGamepads(). This is what we index by. */
+  slot: number;
 }
 
 export class GamepadInput {
@@ -136,7 +139,15 @@ export class GamepadInput {
   analogMovement = false;
   rumbleEnabled = false;
 
-  private activeIndex = -1;
+  /**
+   * ARRAY POSITION of the active pad in getGamepads(), not its reported `index`.
+   *
+   * These are normally identical but nothing in the spec ties them together, and every
+   * lookup here is `pads[slot]`. Storing the reported index and indexing the array with
+   * it silently reads the wrong slot — or null — whenever a pad reports an index that
+   * does not match where the browser actually put it.
+   */
+  private activeSlot = -1;
   private held = new Map<ActionName, boolean>();
   private prevHeld = new Map<ActionName, boolean>();
   private moveOct: number | null = null;
@@ -147,7 +158,7 @@ export class GamepadInput {
   aimX = 0;
   aimY = 0;
 
-  status: PadStatus = { connected: false, id: '', label: '', standard: false, index: -1 };
+  status: PadStatus = { connected: false, id: '', label: '', standard: false, index: -1, slot: -1 };
   /** Set for a few seconds after a connect/disconnect so the HUD can toast it. */
   statusChangedAt = -1;
 
@@ -168,14 +179,13 @@ export class GamepadInput {
   lastEventId = '';
 
   private onConnect = (e: GamepadEvent): void => {
-    if (this.activeIndex < 0) this.activeIndex = e.gamepad.index;
     this.connectEvents++;
     this.lastEventId = e.gamepad.id;
     this.statusChangedAt = performance.now();
   };
 
   private onDisconnect = (e: GamepadEvent): void => {
-    if (this.activeIndex === e.gamepad.index) this.activeIndex = -1;
+    this.activeSlot = -1; // re-resolved on the next poll by scanning every slot
     this.lastEventId = `disconnected: ${e.gamepad.id}`;
     this.statusChangedAt = performance.now();
   };
@@ -204,7 +214,7 @@ export class GamepadInput {
   }
 
   activePad(): Gamepad | null {
-    return this.activeIndex >= 0 ? (this.pads()[this.activeIndex] ?? null) : null;
+    return this.activeSlot >= 0 ? (this.pads()[this.activeSlot] ?? null) : null;
   }
 
   /** Is any control currently deflected? Used to require a release between steps of
@@ -250,20 +260,22 @@ export class GamepadInput {
     const pads = this.pads();
     this.log.observe(pads);
 
-    // Pick the pad the player is actually touching; fall back to the first connected.
-    let pad = this.activeIndex >= 0 ? pads[this.activeIndex] : null;
+    // Pick the pad the player is actually touching; fall back to the first usable one.
+    // Every slot is scanned, so a controller in slot 3 with slots 0-2 empty is found.
+    let pad = this.activeSlot >= 0 ? (pads[this.activeSlot] ?? null) : null;
     if (!padUsable(pad)) {
       pad = null;
-      this.activeIndex = -1;
+      this.activeSlot = -1;
     }
-    for (const p of pads) {
+    for (let slot = 0; slot < pads.length; slot++) {
+      const p = pads[slot];
       if (!padUsable(p)) continue;
       if (!pad) {
         pad = p;
-        this.activeIndex = p.index;
-      } else if (p.index !== this.activeIndex && hasActivity(p)) {
+        this.activeSlot = slot;
+      } else if (slot !== this.activeSlot && hasActivity(p)) {
         pad = p;
-        this.activeIndex = p.index;
+        this.activeSlot = slot;
         this.statusChangedAt = performance.now();
       }
     }
@@ -273,20 +285,22 @@ export class GamepadInput {
 
     if (!pad) {
       if (this.status.connected) this.statusChangedAt = performance.now();
-      this.status = { connected: false, id: '', label: '', standard: false, index: -1 };
+      this.status = { connected: false, id: '', label: '', standard: false, index: -1, slot: -1 };
       this.moveX = this.moveY = this.aimX = this.aimY = 0;
       this.moveOct = this.aimOct = null;
       return;
     }
 
     const standard = pad.mapping === 'standard';
-    this.profile = this.profiles[pad.id] ?? STANDARD_PROFILE;
+    const padId = safePadId(pad, this.activeSlot);
+    this.profile = this.profiles[padId] ?? STANDARD_PROFILE;
     this.status = {
       connected: true,
-      id: pad.id,
-      label: this.profiles[pad.id]?.label ?? (standard ? 'Standard gamepad' : pad.id),
+      id: padId,
+      label: this.profiles[padId]?.label ?? (standard ? 'Standard gamepad' : padId),
       standard,
-      index: pad.index,
+      index: typeof pad.index === 'number' ? pad.index : this.activeSlot,
+      slot: this.activeSlot,
     };
 
     for (const [action, sources] of Object.entries(this.profile.sources) as [
@@ -351,24 +365,28 @@ export class GamepadInput {
    */
   beginDetect(): void {
     this.detectBaseline = new Map();
-    for (const p of this.pads()) {
-      if (padUsable(p)) this.detectBaseline.set(p.index, Array.from(padAxes(p)));
+    const pads = this.pads();
+    for (let slot = 0; slot < pads.length; slot++) {
+      const p = pads[slot];
+      if (padUsable(p)) this.detectBaseline.set(slot, Array.from(padAxes(p)));
     }
   }
 
   detect(): { padId: string; padIndex: number; source: PadSource } | null {
-    for (const pad of this.pads()) {
+    const pads = this.pads();
+    for (let slot = 0; slot < pads.length; slot++) {
+      const pad = pads[slot];
       if (!padUsable(pad)) continue;
 
       const btns = padButtons(pad);
       for (let i = 0; i < btns.length; i++) {
         if (buttonPressed(btns[i])) {
-          this.activeIndex = pad.index;
-          return { padId: pad.id, padIndex: pad.index, source: { kind: 'button', index: i } };
+          this.activeSlot = slot;
+          return { padId: safePadId(pad, slot), padIndex: slot, source: { kind: 'button', index: i } };
         }
       }
 
-      const base = this.detectBaseline?.get(pad.index);
+      const base = this.detectBaseline?.get(slot);
       const axs = padAxes(pad);
       for (let i = 0; i < axs.length; i++) {
         const v = axs[i] ?? 0;
@@ -378,14 +396,14 @@ export class GamepadInput {
         // this, binding Right and then releasing the stick immediately re-binds the next
         // action to that same axis with a meaningless sign.
         if (Math.abs(v) < 0.35 && Math.abs(rest) > 0.5) continue;
-        this.activeIndex = pad.index;
+        this.activeSlot = slot;
         // A hat reports as an axis that snaps to a set of odd constants rather than
         // sweeping; treat a non-extreme resting-offset value as a hat position.
         const source: PadSource =
           Math.abs(v) < 0.98 && Math.abs(v) > 0.02
             ? { kind: 'hat', index: i, value: v, epsilon: 0.08 }
             : { kind: 'axis', index: i, sign: v > 0 ? 1 : -1 };
-        return { padId: pad.id, padIndex: pad.index, source };
+        return { padId: safePadId(pad, slot), padIndex: slot, source };
       }
     }
     return null;
@@ -413,8 +431,8 @@ export class GamepadInput {
   /* --------------------------------------------------------------- rumble */
 
   rumble(duration: number, weak: number, strong: number): void {
-    if (!this.rumbleEnabled || this.activeIndex < 0) return;
-    const pad = this.pads()[this.activeIndex];
+    if (!this.rumbleEnabled || this.activeSlot < 0) return;
+    const pad = this.pads()[this.activeSlot];
     const actuator = (pad as (Gamepad & { vibrationActuator?: GamepadHapticActuator }) | null)
       ?.vibrationActuator;
     if (!actuator?.playEffect) return;
@@ -479,6 +497,12 @@ export function buttonPressed(b: unknown): boolean {
 
 /** A pad slot is usable unless the engine explicitly says it is disconnected.
  *  Some engines omit `connected` entirely; a missing property must not mean "no". */
+/** A stable identity even when the pad reports no usable id. */
+export function safePadId(p: Gamepad, slot: number): string {
+  const id = (p as { id?: unknown }).id;
+  return typeof id === 'string' && id ? id : `(unnamed pad ${slot})`;
+}
+
 export function padUsable(p: Gamepad | null | undefined): p is Gamepad {
   return !!p && (p as { connected?: unknown }).connected !== false;
 }

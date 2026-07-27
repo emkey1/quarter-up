@@ -178,6 +178,53 @@ describe('non-standard pad rescue', () => {
     expect(g.isHeld('fire')).toBe(true);
   });
 
+  it('finds a controller sitting in slot 3 with slots 0-2 empty', () => {
+    // The Gamepad API exposes four slots and a controller may land in any of them.
+    setNavigator({ getGamepads: () => [null, null, null, pad] });
+    const g = new GamepadInput();
+    press(0);
+    g.poll();
+    expect(g.status.connected, 'a pad in slot 3 must still be found').toBe(true);
+    expect(g.status.slot).toBe(3);
+    expect(g.isHeld('fire')).toBe(true);
+    expect(g.activePad()).toBe(pad);
+  });
+
+  it('survives a pad whose reported index does not match its array slot', () => {
+    // Nothing in the spec ties Gamepad.index to the array position. Storing the
+    // reported index and then indexing the array with it reads the wrong slot — the
+    // live readout and the binding flow both go blind while the pad still enumerates.
+    install(makePad({ index: 0 } as Partial<Gamepad>));
+    setNavigator({ getGamepads: () => [null, null, pad] }); // reports 0, actually slot 2
+    const g = new GamepadInput();
+    press(0);
+    g.poll();
+    expect(g.status.connected).toBe(true);
+    expect(g.status.slot, 'must track the real slot').toBe(2);
+    expect(g.activePad(), 'activePad drives the live readout and detection').toBe(pad);
+    expect(g.isHeld('fire')).toBe(true);
+
+    g.beginDetect();
+    expect(g.detect()?.source).toEqual({ kind: 'button', index: 0 });
+  });
+
+  it('prefers whichever of several pads is actually being touched', () => {
+    const quiet = makePad({ id: 'Quiet Pad' });
+    const busy = makePad({ id: 'Busy Pad' });
+    setNavigator({ getGamepads: () => [quiet, busy] });
+    const g = new GamepadInput();
+    g.poll();
+    expect(g.status.id).toBe('Quiet Pad'); // first usable wins by default
+
+    (busy.buttons as unknown as { pressed: boolean; value: number }[])[5] = {
+      pressed: true,
+      value: 1,
+    };
+    g.poll();
+    expect(g.status.id, 'activity should hand over').toBe('Busy Pad');
+    expect(g.status.slot).toBe(1);
+  });
+
   it('finds a pad that never became active', () => {
     // The failure mode being fixed: binding must not require the pad to already be
     // the "active" one, because a pad that does nothing never becomes active.

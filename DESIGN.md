@@ -49,6 +49,9 @@ HTML5 Canvas, art at 2× the original's resolution.
 ### Non-goals
 
 - Multiplayer (local or online). The architecture should not *preclude* it, but no work is spent on it.
+  **Noted as a wanted follow-on** (see §4.14): a local 4-player mode after the single-player game
+  is finished. Nothing in this document should be implemented in a way that makes that harder
+  than it needs to be.
 - Mobile / touch controls.
 - Gauntlet II / Legends / Dark Legacy features (Quest mode, character classes beyond the four,
   invisible walls, "It's a trap!" etc.).
@@ -221,12 +224,41 @@ Each entry: **what changes**, and **why**.
 | 4.10 | 7 intro levels with numbered skip-exits | **Kept.** They double as the solo player's difficulty/depth selector. | Faithful *and* good single-player design. |
 | 4.11 | Death-on-level-N conditioning (next game starts at N as level 8) | **Kept as an option**, off by default; on the score table a run is tagged "cold start" or not. | It's a real, well-known arcade behaviour; leaderboards distinguish them. |
 | 4.12 | No pause, no save | **Pause (P)** and **resume-from-level save** in `localStorage`. Saving marks the run non-leaderboard-eligible unless it's a clean continue. | Browser games get interrupted. |
+| 4.14 | Four players at once, the reason the cabinet had a wide control panel | **Deferred, not abandoned.** A local 4-player mode is wanted *after* the single-player game is finished. See "§4.14 notes" below for what is already compatible and what would have to change. | Building it now would compromise the single-player design (§4.2–4.9 exist precisely because 1P and 4P want different things). Building it *later* is only feasible if we avoid a few specific mistakes now, which is why the notes exist. |
 | 4.13 | Operator DIP switches inside the cabinet, set once by the arcade owner | A **setup screen** (§6.6) exposing rules as toggles: individual monster types, Death, the Thief, the health drain, the rank curve, and the reconstructed mechanics. | This is the descendant of the DIP switches, not an invention — the cabinet shipped with difficulty, starting health and monster-speed switches an operator could set. Moving them in front of the player is the single-player equivalent, and it also serves accessibility and the §13 fidelity work. |
 
 Everything else — health drain, damage numbers, stat tables, generator rules, door timers, the
 180 s wall-to-exit trick, the rank system, the Death potion-value cycle — is preserved exactly.
 
 ---
+
+### §4.14 notes — keeping the door open to 4 players
+
+Not a plan, just a standing constraint on decisions taken between now and then.
+
+**Already compatible, by accident or design:**
+
+- Input reduces every device to an `ActionState` before the simulation sees it, and the
+  gamepad layer tracks pads *by slot* across all four Gamepad API slots with per-device-id
+  binding profiles. Four `ActionState`s is a list, not a redesign.
+- The simulation takes actions as a parameter rather than reading input; nothing in
+  `src/game/` knows what a device is.
+- Rules, run state and level flow are already values passed around, not globals.
+
+**What would have to change, and is worth knowing now:**
+
+| Area | Issue |
+| --- | --- |
+| `World.player` | Singular. Would become a list; every `this.player` is then a decision about *which* player, and most answer "the one who did the thing". |
+| Camera | Follows one point. The arcade followed the group and let stragglers push the edge — a genuinely fiddly problem, and the reason 4P levels are laid out differently. |
+| Viewport-scoped rules | Potions and off-screen generators key off *the* camera. With one shared camera that still works; it is the one thing that gets simpler. |
+| Scoring | §4.2 deletes the treasure multiplier because it exists to make players fight each other. It would come *back* for 4P — so it should be deleted behind a rule rather than ripped out. |
+| HUD | §6.2's single-player panel is the opposite trade from the arcade's four boxes. Both layouts would need to exist. |
+| Levels | The 40 authored levels (M5) are tuned for one player. 4P wants different generator density and more chokepoints. Level files should carry a player-count hint rather than being silently reused. |
+
+**The one rule to follow meanwhile:** when something is per-player, put it on the player
+object rather than on the world. That is nearly free now and is most of the work later.
+
 
 ## 5. Controls
 

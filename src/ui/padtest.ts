@@ -204,6 +204,24 @@ export class PadTest {
     );
     row('Secure context', String(window.isSecureContext), window.isSecureContext ? OK : WARN);
 
+    // Every slot, including the empty ones. The Gamepad API exposes four, and "is it
+    // just looking at the wrong one?" should be answerable by eye rather than by faith.
+    head('slots');
+    const all = gp.allPads();
+    const slotCount = Math.max(4, all.length);
+    for (let i = 0; i < slotCount; i++) {
+      const p = all[i];
+      const usable = padUsable(p);
+      row(
+        `  slot ${i}`,
+        usable ? `${(p!.id || '(unnamed)').slice(0, 34)}` : 'empty',
+        usable ? (i === gp.status.slot ? OK : FG) : 'rgba(215,219,224,.3)',
+      );
+      if (usable && typeof p!.index === 'number' && p!.index !== i) {
+        row('', `reports index ${p!.index} — mismatch`, WARN);
+      }
+    }
+
     for (const p of connected) {
       // Every property here is treated as possibly absent. A pad reporting `buttons`,
       // `axes` or `id` as undefined used to throw and blank this whole screen.
