@@ -15,6 +15,7 @@ function state(over: Partial<AnnouncerState> = {}): AnnouncerState {
     hasHiddenUpgrade: false,
     deathOnScreen: false,
     thiefPresent: false,
+    dead: false,
     ...over,
   };
 }
@@ -95,9 +96,31 @@ describe('announcer', () => {
 
   it('announces the player death exactly once', () => {
     const events: GameEvent[] = [{ t: 'playerDied' }];
-    expect(a.update(state({ health: 0 }), events)?.text).toBe('Elf has died.');
-    // 'died' has no repeat interval, so it is one-shot forever
-    expect(a.update(state({ health: 0, frame: 99999 }), events)?.tag).not.toBe('died');
+    expect(a.update(state({ health: 0, dead: true }), events)?.text).toBe('Elf has died.');
+    expect(a.update(state({ health: 0, dead: true, frame: 99999 }), events)).toBeNull();
+  });
+
+  it('goes silent once the player is dead', () => {
+    // Reported from play: the narrator kept telling a corpse it was about to die.
+    // Every warning is driven by STATE, and a dead player satisfies all of them
+    // permanently — health is 0, Death is still on screen, the thief is still around.
+    a.update(state({ health: 0, dead: true }), [{ t: 'playerDied' }]);
+    for (let f = 0; f < 120 * SEC; f += SEC) {
+      const line = a.update(
+        state({ health: 0, dead: true, frame: 100000 + f, deathOnScreen: true, thiefPresent: true }),
+        [],
+      );
+      expect(line, `should stay silent at +${f / SEC}s after death`).toBeNull();
+    }
+  });
+
+  it('still warns normally right up until the moment of death', () => {
+    expect(a.update(state({ health: 40, dead: false }), [])?.text).toBe('Elf is about to die!');
+  });
+
+  it('says nothing at all if the run ends without a death event reaching it', () => {
+    // e.g. the player quit, or the event was drained on an earlier frame
+    expect(a.update(state({ health: 0, dead: true }), [])).toBeNull();
   });
 });
 

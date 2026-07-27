@@ -50,6 +50,7 @@ export class Presentation {
         hasHiddenUpgrade: world.hasHiddenUpgrade,
         deathOnScreen: world.deaths.some((d) => d.alive && world.camera.contains(d.x, d.y)),
         thiefPresent: world.thieves.some((t) => t.alive),
+        dead: p.dead,
       },
       events,
     );

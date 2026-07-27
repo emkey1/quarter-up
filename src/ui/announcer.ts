@@ -29,6 +29,8 @@ export interface AnnouncerState {
   hasHiddenUpgrade: boolean;
   deathOnScreen: boolean;
   thiefPresent: boolean;
+  /** Once the run is over the narrator has exactly one thing left to say. */
+  dead: boolean;
 }
 
 const SEC = 60;
@@ -88,6 +90,20 @@ export class Announcer {
    */
   update(s: AnnouncerState, events: readonly GameEvent[]): Line | null {
     const out: Line[] = [];
+
+    // Death is the end of the conversation.
+    //
+    // Every warning below is driven by *state*, not by an event — health, Death on
+    // screen, a thief in the level — and a corpse satisfies all of them permanently.
+    // Without this gate the narrator cheerfully informs a dead player that they are
+    // about to die, once every ten seconds, forever.
+    if (s.dead) {
+      if (events.some((e) => e.t === 'playerDied') && this.canSay('died', s.frame)) {
+        this.mark('died', s.frame);
+        return { text: `${s.className} has died.`, priority: 'critical', tag: 'died' };
+      }
+      return null;
+    }
 
     for (const e of events) {
       switch (e.t) {
