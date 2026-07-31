@@ -1,6 +1,7 @@
 import type { Layout } from '@/engine/display';
 import type { ActionState } from '@/engine/actions';
 import { UI, centred, logo, sans, mono, blink } from '@/render/ui';
+import type { Pointer } from '@/engine/pointer';
 import { MenuInput, type Screen } from './screen';
 import { loadScores, sortScores } from './highscores';
 import { CLASSES, CLASS_ORDER } from '@/data/classes';
@@ -39,6 +40,7 @@ export class AttractScreen implements Screen {
   constructor(
     private readonly kbPressed: (code: string) => boolean,
     private readonly onStart: () => void,
+    private readonly pointer: Pointer,
   ) {}
 
   enter(): void {
@@ -53,7 +55,10 @@ export class AttractScreen implements Screen {
     const cycle = this.t % (16 * 60);
     this.page = cycle < 10 * 60 ? 'title' : 'scores';
     if (this.t % (5 * 60) === 0) this.tipIndex = (this.tipIndex + 1) % TIPS.length;
-    if (this.menu.confirm) this.onStart();
+    // A click anywhere starts, like pressing anything else. The four characters on this
+    // screen are decoration, but they look exactly like the ones you pick on the next
+    // screen, so a click aimed at them has to do SOMETHING rather than nothing at all.
+    if (this.menu.confirm || (stepIndex === 0 && this.pointer.clicked)) this.onStart();
   }
 
   draw(ctx: CanvasRenderingContext2D, layout: Layout): void {
@@ -108,7 +113,7 @@ export class AttractScreen implements Screen {
       });
 
       if (blink()) {
-        centred(ctx, 'PRESS ENTER', cw / 2, ch * 0.75, sans(20, s, 800), UI.gold, 2.5 * s);
+        centred(ctx, 'PRESS ENTER OR CLICK', cw / 2, ch * 0.75, sans(20, s, 800), UI.gold, 2.5 * s);
       }
 
       centred(ctx, TIPS[this.tipIndex], cw / 2, ch * 0.84, sans(12, s, 600), UI.fg);
@@ -162,7 +167,7 @@ export class AttractScreen implements Screen {
       }
 
       if (blink()) {
-        centred(ctx, 'PRESS ENTER', cw / 2, ch - 46 * s, sans(18, s, 800), UI.gold, 2.5 * s);
+        centred(ctx, 'PRESS ENTER OR CLICK', cw / 2, ch - 46 * s, sans(18, s, 800), UI.gold, 2.5 * s);
       }
     }
   }

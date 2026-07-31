@@ -9,6 +9,7 @@ import { Audio } from '@/engine/audio';
 import { Speech } from '@/engine/speech';
 import { loadSettings, saveSettings } from '@/engine/storage';
 import { Run } from '@/game/flow';
+import { Pointer } from '@/engine/pointer';
 import { ScreenFx, prefersReducedMotion } from '@/render/fx';
 import { AttractScreen } from './attract';
 import { CharSelectScreen } from './charselect';
@@ -32,6 +33,8 @@ export class App implements LoopHost {
   readonly fx = new ScreenFx();
   readonly setup: SetupScreen;
   readonly padTest = new PadTest();
+  /** Mouse and touch, for the menus. Never a gameplay input — see engine/pointer.ts. */
+  readonly pointer = new Pointer();
 
   private screens: Record<ScreenId, Screen>;
   private current: Screen;
@@ -82,11 +85,13 @@ export class App implements LoopHost {
     );
     if (prefersReducedMotion()) this.play.presentation.particles.enabled = false;
 
-    this.attract = new AttractScreen(kb, () => this.go('charselect'));
+    this.attract = new AttractScreen(kb, () => this.go('charselect'), this.pointer);
     this.charSelect = new CharSelectScreen(
       kb,
       (cls, skipTutorial) => this.startRun(cls, skipTutorial),
       () => this.go('attract'),
+      this.pointer,
+      () => this.display.layout,
     );
     this.charSelect.skipTutorial = settings.skipTutorial ?? false;
     this.levelIntro = new LevelIntroScreen(kb, () => this.go('play'));
@@ -166,6 +171,8 @@ export class App implements LoopHost {
   /* ------------------------------------------------------------------ loop host */
 
   poll(): void {
+    this.pointer.attach(this.display.canvas);
+    this.pointer.poll();
     this.input.poll();
     if (this.input.keyboard.anyActivity() || this.input.gamepad.anyActivity()) this.audio.unlock();
   }

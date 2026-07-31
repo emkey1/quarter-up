@@ -5,7 +5,15 @@ import { UI, centred, logo, sans, statBar, blink } from '@/render/ui';
 import { sprites } from '@/render/sprites';
 import { WALK_FRAMES } from '@/render/spritegen';
 import { INTRO } from '@/data/campaign';
+import type { Pointer } from '@/engine/pointer';
 import { MenuInput, type Screen } from './screen';
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 /**
  * Character select.
@@ -35,12 +43,52 @@ export class CharSelectScreen implements Screen {
    * asking to skip once is telling you something about every run after it.
    */
   skipTutorial = false;
+  /** Card the cursor is over, or -1. Purely visual — hovering never changes the choice,
+   *  so a mouse resting on the screen cannot fight the arrow keys. */
+  private hover = -1;
 
   constructor(
     private readonly kbPressed: (code: string) => boolean,
     private readonly onChoose: (cls: ClassId, skipTutorial: boolean) => void,
     private readonly onBack: () => void,
+    private readonly pointer: Pointer,
+    private readonly getLayout: () => Layout,
   ) {}
+
+  /**
+   * Where everything sits, in canvas pixels.
+   *
+   * Shared by draw() and step() so a click lands on exactly the rectangle that was
+   * drawn. Computing the layout twice — once to paint, once to hit-test — is how you get
+   * a button that highlights in one place and responds in another.
+   */
+  private geometry(layout: Layout): {
+    cards: Rect[];
+    start: Rect;
+    begin: Rect;
+  } {
+    const s = layout.uiScale;
+    const cw = layout.canvasW;
+    const ch = layout.canvasH;
+    const n = CLASS_ORDER.length;
+    const gap = 12 * s;
+    const cardW = Math.min(200 * s, (cw - 60 * s - (n - 1) * gap) / n);
+    const totalW = n * cardW + (n - 1) * gap;
+    const x0 = (cw - totalW) / 2;
+    const top = 112 * s;
+    const cardH = Math.min(268 * s, ch - top - 210 * s);
+
+    return {
+      cards: CLASS_ORDER.map((_, i) => ({
+        x: x0 + i * (cardW + gap),
+        y: top,
+        w: cardW,
+        h: cardH,
+      })),
+      start: { x: cw / 2 - 190 * s, y: ch - 76 * s, w: 380 * s, h: 32 * s },
+      begin: { x: cw / 2 - 130 * s, y: ch - 42 * s, w: 260 * s, h: 30 * s },
+    };
+  }
 
   enter(): void {
     this.menu = new MenuInput();
@@ -61,6 +109,34 @@ export class CharSelectScreen implements Screen {
     if (this.menu.right) this.index = (this.index + 1) % n;
     if (this.menu.up || this.menu.down) this.skipTutorial = !this.skipTutorial;
     if (this.kbPressed('KeyT')) this.skipTutorial = !this.skipTutorial;
+
+    // --- mouse. The cards look like buttons, so they are buttons.
+    if (stepIndex === 0) {
+      const g = this.geometry(this.getLayout());
+      this.hover = g.cards.findIndex((r) => this.pointer.over(r.x, r.y, r.w, r.h));
+
+      for (let i = 0; i < g.cards.length; i++) {
+        const r = g.cards[i];
+        if (!this.pointer.hit(r.x, r.y, r.w, r.h)) continue;
+        // First click picks; clicking the one already picked commits. That way a click
+        // is never an irreversible commitment made by accident, but choosing and starting
+        // is still two clicks in the same place rather than a hunt for a button.
+        if (i === this.index) {
+          this.onChoose(this.selected, this.skipTutorial);
+          return;
+        }
+        this.index = i;
+      }
+
+      if (this.pointer.hit(g.start.x, g.start.y, g.start.w, g.start.h)) {
+        this.skipTutorial = !this.skipTutorial;
+      }
+      if (this.pointer.hit(g.begin.x, g.begin.y, g.begin.w, g.begin.h)) {
+        this.onChoose(this.selected, this.skipTutorial);
+        return;
+      }
+    }
+
     if (this.menu.confirm) this.onChoose(this.selected, this.skipTutorial);
     if (this.menu.cancel) this.onBack();
   }
@@ -85,25 +161,15 @@ export class CharSelectScreen implements Screen {
     logo(ctx, cw / 2, 58 * s, s, 0.42);
     centred(ctx, 'CHOOSE YOUR CHARACTER', cw / 2, 84 * s, sans(11, s, 600), UI.dim, 3.5 * s);
 
-    const n = CLASS_ORDER.length;
-    const gap = 12 * s;
-    const cardW = Math.min(200 * s, (cw - 60 * s - (n - 1) * gap) / n);
-    const totalW = n * cardW + (n - 1) * gap;
-    const x0 = (cw - totalW) / 2;
-    const top = 112 * s;
-    const cardH = Math.min(268 * s, ch - top - 210 * s);
-
+    const g = this.geometry(layout);
     CLASS_ORDER.forEach((id, i) => {
-      const c = CLASSES[id];
-      const x = x0 + i * (cardW + gap);
-      const sel = i === this.index;
-      this.card(ctx, s, x, top, cardW, cardH, id, sel);
-      void c;
+      const r = g.cards[i];
+      this.card(ctx, s, r.x, r.y, r.w, r.h, id, i === this.index, i === this.hover);
     });
 
     // --- detail for the highlighted class
     const c = CLASSES[this.selected];
-    let y = top + cardH + 34 * s;
+    let y = g.cards[0].y + g.cards[0].h + 34 * s;
     centred(ctx, CLASS_VERDICT[this.selected], cw / 2, y, sans(13, s, 700), c.colour);
     y += 26 * s;
 
@@ -127,26 +193,46 @@ export class CharSelectScreen implements Screen {
 
     // --- where the run starts. A row rather than a hint, because a player who does not
     // know the option exists will replay the tutorial forever.
-    const sy = ch - 62 * s;
     const label = this.skipTutorial ? 'START IN THE DUNGEON' : 'START WITH THE TUTORIAL';
     const note = this.skipTutorial
       ? `skipping ${INTRO.length} intro levels — begins at depth ${INTRO.length + 1}`
       : `${INTRO.length} short levels, one idea each`;
+    this.button(ctx, s, g.start, `↑↓   ${label}`, this.skipTutorial ? UI.gold : UI.dim, 11);
+    centred(ctx, note, cw / 2, g.start.y + g.start.h + 9 * s, sans(9, s, 500), UI.faint);
+
+    // The begin button is drawn as a button rather than as a blinking hint. A hint tells
+    // you a key exists; a button tells you where to click, and this screen had four
+    // card-shaped things that ignored every click aimed at them.
+    const beginHot = this.pointer.over(g.begin.x, g.begin.y, g.begin.w, g.begin.h);
+    this.button(ctx, s, g.begin, 'ENTER, FIRE or CLICK to begin', beginHot || blink() ? UI.gold : UI.dim, 12);
+
     centred(
       ctx,
-      `↑↓   ${label}`,
+      '← →  choose      ↑ ↓  start point      ESC  back      or use the mouse',
       cw / 2,
-      sy,
-      sans(12, s, 700),
-      this.skipTutorial ? UI.gold : UI.dim,
-      1.2 * s,
+      ch - 6 * s,
+      sans(9.5, s, 500),
+      UI.faint,
     );
-    centred(ctx, note, cw / 2, sy + 13 * s, sans(9, s, 500), UI.faint);
+  }
 
-    if (blink()) {
-      centred(ctx, 'ENTER or FIRE to begin', cw / 2, ch - 30 * s, sans(14, s, 800), UI.gold, 1.5 * s);
+  /** A hit-testable label: box on hover, so what is clickable is visible before clicking. */
+  private button(
+    ctx: CanvasRenderingContext2D,
+    s: number,
+    r: Rect,
+    text: string,
+    colour: string,
+    size: number,
+  ): void {
+    if (this.pointer.over(r.x, r.y, r.w, r.h)) {
+      ctx.fillStyle = 'rgba(255,255,255,.07)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = 'rgba(255,215,106,.45)';
+      ctx.lineWidth = Math.max(1, s);
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
     }
-    centred(ctx, '← →  choose      ↑ ↓  start point      ESC  back', cw / 2, ch - 12 * s, sans(10, s, 500), UI.faint);
+    centred(ctx, text, r.x + r.w / 2, r.y + r.h * 0.68, sans(size, s, 800), colour, 1.2 * s);
   }
 
   private card(
@@ -158,6 +244,7 @@ export class CharSelectScreen implements Screen {
     h: number,
     id: ClassId,
     sel: boolean,
+    hot = false,
   ): void {
     const c = CLASSES[id];
 
@@ -173,8 +260,13 @@ export class CharSelectScreen implements Screen {
       ctx.fillStyle = 'rgba(9,10,15,.78)';
     }
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = sel ? c.colour : 'rgba(255,255,255,.09)';
-    ctx.lineWidth = sel ? Math.max(2, s * 1.6) : Math.max(1, s * 0.6);
+    // Hover lifts an unselected card so it is obvious the card is a control, not a poster.
+    if (hot && !sel) {
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.strokeStyle = sel ? c.colour : hot ? 'rgba(255,215,106,.55)' : 'rgba(255,255,255,.09)';
+    ctx.lineWidth = sel ? Math.max(2, s * 1.6) : Math.max(1, s * (hot ? 1.2 : 0.6));
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.restore();
 
