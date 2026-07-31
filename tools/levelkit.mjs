@@ -432,14 +432,23 @@ export function remotestCell(g, start, avoid = []) {
 }
 
 /**
- * Well-separated reachable floor cells, furthest-first.
+ * Reachable floor cells spread evenly over the whole level.
  *
- * For topping a level up to a minimum generator density without piling the extras on
- * top of each other or on top of the nest a recipe already built. Greedy furthest-first
- * rather than random: generators that end up clustered are one fight, and the point of
- * adding them is to give the level more than one front.
+ * Greedy farthest-point sampling: each pick is the cell that maximises the minimum
+ * distance to everything already placed, including whatever the recipe placed itself.
+ * That fills the map uniformly however many are asked for.
+ *
+ * This was furthest-from-the-start-first, which is correct for adding three extras — you
+ * want them opening a second front, not thickening the fight in front of you — and badly
+ * wrong for adding twenty. It packed everything into the far end and left the player's
+ * whole starting region empty: standing still on depth 1 and depth 20 for a full minute
+ * produced exactly zero monsters, because no generator was ever inside the viewport.
+ *
+ * `startGap` keeps a ring around the spawn clear, so covering the map does not mean
+ * being stood on at frame one.
  */
-export function spreadCells(g, start, want, minGap = 6, taken = []) {
+export function spreadCells(g, start, want, startGap = 6, taken = []) {
+  if (want <= 0) return [];
   const solid = new Set(['X', ' ']);
   const dist = new Map([[start.join(','), 0]]);
   const queue = [[start[0], start[1]]];
@@ -448,7 +457,7 @@ export function spreadCells(g, start, want, minGap = 6, taken = []) {
   for (let head = 0; head < queue.length; head++) {
     const [x, y] = queue[head];
     const d = dist.get(`${x},${y}`);
-    if (g.tiles[y][x] === '.' && d > minGap) open.push([x, y, d]);
+    if (g.tiles[y][x] === '.' && d > startGap) open.push([x, y]);
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx;
       const ny = y + dy;
@@ -458,15 +467,34 @@ export function spreadCells(g, start, want, minGap = 6, taken = []) {
       queue.push([nx, ny]);
     }
   }
+  if (!open.length) return [];
 
-  open.sort((a, b) => b[2] - a[2]);
+  // Distance from each candidate to the nearest thing already placed. Seeded from what
+  // the recipe built, so its nest counts as occupied territory and the extras go
+  // somewhere else.
+  const near = open.map(([x, y]) =>
+    taken.length
+      ? Math.min(...taken.map(([tx, ty]) => Math.abs(tx - x) + Math.abs(ty - y)))
+      : Infinity,
+  );
+
   const chosen = [];
-  const clear = (x, y) =>
-    ![...taken, ...chosen].some(([tx, ty]) => Math.abs(tx - x) + Math.abs(ty - y) < minGap);
-
-  for (const [x, y] of open) {
-    if (chosen.length >= want) break;
-    if (clear(x, y)) chosen.push([x, y]);
+  while (chosen.length < want) {
+    let best = -1;
+    let bestD = -1;
+    for (let i = 0; i < open.length; i++) {
+      if (near[i] > bestD) {
+        bestD = near[i];
+        best = i;
+      }
+    }
+    if (best < 0 || bestD <= 0) break;
+    const [bx, by] = open[best];
+    chosen.push([bx, by]);
+    for (let i = 0; i < open.length; i++) {
+      const d = Math.abs(open[i][0] - bx) + Math.abs(open[i][1] - by);
+      if (d < near[i]) near[i] = d;
+    }
   }
   return chosen;
 }

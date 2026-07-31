@@ -186,24 +186,165 @@
       "y": 5
     },
     {
-      "t": "food",
+      "t": "gen",
       "x": 1,
+      "y": 46,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 13,
+      "y": 39,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 30,
+      "y": 1,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 4,
+      "y": 32,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 32,
+      "y": 16,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 18,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 19,
+      "y": 32,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 11,
+      "y": 28,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 27,
+      "y": 10,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 24,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 38,
+      "y": 11,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 16,
+      "y": 46,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 23,
+      "y": 25,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 39,
+      "y": 22,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 22,
+      "y": 38,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 9,
+      "y": 44,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 28,
+      "y": 21,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "food",
+      "x": 33,
+      "y": 7
+    },
+    {
+      "t": "food",
+      "x": 16,
       "y": 1
     },
     {
       "t": "food",
-      "x": 41,
-      "y": 1
+      "x": 38,
+      "y": 2
     },
     {
       "t": "food",
       "x": 1,
-      "y": 8
+      "y": 10
+    },
+    {
+      "t": "food",
+      "x": 46,
+      "y": 46
+    },
+    {
+      "t": "food",
+      "x": 4,
+      "y": 41
     },
     {
       "t": "food",
       "x": 8,
-      "y": 1
+      "y": 36
     }
   ]
 }

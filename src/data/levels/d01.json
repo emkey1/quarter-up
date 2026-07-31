@@ -120,6 +120,143 @@
       "t": "exit",
       "x": 44,
       "y": 44
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 41,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 21,
+      "y": 46,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 8,
+      "y": 18,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 16,
+      "y": 30,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 34,
+      "y": 35,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 14,
+      "y": 6,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 31,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 20,
+      "y": 16,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 23,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 6,
+      "y": 33,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 13,
+      "y": 40,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 13,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 23,
+      "y": 36,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 29,
+      "y": 42,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "food",
+      "x": 46,
+      "y": 16
+    },
+    {
+      "t": "food",
+      "x": 1,
+      "y": 28
+    },
+    {
+      "t": "food",
+      "x": 13,
+      "y": 23
+    },
+    {
+      "t": "food",
+      "x": 21,
+      "y": 25
+    },
+    {
+      "t": "food",
+      "x": 31,
+      "y": 3
     }
   ]
 }

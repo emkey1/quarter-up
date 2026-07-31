@@ -44,6 +44,48 @@ describe('campaign content', () => {
     }
   });
 
+  it('puts enough generators on every screen, not merely on every level', () => {
+    // Per-level was the wrong unit and it hid this for two rounds of playtesting.
+    // Off-screen generators are inert, so what a player experiences is how many sit
+    // inside the viewport — and a level is about nine screens. The campaign once ran
+    // 0.53 generators per screen at depth 1, which means most screens had none at all.
+    //
+    // Computed from the REAL tuning values, so if the viewport or tile size changes, or
+    // the copies of them in tools/mkcampaign.mjs drift, this fails.
+    const tilesPerScreen = (T.VIEW_W / T.TILE) * (T.VIEW_H / T.TILE);
+    const normals = DUNGEONS.filter((l) => l.type === 'normal');
+
+    for (const lvl of normals) {
+      const screens = analyseLevel(lvl).reachable.size / tilesPerScreen;
+      const perScreen = lvl.objects.filter((o) => o.t === 'gen').length / screens;
+      expect(perScreen, `${lvl.id} has only ${perScreen.toFixed(2)} generators per screen`).toBeGreaterThan(1.8);
+      expect(perScreen, `${lvl.id} is a monster fountain at ${perScreen.toFixed(2)} per screen`).toBeLessThan(6);
+    }
+  });
+
+  it('shows the player something to fight from where they spawn', () => {
+    // A level can hit its density target and still open on an empty room if everything
+    // was placed far from the start, which is exactly what the first attempt did — a
+    // full minute of standing still on depth 1 and depth 20 produced zero monsters.
+    for (const lvl of DUNGEONS.filter((l) => l.type === 'normal')) {
+      const w = new World(lvl, 'elf', 1);
+      const visible = w.generators.filter((g) =>
+        w.camera.contains(g.x, g.y, T.GEN_OFFSCREEN_MARGIN),
+      ).length;
+      expect(visible, `${lvl.id} opens with nothing on screen`).toBeGreaterThan(0);
+    }
+  });
+
+  it('never spawns a generator on top of the player', () => {
+    for (const lvl of DUNGEONS.filter((l) => l.type === 'normal')) {
+      const w = new World(lvl, 'elf', 1);
+      for (const g of w.generators) {
+        const tiles = Math.hypot(g.x - w.player.x, g.y - w.player.y) / T.TILE;
+        expect(tiles, `${lvl.id}: generator ${tiles.toFixed(1)} tiles from spawn`).toBeGreaterThan(3);
+      }
+    }
+  });
+
   it('ramps generator pressure across the campaign', () => {
     const pressure = (lvl: (typeof CAMPAIGN)[number]) => {
       const w = new World(lvl, 'elf', 1);

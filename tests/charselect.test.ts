@@ -159,19 +159,46 @@ describe('character select — mouse', () => {
     expect(h.cs.selected).toBe('elf');
   });
 
-  it('toggles the start point from its row', () => {
+  it('picks the start point from two visible options', () => {
+    // One line of text that toggles reads as a caption describing the current state; you
+    // have to already know it is a control to try it. Two boxes with one lit is a choice.
+    const l = layout();
+    const s = l.uiScale;
+    const y = l.canvasH - 78 * s + 17 * s;
+
+    const h = harness();
+    h.at(l.canvasW / 2 + 100 * s, y, true); // DUNGEON
+    expect(h.cs.skipTutorial).toBe(true);
+    h.at(l.canvasW / 2 - 100 * s, y, true); // TUTORIAL
+    expect(h.cs.skipTutorial).toBe(false);
+  });
+
+  it('leaves the start point alone when its current option is clicked again', () => {
+    // Each side SETS its value rather than toggling, so a second click is a no-op rather
+    // than silently flipping you to the other one.
+    const l = layout();
+    const s = l.uiScale;
+    const y = l.canvasH - 78 * s + 17 * s;
+    const h = harness();
+    h.at(l.canvasW / 2 - 100 * s, y, true);
+    h.at(l.canvasW / 2 - 100 * s, y, true);
+    expect(h.cs.skipTutorial).toBe(false);
+  });
+
+  it('carries the start point into the run it begins', () => {
     const l = layout();
     const s = l.uiScale;
     const h = harness();
-    h.at(l.canvasW / 2, l.canvasH - 76 * s + 16 * s, true);
-    expect(h.cs.skipTutorial).toBe(true);
+    h.at(l.canvasW / 2 + 100 * s, l.canvasH - 78 * s + 17 * s, true); // DUNGEON
+    h.at(l.canvasW / 2, l.canvasH - 40 * s + 15 * s, true); // BEGIN
+    expect(h.chosen).toEqual({ cls: 'elf', skip: true });
   });
 
   it('begins from the begin button', () => {
     const l = layout();
     const s = l.uiScale;
     const h = harness();
-    h.at(l.canvasW / 2, l.canvasH - 42 * s + 15 * s, true);
+    h.at(l.canvasW / 2, l.canvasH - 40 * s + 15 * s, true);
     expect(h.chosen).toEqual({ cls: 'elf', skip: false });
   });
 });

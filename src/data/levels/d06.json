@@ -128,6 +128,162 @@
       "t": "exit",
       "x": 44,
       "y": 44
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 27,
+      "y": 7,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 6,
+      "y": 18,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 41,
+      "y": 18,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 18,
+      "y": 14,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 30,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 29,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 10,
+      "y": 7,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 19,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 9,
+      "y": 34,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 24,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 16,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 38,
+      "y": 34,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 38,
+      "y": 9,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 34,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 14,
+      "y": 21,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "food",
+      "x": 46,
+      "y": 12
+    },
+    {
+      "t": "food",
+      "x": 1,
+      "y": 12
+    },
+    {
+      "t": "food",
+      "x": 10,
+      "y": 44
+    },
+    {
+      "t": "food",
+      "x": 35,
+      "y": 46
+    },
+    {
+      "t": "food",
+      "x": 3,
+      "y": 38
+    },
+    {
+      "t": "food",
+      "x": 28,
+      "y": 22
     }
   ]
 }

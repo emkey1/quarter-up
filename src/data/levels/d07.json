@@ -115,10 +115,163 @@
     },
     {
       "t": "gen",
-      "x": 40,
+      "x": 46,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
       "y": 1,
       "kind": "grunt",
       "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 39,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 24,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 16,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 39,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 42,
+      "y": 28,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 5,
+      "y": 24,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 11,
+      "y": 10,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 12,
+      "y": 35,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 39,
+      "y": 16,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 32,
+      "y": 8,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 15,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 25,
+      "y": 44,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 37,
+      "y": 44,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 26,
+      "y": 33,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 43,
+      "y": 38,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 32,
+      "y": 27,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 24,
+      "y": 13,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 19,
+      "y": 7,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "food",
+      "x": 13,
+      "y": 1
+    },
+    {
+      "t": "food",
+      "x": 46,
+      "y": 21
+    },
+    {
+      "t": "food",
+      "x": 36,
+      "y": 1
+    },
+    {
+      "t": "food",
+      "x": 10,
+      "y": 19
     }
   ]
 }

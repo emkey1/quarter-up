@@ -127,6 +127,171 @@
       "t": "exit",
       "x": 44,
       "y": 44
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 41,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 21,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 8,
+      "y": 18,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 16,
+      "y": 30,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 14,
+      "y": 6,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 37,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 31,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 20,
+      "y": 16,
+      "kind": "grunt",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 23,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 6,
+      "y": 33,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 13,
+      "y": 40,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 13,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 16,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 34,
+      "y": 46,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 7,
+      "y": 46,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 26,
+      "y": 31,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 13,
+      "y": 23,
+      "kind": "ghost",
+      "lvl": 2
+    },
+    {
+      "t": "gen",
+      "x": 21,
+      "y": 25,
+      "kind": "demon",
+      "lvl": 2
+    },
+    {
+      "t": "food",
+      "x": 1,
+      "y": 28
+    },
+    {
+      "t": "food",
+      "x": 37,
+      "y": 29
+    },
+    {
+      "t": "food",
+      "x": 40,
+      "y": 36
+    },
+    {
+      "t": "food",
+      "x": 31,
+      "y": 3
+    },
+    {
+      "t": "food",
+      "x": 13,
+      "y": 14
     }
   ]
 }

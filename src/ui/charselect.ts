@@ -64,7 +64,8 @@ export class CharSelectScreen implements Screen {
    */
   private geometry(layout: Layout): {
     cards: Rect[];
-    start: Rect;
+    tutorial: Rect;
+    dungeon: Rect;
     begin: Rect;
   } {
     const s = layout.uiScale;
@@ -85,8 +86,12 @@ export class CharSelectScreen implements Screen {
         w: cardW,
         h: cardH,
       })),
-      start: { x: cw / 2 - 190 * s, y: ch - 76 * s, w: 380 * s, h: 32 * s },
-      begin: { x: cw / 2 - 130 * s, y: ch - 42 * s, w: 260 * s, h: 30 * s },
+      // Two side-by-side options rather than one line that toggles. A single line reads
+      // as a caption describing the current state; you have to already know it is a
+      // control to try it. Two boxes with one lit is unmistakably a choice.
+      tutorial: { x: cw / 2 - 210 * s, y: ch - 78 * s, w: 205 * s, h: 34 * s },
+      dungeon: { x: cw / 2 + 5 * s, y: ch - 78 * s, w: 205 * s, h: 34 * s },
+      begin: { x: cw / 2 - 130 * s, y: ch - 40 * s, w: 260 * s, h: 30 * s },
     };
   }
 
@@ -128,8 +133,13 @@ export class CharSelectScreen implements Screen {
         this.index = i;
       }
 
-      if (this.pointer.hit(g.start.x, g.start.y, g.start.w, g.start.h)) {
-        this.skipTutorial = !this.skipTutorial;
+      // Each option sets its own value rather than toggling, so clicking the one that is
+      // already lit is a no-op instead of silently flipping you to the other.
+      if (this.pointer.hit(g.tutorial.x, g.tutorial.y, g.tutorial.w, g.tutorial.h)) {
+        this.skipTutorial = false;
+      }
+      if (this.pointer.hit(g.dungeon.x, g.dungeon.y, g.dungeon.w, g.dungeon.h)) {
+        this.skipTutorial = true;
       }
       if (this.pointer.hit(g.begin.x, g.begin.y, g.begin.w, g.begin.h)) {
         this.onChoose(this.selected, this.skipTutorial);
@@ -191,14 +201,12 @@ export class CharSelectScreen implements Screen {
 
     centred(ctx, 'lighter bar = with its upgrade potion', cw / 2, y + 6 * s, sans(9, s, 500), UI.faint);
 
-    // --- where the run starts. A row rather than a hint, because a player who does not
-    // know the option exists will replay the tutorial forever.
-    const label = this.skipTutorial ? 'START IN THE DUNGEON' : 'START WITH THE TUTORIAL';
-    const note = this.skipTutorial
-      ? `skipping ${INTRO.length} intro levels — begins at depth ${INTRO.length + 1}`
-      : `${INTRO.length} short levels, one idea each`;
-    this.button(ctx, s, g.start, `↑↓   ${label}`, this.skipTutorial ? UI.gold : UI.dim, 11);
-    centred(ctx, note, cw / 2, g.start.y + g.start.h + 9 * s, sans(9, s, 500), UI.faint);
+    // --- where the run starts. Two visible options with one lit, not a line of text that
+    // happens to toggle: a player who does not know the option exists will otherwise
+    // replay the tutorial forever, which is exactly what happened.
+    centred(ctx, 'START AT', cw / 2, g.tutorial.y - 8 * s, sans(8.5, s, 600), UI.faint, 2.4 * s);
+    this.option(ctx, s, g.tutorial, 'TUTORIAL', `${INTRO.length} levels, one idea each`, !this.skipTutorial);
+    this.option(ctx, s, g.dungeon, 'DUNGEON', `skip to depth ${INTRO.length + 1}`, this.skipTutorial);
 
     // The begin button is drawn as a button rather than as a blinking hint. A hint tells
     // you a key exists; a button tells you where to click, and this screen had four
@@ -214,6 +222,26 @@ export class CharSelectScreen implements Screen {
       sans(9.5, s, 500),
       UI.faint,
     );
+  }
+
+  /** One side of the start-point choice. Lit when active, boxed on hover. */
+  private option(
+    ctx: CanvasRenderingContext2D,
+    s: number,
+    r: Rect,
+    label: string,
+    note: string,
+    active: boolean,
+  ): void {
+    const hot = this.pointer.over(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = active ? 'rgba(255,215,106,.13)' : hot ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.02)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = active ? UI.gold : hot ? 'rgba(255,215,106,.5)' : 'rgba(255,255,255,.12)';
+    ctx.lineWidth = Math.max(1, s * (active ? 1.4 : 0.8));
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+
+    centred(ctx, label, r.x + r.w / 2, r.y + 15 * s, sans(11, s, 800), active ? UI.gold : UI.dim, 1.6 * s);
+    centred(ctx, note, r.x + r.w / 2, r.y + 27 * s, sans(8.5, s, 500), UI.faint);
   }
 
   /** A hit-testable label: box on hover, so what is clickable is visible before clicking. */

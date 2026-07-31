@@ -100,9 +100,37 @@ function nestCount(base) {
   return Math.max(base, Math.round(base * ramp));
 }
 
-/** Minimum generators on a normal dungeon level, ramping with depth. */
-function genFloor(d) {
-  return Math.min(9, 3 + Math.floor(d / 6));
+/**
+ * Generators per level, derived from generators per SCREEN.
+ *
+ * Per-level was the wrong unit and it hid the problem for two rounds. Off-screen
+ * generators are inert (DESIGN.md §6.1), so what a player experiences is how many are
+ * within the 232x240 viewport — and a 48x48 level is about nine screens. Eight
+ * generators spread over nine screens is 0.9 per screen, which means most screens have
+ * none at all and you walk through empty rooms between set pieces. Measured on the
+ * shipped campaign before this change: 0.53 per screen at depth 1, 1.19 at depth 40.
+ *
+ * Targeting density directly instead. Roughly two generators per screen early, rising to
+ * nearly four deep, so there is essentially always something producing.
+ *
+ * These three constants mirror tuning.ts. They are duplicated because the level tools are
+ * plain Node and tuning.ts is TypeScript; tests/campaign.test.ts recomputes the density
+ * from the REAL values and fails if the two ever drift apart.
+ */
+const VIEW_W = 232;
+const VIEW_H = 240;
+const TILE = 16;
+const TILES_PER_SCREEN = (VIEW_W / TILE) * (VIEW_H / TILE);
+
+function genFloor(d, reachableCells) {
+  const screens = Math.max(1, reachableCells / TILES_PER_SCREEN);
+  const perScreen = 2.2 + (Math.min(d, 40) / 40) * 1.8;
+  return Math.round(screens * perScreen);
+}
+
+/** Food scales with the pressure, but far more gently — the rank curve culls it anyway. */
+function foodFloor(reachableCells) {
+  return Math.max(3, Math.round((reachableCells / TILES_PER_SCREEN) * 0.85));
 }
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/levels');
@@ -395,8 +423,10 @@ for (let d = 1; d <= 40; d++) {
   // no generators at all. The floor tops the level up with standalone generators placed
   // far from the start and well apart from each other, so the extras open a second front
   // rather than thickening the fight the recipe already designed.
+  const cells = analyse({ tiles: g.tiles.map((row) => row.join('')), start, objects: g.objects })
+    .reachable.size;
   const have = g.objects.filter((o) => o.t === 'gen');
-  const short = genFloor(d) - have.length;
+  const short = genFloor(d, cells) - have.length;
   if (short > 0) {
     const kinds = ['grunt', 'ghost', 'demon', 'sorcerer', 'lobber'];
     const spots = K.spreadCells(
@@ -420,8 +450,7 @@ for (let d = 1; d <= 40; d++) {
   // Every level must feed you something: the drain never stops, so a foodless level
   // is not "hard", it is a level you cannot survive arriving at with low health.
   // More generators means more incoming, so this scales with the pressure too.
-  const foodWanted = Math.max(2, Math.round(genFloor(d) / 2));
-  const foodShort = foodWanted - g.objects.filter((o) => o.t === 'food').length;
+  const foodShort = foodFloor(cells) - g.objects.filter((o) => o.t === 'food').length;
   if (foodShort > 0) {
     const spots = K.spreadCells(
       g,

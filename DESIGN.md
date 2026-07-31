@@ -587,13 +587,26 @@ a bigger grid gets *more* lattice, *more* pillars and *more* switchbacks — not
 ones. Scaling the grain too would give a level that is simply zoomed out: identical
 content spread further apart, which plays worse than the small version, not better.
 
-Generator density is now enforced rather than assumed. `nest()` had a hard-coded list of
-six spots that silently capped every nest in the game at six generators however many a
-recipe asked for, which is most of why the campaign averaged 2.6 per level. On top of
-that, a **density floor** (`genFloor`) tops each dungeon level up with standalone
-generators placed far from the start and well apart from each other, because some recipes
-build their pressure out of loose monsters and would otherwise ship depth 35 with none at
-all. The campaign now runs 3–5 early and 7–16 deep. Intro levels are exempt from both.
+**Generator density is targeted per SCREEN, not per level**, and getting that unit wrong
+hid the problem through two rounds of playtesting. Off-screen generators are inert (§6.1),
+so what a player experiences is how many sit inside the viewport — and a 48×48 level is
+about nine screens. Eight generators over nine screens is 0.9 per screen: most screens
+have none, and you walk through empty rooms between set pieces. Measured on the shipped
+campaign at the time: **0.53 per screen at depth 1, 1.19 at depth 40**.
+
+`genFloor` now derives the count from reachable area: about **2.2 generators per screen
+early rising to 4.0 deep** (21 and 37 per level). Two placement bugs had to go with it:
+`nest()` had a hard-coded list of six spots that silently capped every nest at six however
+many a recipe asked for, and the top-up placed extras *furthest from the start*, which is
+right for adding three and badly wrong for adding twenty — it packed everything into the
+far end and left the whole starting region empty, so standing still on depth 1 and depth
+20 for a full minute produced zero monsters. Placement is now greedy farthest-point
+sampling over the reachable floor, seeded with whatever the recipe already built, so the
+extras cover the map uniformly and avoid the nest. Intro levels are exempt from all of it.
+
+Three tests hold this: per-screen density stays in a band computed from the *real* tuning
+values (so the copies in the Node tooling cannot drift), every level has a generator
+visible from the spawn point, and none is within three tiles of it.
 
 **The exit sequence** (`T.EXIT_SEQUENCE_F`, 78 frames) is part of the **simulation**, not
 the renderer. Reaching the exit starts it; `exitReached` — which is what the run flow

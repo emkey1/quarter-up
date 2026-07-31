@@ -129,7 +129,7 @@
     },
     {
       "t": "gen",
-      "x": 40,
+      "x": 1,
       "y": 1,
       "kind": "lobber",
       "lvl": 3
@@ -137,16 +137,211 @@
     {
       "t": "gen",
       "x": 46,
-      "y": 11,
+      "y": 46,
       "kind": "grunt",
       "lvl": 3
     },
     {
       "t": "gen",
-      "x": 40,
-      "y": 9,
+      "x": 1,
+      "y": 39,
       "kind": "lobber",
       "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 16,
+      "y": 46,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 25,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 22,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 5,
+      "y": 24,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 11,
+      "y": 10,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 43,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 40,
+      "y": 36,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 12,
+      "y": 35,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 39,
+      "y": 16,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 8,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 22,
+      "y": 39,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 15,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 36,
+      "y": 1,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 35,
+      "y": 24,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 10,
+      "y": 19,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 32,
+      "y": 34,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 22,
+      "y": 12,
+      "kind": "demon",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 17,
+      "y": 6,
+      "kind": "lobber",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 12,
+      "y": 1,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 13,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 5,
+      "y": 33,
+      "kind": "ghost",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 10,
+      "y": 28,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 25,
+      "y": 46,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 15,
+      "y": 24,
+      "kind": "sorcerer",
+      "lvl": 3
+    },
+    {
+      "t": "gen",
+      "x": 39,
+      "y": 44,
+      "kind": "grunt",
+      "lvl": 3
+    },
+    {
+      "t": "food",
+      "x": 15,
+      "y": 15
+    },
+    {
+      "t": "food",
+      "x": 1,
+      "y": 29
+    },
+    {
+      "t": "food",
+      "x": 24,
+      "y": 33
+    },
+    {
+      "t": "food",
+      "x": 35,
+      "y": 39
     }
   ]
 }

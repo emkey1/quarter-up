@@ -134,6 +134,136 @@
       "t": "exit",
       "x": 44,
       "y": 44
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 46,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 22,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 30,
+      "y": 23,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 17,
+      "y": 45,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 17,
+      "y": 1,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 1,
+      "y": 17,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 31,
+      "y": 2,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 30,
+      "y": 43,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 3,
+      "y": 28,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 17,
+      "y": 17,
+      "kind": "ghost",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 20,
+      "y": 26,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 4,
+      "y": 38,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 9,
+      "y": 43,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "gen",
+      "x": 46,
+      "y": 12,
+      "kind": "grunt",
+      "lvl": 1
+    },
+    {
+      "t": "food",
+      "x": 1,
+      "y": 1
+    },
+    {
+      "t": "food",
+      "x": 41,
+      "y": 17
+    },
+    {
+      "t": "food",
+      "x": 40,
+      "y": 26
+    },
+    {
+      "t": "food",
+      "x": 45,
+      "y": 31
+    },
+    {
+      "t": "food",
+      "x": 30,
+      "y": 14
     }
   ]
 }

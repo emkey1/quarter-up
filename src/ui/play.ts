@@ -189,7 +189,9 @@ export class PlayScreen implements Screen {
 
     this.lighting.draw(ctx, pf, this.presentation.collectLights(this.world, toX, toY, px));
     this.fx.drawOverlays(ctx, layout, pf);
-    this.drawCaptions(ctx, layout, pf);
+    // Captions are chrome, not scenery. Drawn unconditionally they print the announcer's
+    // subtitles across the character select, which is where the backdrop is a backdrop.
+    if (chrome) this.drawCaptions(ctx, layout, pf);
 
     if (p.damageFlash > 0) {
       ctx.save();

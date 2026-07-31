@@ -50,10 +50,11 @@ are still written on a 32-unit design space and mapped up when generated, under 
 serpentine gap stay as authored, so a bigger grid holds *more* lattice and *more*
 switchbacks rather than bigger ones. Scaling the grain too would just zoom the level out.
 
-Generator density is enforced, not hoped for: nests place as many as the recipe asks for
-(there used to be a hard cap of six that nothing mentioned), and a floor tops each level
-up with generators placed far from the start and well apart, so every dungeon level opens
-more than one front. Levels run 3–5 generators early and 7–16 deep.
+Generator density is targeted **per screen, not per level** — off-screen generators are
+inert, so what you experience is how many are inside the 232×240 viewport, and a level is
+about nine screens. Levels run about 2.2 generators per screen early and 4.0 deep (21 and
+37 per level). Placement is greedy farthest-point sampling over the reachable floor, so
+they cover the whole map rather than clustering, with a clear ring around the spawn.
 
 Two ways to make one, and they share a definition of "playable".
 
@@ -97,8 +98,10 @@ is simulated instead.
 | Face lock | `Alt` / `L` | `X` |
 | Pause | `P` / `Esc` | `Start` |
 
-On the character-select screen, `↑` `↓` (or `T`) switches between starting with the
-seven tutorial levels and starting straight in the dungeon. The choice is remembered.
+The menus take the **mouse** as well: click a character card to pick it, click it again
+to start, and click **START AT → DUNGEON** to skip the seven tutorial levels and begin at
+depth 8. On the keyboard that is `←` `→` to choose and `↑` `↓` (or `T`) for the start
+point. The choice is remembered between runs.
 
 `Tab` opens setup, `G` controller setup, `M` mutes, `[` `]` change scale, `F`
 fullscreen. Development hotkeys: `O` cycles the fire model, `N` skips a level.
