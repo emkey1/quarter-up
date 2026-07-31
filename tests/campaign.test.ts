@@ -187,7 +187,8 @@ describe('treasure rooms', () => {
   it('ends the room when the clock runs out', () => {
     const w = new World(room(), 'elf', 1);
     const a = emptyActions();
-    for (let i = 0; i < T.TREASURE_ROOM_SEC * T.STEP_HZ + 5 && !w.exitReached; i++) w.step(a);
+    const limit = (T.TREASURE_ROOM_SEC + 2) * T.STEP_HZ + T.EXIT_SEQUENCE_F;
+    for (let i = 0; i < limit && !w.exitReached; i++) w.step(a);
     expect(w.exitReached).toBe(true);
   });
 
@@ -213,9 +214,13 @@ describe('treasure rooms', () => {
     const w = new World(room(), 'elf', 1);
     const before = w.player.score;
     w.treasureTimer = 1;
+    // The bonus is paid when the clock stops, not when the exit sequence finishes —
+    // the score must be settled before the animation, or a player who quits during it
+    // would lose the payout.
     w.step(emptyActions());
-    expect(w.exitReached).toBe(true);
     expect(w.player.score).toBe(before);
+    for (let i = 0; i < T.EXIT_SEQUENCE_F + 2; i++) w.step(emptyActions());
+    expect(w.exitReached).toBe(true);
   });
 });
 

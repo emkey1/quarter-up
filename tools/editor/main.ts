@@ -19,7 +19,8 @@ import { PLAYTEST_KEY } from '@/playtest';
  */
 
 const N = T.GRID;
-const CELL = 22;
+/** Sized so the whole grid fits a laptop viewport whatever T.GRID is set to. */
+const CELL = Math.max(10, Math.min(22, Math.floor(700 / N)));
 
 /* ------------------------------------------------------------------ palette */
 
@@ -236,7 +237,9 @@ function draw(): void {
   // Objects carry a letter, not just a colour. Half a dozen warm-toned pickups are not
   // reliably distinguishable at 22px, and misreading food for a generator is exactly the
   // kind of mistake that survives all the way to a playtest.
-  ctx.font = '700 11px ui-monospace, Menlo, monospace';
+  // Marker type is a letter, so it has to stay legible as CELL shrinks with the grid.
+  const glyphPx = Math.max(7, Math.round(CELL * 0.5));
+  ctx.font = `700 ${glyphPx}px ui-monospace, Menlo, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const o of level.objects) {
@@ -253,9 +256,9 @@ function draw(): void {
     // Generator and monster level rides in the corner — it changes what the level is.
     if ((o.t === 'gen' || o.t === 'mon') && (o.lvl ?? 1) > 1) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = '700 9px ui-monospace, Menlo, monospace';
+      ctx.font = `700 ${Math.max(6, glyphPx - 2)}px ui-monospace, Menlo, monospace`;
       ctx.fillText(String(o.lvl), cx + CELL * 0.34, cy - CELL * 0.3);
-      ctx.font = '700 11px ui-monospace, Menlo, monospace';
+      ctx.font = `700 ${glyphPx}px ui-monospace, Menlo, monospace`;
     }
   }
   ctx.textAlign = 'left';

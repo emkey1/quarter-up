@@ -79,6 +79,22 @@ export class World {
 
   /** Set when the player steps on an exit; the Run picks it up and advances. */
   exitReached = false;
+  /**
+   * The exit sequence.
+   *
+   * Reaching the exit does not end the level on the same frame any more — it starts a
+   * short sequence during which the player is drawn into the exit and nothing can touch
+   * them. `exitFrames` counts up; `exitReached` only goes true at the end of it, which
+   * is what the run flow already watches, so the transition stays where it was.
+   *
+   * This lives in the simulation rather than in the renderer because it changes what the
+   * game DOES: the level is over the instant you touch the exit, and a ghost cannot kill
+   * you while the animation plays. A presentation-only version would have to either lie
+   * about that or let you die during a victory.
+   */
+  exitFrames = -1;
+  /** Cell centre the player is drawn toward, in world units. */
+  exitAt: readonly [number, number] | null = null;
   /** Which exit was used, if it names a destination. Intro levels use this for the
    *  numbered skip exits that let a solo player choose their starting depth. */
   exitSkipTo: number | null = null;
@@ -249,6 +265,16 @@ export class World {
    */
   step(a: Readonly<ActionState>): void {
     if (this.player.dead || this.exitReached) {
+      this.frame++;
+      return;
+    }
+
+    // The exit sequence owns the world while it runs. Nothing else steps: no monster
+    // moves, no generator spawns, no drain. Leaving the simulation live here would mean
+    // a ghost could kill you mid-victory, and a level you had already finished could
+    // still end the run.
+    if (this.exitFrames >= 0) {
+      this.stepExitSequence();
       this.frame++;
       return;
     }
@@ -1057,8 +1083,42 @@ export class World {
     this.exitSkipTo = (named?.skipTo as number | undefined) ?? null;
 
     if (this.isTreasureRoom) this.awardTreasureRoom();
-    this.exitReached = true;
+    this.beginExit(cellCentre(cx, cy));
+  }
+
+  /**
+   * Start the exit sequence.
+   *
+   * The player is pulled to the exit's centre over the first half of it, so the sprite
+   * always ends up dead centre in the portal no matter where on the tile you touched it.
+   */
+  private beginExit(at: readonly [number, number]): void {
+    if (this.exitFrames >= 0 || this.exitReached) return;
+    this.exitFrames = 0;
+    this.exitAt = at;
     this.events.emit({ t: 'exitReached' });
+  }
+
+  /** 0 at the moment of touching the exit, 1 when the next level loads. */
+  get exitProgress(): number {
+    if (this.exitFrames < 0) return 0;
+    return Math.min(1, this.exitFrames / T.EXIT_SEQUENCE_F);
+  }
+
+  private stepExitSequence(): void {
+    this.exitFrames++;
+
+    // Glide to the centre over the first 40% and hold there for the rest.
+    if (this.exitAt) {
+      const k = Math.min(1, this.exitProgress / 0.4);
+      const p = this.player;
+      p.x += (this.exitAt[0] - p.x) * k * 0.25;
+      p.y += (this.exitAt[1] - p.y) * k * 0.25;
+    }
+
+    this.camera.follow(this.player.x, this.player.y);
+
+    if (this.exitFrames >= T.EXIT_SEQUENCE_F) this.exitReached = true;
   }
 
   /** Leaving a treasure room pays 50 per treasure collected, per DESIGN.md §3.6. */
@@ -1073,8 +1133,9 @@ export class World {
     if (--this.treasureTimer > 0) return;
     this.treasureTimer = 0;
     this.awardTreasureRoom();
-    this.exitReached = true;
-    this.events.emit({ t: 'exitReached' });
+    // The clock running out gets the same send-off as walking out, from wherever the
+    // player happens to be standing — being hurried is not the same as being cheated.
+    this.beginExit([this.player.x, this.player.y]);
   }
 
   /* ------------------------------------------------------------------ upkeep */

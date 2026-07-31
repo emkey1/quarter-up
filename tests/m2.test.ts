@@ -381,10 +381,16 @@ function miniCampaign(n = 5): LevelData[] {
   return Array.from({ length: n }, (_, i) => ({
     ...arena(
       // A few things to pick up, so "collects as it goes" is actually testable.
+      //
+      // Placed RELATIVE to the arena start rather than at absolute coordinates. The
+      // sweep below is a crude bot, not a pathfinder, and at fixed coordinates it only
+      // happened to cross them at one particular grid size — growing the world left it
+      // wandering an empty quadrant and collecting nothing, which looked like a game bug
+      // and was a fixture bug.
       [
-        { t: 'food', x: 12, y: 14 },
-        { t: 'treasure', x: 20, y: 14 },
-        { t: 'key', x: 12, y: 18 },
+        { t: 'food', x: 16, y: 18 },
+        { t: 'treasure', x: 18, y: 16 },
+        { t: 'key', x: 18, y: 18 },
       ],
       (rows) => {
         rows[16][24] = 'E';

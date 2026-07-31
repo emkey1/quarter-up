@@ -5,12 +5,11 @@ import { validateLevel, type LevelData } from '@/game/level';
 import { emptyActions } from '@/engine/actions';
 import type { ClassId } from '@/data/classes';
 import { makeMonster } from '@/game/monster';
-import proving from '@/data/levels/proving.json';
+import { PROVING } from '@/data/proving';
 
+/** The proving ground, padded to the current grid by @/data/proving. */
 function level(): LevelData {
-  const r = validateLevel(proving);
-  if (!r.ok) throw new Error(r.errors.join('; '));
-  return r.data;
+  return PROVING;
 }
 
 /** A bare arena with nothing but a border, for isolating one system at a time. */
@@ -151,10 +150,13 @@ describe('shooting', () => {
       let fired = 0;
       const a = emptyActions();
       for (let i = 0; i < 900 && m.alive; i++) {
-        const had = w.player.shotAlive;
         a.fire = true;
         w.step(a);
-        if (!had && w.player.shotAlive) fired++;
+        // Count the events, not transitions of `shotAlive`. Watching the flag misses any
+        // shot that spawns on the same frame the previous one expires, which is exactly
+        // what happens once the grunt has closed to point-blank — it reported one shot
+        // for every class and made the comparison meaningless.
+        fired += w.events.drain().filter((e) => e.t === 'shotFired').length;
       }
       return { dead: !m.alive, fired };
     };

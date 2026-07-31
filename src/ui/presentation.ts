@@ -229,12 +229,13 @@ export class Presentation {
         break;
 
       case 'wallsBecameExits':
-        A.play('exit');
+        A.play('exitOpen');
         this.fx.addFlash(0.4, '#6ff08a');
         break;
 
       case 'exitReached':
         A.play('exit');
+        this.fx.addFlash(0.22, '#9fe8ff');
         break;
 
       case 'deathVanished':

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { validateLevel } from '@/game/level';
+import { T } from '@/data/tuning';
+import { PROVING } from '@/data/proving';
 import { blobIndex, reduceMask, BLOB_COUNT, NB, neighbourMask } from '@/render/autotile';
 
 const levelDir = resolve(__dirname, '../src/data/levels');
@@ -13,6 +15,10 @@ describe('shipped levels', () => {
   });
 
   for (const f of levelFiles) {
+    // proving.json is deliberately authored at whatever size it was and padded to the
+    // current grid on load (see src/data/proving.ts) — it is a test harness whose fixed
+    // coordinates are the point, so it is checked through that path, not raw.
+    if (f === 'proving.json') continue;
     it(`${f} passes validation`, () => {
       const data = JSON.parse(readFileSync(resolve(levelDir, f), 'utf8'));
       const r = validateLevel(data);
@@ -20,6 +26,11 @@ describe('shipped levels', () => {
       expect(r.ok).toBe(true);
     });
   }
+
+  it('proving.json loads and validates once padded to the grid', () => {
+    expect(PROVING.tiles.length).toBe(T.GRID);
+    expect(PROVING.tiles.every((r) => r.length === T.GRID)).toBe(true);
+  });
 });
 
 describe('autotile', () => {

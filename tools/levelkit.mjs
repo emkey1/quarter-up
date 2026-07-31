@@ -14,7 +14,33 @@
  * intent; the parameters carry the pacing.
  */
 
-export const N = 32;
+/** Output grid, in tiles. Must match T.GRID in src/data/tuning.ts. */
+export const N = 48;
+
+/**
+ * The space recipes are written in.
+ *
+ * Recipes stay authored on a 32-unit grid and are mapped up at the call site (see
+ * `scaled()` in mkcampaign.mjs). This is not stretching: only *regions* scale, while the
+ * grain inside a pattern — lattice step, pillar spacing, corridor width, serpentine gap —
+ * stays exactly as authored. A scaled-up lattice therefore holds more lattice, not bigger
+ * lattice, and a scaled-up serpentine has more switchbacks rather than longer ones.
+ *
+ * Scaling regions but not grain is the whole trick. Scaling both would give a level that
+ * is merely zoomed out: the same content, further apart, which is a worse game than the
+ * small version, not a better one.
+ */
+export const DESIGN = 32;
+
+/** Map a design-space coordinate onto the output grid. */
+export function ds(v) {
+  return Math.round((v * (N - 1)) / (DESIGN - 1));
+}
+
+/** Map a design-space extent anchored at `from`, so edges land where positions do. */
+export function dsExtent(from, size) {
+  return ds(from + size) - ds(from);
+}
 
 /* ------------------------------------------------------------------ canvas */
 
@@ -97,16 +123,33 @@ export function nest(g, o) {
     else if (opening === 'w') { set(g, x, midY, '.'); set(g, x, midY + 1, '.'); }
     else { set(g, x + w, midY, '.'); set(g, x + w, midY + 1, '.'); }
   }
-  // Spread the generators to the corners of the room so clearing one does not clear
-  // the line of fire to the others.
+  // Spread the generators out so clearing one does not clear the line of fire to the
+  // others. Corners first — they are the positions that make a nest a problem rather
+  // than a queue — then the edge midpoints, then an interior lattice for the big rooms.
+  //
+  // This used to be a hard-coded list of six, which quietly capped every nest in the
+  // game at six generators no matter what a recipe asked for. That cap is most of why
+  // the campaign averaged under three generators a level.
   const spots = [
     [x + 2, y + 2],
     [x + w - 2, y + 2],
     [x + 2, y + h - 2],
     [x + w - 2, y + h - 2],
-    [Math.round(x + w / 2), Math.round(y + h / 2)],
     [Math.round(x + w / 2), y + 2],
+    [Math.round(x + w / 2), y + h - 2],
+    [x + 2, Math.round(y + h / 2)],
+    [x + w - 2, Math.round(y + h / 2)],
+    [Math.round(x + w / 2), Math.round(y + h / 2)],
   ];
+  // Interior lattice, on a 4-tile pitch, for rooms with space left over.
+  for (let gy = y + 4; gy <= y + h - 4 && spots.length < 40; gy += 4) {
+    for (let gx = x + 4; gx <= x + w - 4 && spots.length < 40; gx += 4) {
+      if (!spots.some(([sx, sy]) => Math.abs(sx - gx) < 3 && Math.abs(sy - gy) < 3)) {
+        spots.push([gx, gy]);
+      }
+    }
+  }
+
   for (let i = 0; i < Math.min(count, spots.length); i++) {
     const [gx, gy] = spots[i];
     obj(g, {
@@ -386,6 +429,46 @@ export function remotestCell(g, start, avoid = []) {
     }
   }
   return { cell: best, steps: bestD };
+}
+
+/**
+ * Well-separated reachable floor cells, furthest-first.
+ *
+ * For topping a level up to a minimum generator density without piling the extras on
+ * top of each other or on top of the nest a recipe already built. Greedy furthest-first
+ * rather than random: generators that end up clustered are one fight, and the point of
+ * adding them is to give the level more than one front.
+ */
+export function spreadCells(g, start, want, minGap = 6, taken = []) {
+  const solid = new Set(['X', ' ']);
+  const dist = new Map([[start.join(','), 0]]);
+  const queue = [[start[0], start[1]]];
+  const open = [];
+
+  for (let head = 0; head < queue.length; head++) {
+    const [x, y] = queue[head];
+    const d = dist.get(`${x},${y}`);
+    if (g.tiles[y][x] === '.' && d > minGap) open.push([x, y, d]);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const k = `${nx},${ny}`;
+      if (!inb(nx, ny) || dist.has(k) || solid.has(g.tiles[ny][nx])) continue;
+      dist.set(k, d + 1);
+      queue.push([nx, ny]);
+    }
+  }
+
+  open.sort((a, b) => b[2] - a[2]);
+  const chosen = [];
+  const clear = (x, y) =>
+    ![...taken, ...chosen].some(([tx, ty]) => Math.abs(tx - x) + Math.abs(ty - y) < minGap);
+
+  for (const [x, y] of open) {
+    if (chosen.length >= want) break;
+    if (clear(x, y)) chosen.push([x, y]);
+  }
+  return chosen;
 }
 
 export function finish(g, meta) {

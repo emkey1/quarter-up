@@ -32,7 +32,8 @@ export type SfxName =
   | 'thiefSteal'
   | 'deathTouch'
   | 'levelStart'
-  | 'exit';
+  | 'exit'
+  | 'exitOpen';
 
 export class Audio {
   private ctx: AudioContext | null = null;
@@ -158,6 +159,46 @@ export class Audio {
 
   /* ------------------------------------------------------------------ playback */
 
+  /**
+   * A rising sweep — the "something is happening to you" voice.
+   *
+   * The cabinet's exit was a long, unmistakable event rather than a blip, and that is
+   * most of why people remember it. A single arpeggio cannot carry that, so this stacks
+   * three things that a chip could not do at once: a glide up in pitch, a resonant filter
+   * opening over noise, and a sub-bass swell underneath.
+   */
+  private sweep(from: number, to: number, dur: number, peak = 0.2): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+
+    // The voice: two detuned saws gliding up an octave and a fifth.
+    for (const detune of [-7, 7]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.detune.setValueAtTime(detune, t);
+      o.frequency.setValueAtTime(from, t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1, to), t + dur);
+      const filt = this.ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.Q.setValueAtTime(9, t);
+      filt.frequency.setValueAtTime(from * 2, t);
+      filt.frequency.exponentialRampToValueAtTime(Math.max(200, to * 4), t + dur);
+      o.connect(filt);
+      this.env(filt, dur * 0.55, dur * 0.45, peak * 0.5);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+
+    // The floor: a sub that swells and drops away, so it lands in the chest.
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(from / 2, t);
+    sub.frequency.exponentialRampToValueAtTime(Math.max(20, from / 3), t + dur);
+    this.env(sub, dur * 0.5, dur * 0.5, peak * 0.85);
+    sub.start(t);
+    sub.stop(t + dur + 0.05);
+  }
+
   /** `throttle` in ms stops a stream of identical events becoming a buzzsaw. */
   play(name: SfxName, throttle = 0): void {
     if (!this.ready || this.muted) return;
@@ -245,6 +286,14 @@ export class Audio {
         this.arp([392, 523, 659, 784, 659, 784], 0.11, 'triangle', 0.2);
         break;
       case 'exit':
+        // The full send-off, ~1.2s, matching EXIT_SEQUENCE_F. Layered so it arrives in
+        // three stages the way the animation does: the pull, the climb, the arrival.
+        this.sweep(180, 1400, 1.05, 0.22);
+        this.arp([523, 659, 784, 1047, 1319], 0.11, 'triangle', 0.2);
+        this.noise(0.9, 0.1, 600, 7000);
+        break;
+      /** The short chime, still used when walls give way — not a level ending. */
+      case 'exitOpen':
         this.arp([523, 784, 1047], 0.08, 'triangle', 0.22);
         break;
     }

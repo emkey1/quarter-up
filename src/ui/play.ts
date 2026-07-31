@@ -167,12 +167,13 @@ export class PlayScreen implements Screen {
     let drewPlayer = false;
     for (const m of sorted) {
       if (!drewPlayer && m.y > p.y) {
-        sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+        this.drawHero(ctx, toX(p.x), toY(p.y), px);
         drewPlayer = true;
       }
       sprites.monster(ctx, m, toX(m.x), toY(m.y), px, this.animFrame);
     }
-    if (!drewPlayer) sprites.player(ctx, p, toX(p.x), toY(p.y), px, this.animFrame);
+    if (!drewPlayer) this.drawHero(ctx, toX(p.x), toY(p.y), px);
+    this.drawExitPortal(ctx, toX, toY, px);
 
     for (const d of this.world.deaths) {
       if (d.alive) sprites.death(ctx, d, toX(d.x), toY(d.y), px, this.animFrame);
@@ -198,6 +199,29 @@ export class PlayScreen implements Screen {
       ctx.restore();
     }
 
+    // The iris. Closes on the exit rather than on the middle of the screen, so the last
+    // thing visible is where you went — a centred fade would just be a fade.
+    if (this.world.exitFrames >= 0 && this.world.exitAt) {
+      const t = this.world.exitProgress;
+      const close = Math.max(0, (t - 0.45) / 0.55);
+      if (close > 0) {
+        const ix = toX(this.world.exitAt[0]);
+        const iy = toY(this.world.exitAt[1]);
+        const full = Math.hypot(pf.w, pf.h);
+        const r = full * (1 - close * close);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pf.x, pf.y, pf.w, pf.h);
+        ctx.clip();
+        const iris = ctx.createRadialGradient(ix, iy, Math.max(0, r * 0.55), ix, iy, Math.max(1, r));
+        iris.addColorStop(0, 'rgba(5,6,10,0)');
+        iris.addColorStop(1, 'rgba(5,6,10,1)');
+        ctx.fillStyle = iris;
+        ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
+        ctx.restore();
+      }
+    }
+
     // playfield border, so the locked gameplay viewport is visible as a deliberate frame
     ctx.strokeStyle = 'rgba(255,255,255,.10)';
     ctx.lineWidth = Math.max(1, layout.dpr);
@@ -216,6 +240,109 @@ export class PlayScreen implements Screen {
     if (this.paused) this.drawPaused(ctx, layout.playfield, layout.uiScale);
     this.drawTierBadge(ctx, layout);
     this.drawPadHint(ctx, layout);
+  }
+
+  /**
+   * The player sprite, wound down into the exit when the level is ending.
+   *
+   * Scaling about the sprite's own feet rather than its centre: a figure that shrinks
+   * toward its middle looks like it is being deleted, one that shrinks toward the ground
+   * looks like it is being pulled down into something. Same three lines of maths,
+   * completely different read.
+   */
+  private drawHero(ctx: CanvasRenderingContext2D, sx: number, sy: number, px: number): void {
+    const w = this.world;
+    const p = w.player;
+    if (w.exitFrames < 0) {
+      sprites.player(ctx, p, sx, sy, px, this.animFrame);
+      return;
+    }
+
+    const t = w.exitProgress;
+    // Hold full size briefly so the pull to the centre is visible before the descent.
+    const k = Math.max(0, (t - 0.25) / 0.6);
+    const scale = Math.max(0.001, 1 - k * k);
+    const spin = k * k * Math.PI * 3;
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - k * k * 1.1);
+    ctx.translate(sx, sy + px * 6);
+    ctx.rotate(spin);
+    ctx.scale(scale, scale);
+    ctx.translate(0, -px * 6);
+    sprites.player(ctx, p, 0, 0, px, this.animFrame);
+    ctx.restore();
+  }
+
+  /**
+   * The portal itself: a ring that opens, a column of light, and sparks drawn inward.
+   *
+   * Sparks converge rather than explode. An outward burst is a thing being destroyed; the
+   * point here is that the dungeon is taking you somewhere.
+   */
+  private drawExitPortal(
+    ctx: CanvasRenderingContext2D,
+    toX: (n: number) => number,
+    toY: (n: number) => number,
+    px: number,
+  ): void {
+    const w = this.world;
+    if (w.exitFrames < 0 || !w.exitAt) return;
+
+    const t = w.exitProgress;
+    const cx = toX(w.exitAt[0]);
+    const cy = toY(w.exitAt[1]);
+    const unit = px * T.TILE;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Ground glow, opening fast and fading at the very end with the wipe.
+    const grow = Math.min(1, t / 0.35);
+    const fade = t > 0.8 ? Math.max(0, (1 - t) / 0.2) : 1;
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, unit * 1.9 * grow);
+    glow.addColorStop(0, `rgba(190,240,255,${0.85 * fade})`);
+    glow.addColorStop(0.35, `rgba(90,180,255,${0.45 * fade})`);
+    glow.addColorStop(1, 'rgba(20,60,140,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, unit * 1.9 * grow, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Two expanding rings, offset in time, so the portal reads as pulsing rather than
+    // as one shape changing size.
+    for (const off of [0, 0.45]) {
+      const rt = (t * 1.9 + off) % 1;
+      ctx.strokeStyle = `rgba(210,245,255,${(1 - rt) * 0.7 * fade})`;
+      ctx.lineWidth = Math.max(1, px * 1.6 * (1 - rt));
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + px * 3, unit * 1.5 * rt, unit * 0.6 * rt, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Sparks falling inward. Deterministic angles, so it is the same every time and
+    // cannot flicker between frames.
+    const sparks = 14;
+    for (let i = 0; i < sparks; i++) {
+      const a = (i / sparks) * Math.PI * 2 + t * 2.2;
+      const r = unit * 2.2 * (1 - ((t * 1.6 + i / sparks) % 1));
+      const px2 = cx + Math.cos(a) * r;
+      const py2 = cy + Math.sin(a) * r * 0.45 - px * 2;
+      ctx.fillStyle = `rgba(235,250,255,${0.9 * fade * (1 - r / (unit * 2.2))})`;
+      ctx.fillRect(px2 - px * 0.6, py2 - px * 0.6, px * 1.2, px * 1.2);
+    }
+
+    // The column, arriving late — the moment of actually going.
+    if (t > 0.45) {
+      const ct = (t - 0.45) / 0.55;
+      const beam = ctx.createLinearGradient(cx, cy - unit * 7, cx, cy + px * 4);
+      beam.addColorStop(0, 'rgba(150,220,255,0)');
+      beam.addColorStop(1, `rgba(220,248,255,${0.55 * Math.sin(ct * Math.PI) })`);
+      ctx.fillStyle = beam;
+      const halfW = unit * 0.42 * (1 - ct * 0.45);
+      ctx.fillRect(cx - halfW, cy - unit * 7, halfW * 2, unit * 7 + px * 4);
+    }
+    ctx.restore();
   }
 
   /**

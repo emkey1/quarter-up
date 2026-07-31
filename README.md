@@ -44,6 +44,17 @@ npm run build     # typecheck + production bundle
 
 ## Levels
 
+Levels are **48×48 tiles** — a bit over three screens each way. The forty dungeon recipes
+are still written on a 32-unit design space and mapped up when generated, under one rule:
+**regions scale, grain does not.** Lattice step, pillar pitch, corridor width and
+serpentine gap stay as authored, so a bigger grid holds *more* lattice and *more*
+switchbacks rather than bigger ones. Scaling the grain too would just zoom the level out.
+
+Generator density is enforced, not hoped for: nests place as many as the recipe asks for
+(there used to be a hard cap of six that nothing mentioned), and a floor tops each level
+up with generators placed far from the start and well apart, so every dungeon level opens
+more than one front. Levels run 3–5 generators early and 7–16 deep.
+
 Two ways to make one, and they share a definition of "playable".
 
 **The editor** — open http://localhost:5173/editor.html. Paint terrain, drop objects,

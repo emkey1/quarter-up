@@ -377,7 +377,7 @@ So the codebase separates two scales that the arcade conflated:
 | Quantity | Value | May change? |
 | --- | --- | --- |
 | Block | **16 world units (wu)** | No |
-| Level | 32 × 32 blocks = 512 × 512 wu | No |
+| Level | 48 × 48 blocks = 768 × 768 wu | Raised from 32 after playtesting — see §6.8 |
 | **Gameplay viewport** | **232 × 240 wu** (14.5 × 15 blocks) | **No** — locked in Arcade preset |
 | Art scale `A` | **2 px per wu** (32×32 px per block) | Yes — this is the upgrade |
 | Screen scale `S` | 1–3, integer, auto-fit to window | Yes |
@@ -571,7 +571,52 @@ The tier is computed from the rules, not stored, so it can never drift from what
 actually enabled. The active tier is shown on the HUD whenever it is not Arcade — an
 easier run should never be able to quietly look like a real one.
 
-### 6.7 Difficulty
+### 6.7 Level size and the exit sequence
+
+*(Both implemented, both from playtesting.)*
+
+**Levels are 48×48 blocks, not 32×32.** At 32 a level is barely two screens across, which
+is not a dungeon, it is a room: nowhere to hide anything, and a generator on the far side
+is already on screen when you arrive. At 48 it is a bit over three screens each way.
+
+The forty recipes are still written on a **32-unit design space** and mapped up at the
+call site (`scaleOpts` in `tools/mkcampaign.mjs`). The rule that makes this work rather
+than merely stretching: **regions scale, grain does not.** A lattice's step, a pillar
+field's pitch, a corridor's width and a serpentine's gap all stay exactly as authored, so
+a bigger grid gets *more* lattice, *more* pillars and *more* switchbacks — not bigger
+ones. Scaling the grain too would give a level that is simply zoomed out: identical
+content spread further apart, which plays worse than the small version, not better.
+
+Generator density is now enforced rather than assumed. `nest()` had a hard-coded list of
+six spots that silently capped every nest in the game at six generators however many a
+recipe asked for, which is most of why the campaign averaged 2.6 per level. On top of
+that, a **density floor** (`genFloor`) tops each dungeon level up with standalone
+generators placed far from the start and well apart from each other, because some recipes
+build their pressure out of loose monsters and would otherwise ship depth 35 with none at
+all. The campaign now runs 3–5 early and 7–16 deep. Intro levels are exempt from both.
+
+**The exit sequence** (`T.EXIT_SEQUENCE_F`, 78 frames) is part of the **simulation**, not
+the renderer. Reaching the exit starts it; `exitReached` — which is what the run flow
+watches — only goes true at the end. During it the whole world is frozen: no monster
+moves, no generator spawns, no drain ticks.
+
+That placement is the whole design. The level is over the instant you touch the exit, and
+a presentation-only version would have to either lie about that or let a ghost kill you
+during your own victory animation. It also means the sequence is deterministic and
+replayable like everything else.
+
+What plays: the player is pulled to the exact centre of the exit tile, then wound down
+into it — scaled about its **feet**, not its centre, because a figure shrinking toward its
+middle looks deleted while one shrinking toward the ground looks pulled under. A portal
+opens beneath, sparks fall *inward* (an outward burst reads as destruction; this is the
+dungeon taking you somewhere), a column of light arrives late, and an iris closes on the
+exit rather than on the middle of the screen — so the last thing visible is where you
+went. The sound is a 1.05s layered sweep: two detuned saws gliding up through an opening
+resonant filter, a sub-bass swell underneath, an arpeggio over the top, and filtered
+noise. A single chime cannot carry an event this long, and the length is most of why the
+original's exit is the part people remember.
+
+### 6.8 Difficulty
 
 *(Implemented.)* A five-rung ladder, and the setting that changes the game most, so it
 sits at the top of the setup screen rather than buried under sixteen toggles. It lives in
@@ -778,7 +823,7 @@ Update order per step (fixed, documented, because it is observable):
 
 ### 7.5 Coordinates
 
-- World is **512×512 world units (wu)**, `32×32` blocks of `16 wu`. All positions are floats in wu.
+- World is **768×768 world units (wu)**, `48×48` blocks of `16 wu`. All positions are floats in wu.
   **Nothing in `src/game/` ever refers to a screen pixel** — that conversion happens only in
   `src/render/`, which multiplies by `A·S`. This is what lets the art scale change freely.
 - Entity collision boxes are AABBs centred on position:
@@ -964,7 +1009,7 @@ Health-relevant, so it is the difficulty curve.
 
 ### 8.10 Rendering
 
-- The full 512×512 level is pre-rendered once to an offscreen canvas. Tile changes (door opened,
+- The full level is pre-rendered once to an offscreen canvas. Tile changes (door opened,
   wall destroyed, wall→exit conversion) mark 16×16 dirty rects, redrawn in place.
 - Each frame: blit the camera rect, then draw entities sorted by `y` (so sprites overlap
   correctly), then projectiles, then fx, then the HUD panel, then captions/overlays.
@@ -1049,7 +1094,7 @@ a magic gameplay number. Marked **[i]** = inferred, needs validation against ref
 ```ts
 export const T = {
   // --- world space (wu). Never change these. ---
-  TILE: 16, GRID: 32, WORLD: 512,
+  TILE: 16, GRID: 48, WORLD: 768,
   VIEW_W: 232, VIEW_H: 240,          // gameplay viewport, LOCKED (see 6.1)
   STEP_HZ: 60,
 

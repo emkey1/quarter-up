@@ -12,8 +12,14 @@ export const T = {
   // ---------------------------------------------------------------- world space (wu)
   // Never change these. They define the simulation's units.
   TILE: 16,
-  GRID: 32,
-  WORLD: 512, // TILE * GRID
+  /** Level size in tiles.
+   *
+   *  Raised from 32 after playtesting: at 32 a level is barely two screens across, which
+   *  is not a dungeon, it is a room. At 48 it is a bit over three screens each way, so
+   *  the maze has somewhere to hide things and a generator on the far side is a genuine
+   *  second front rather than something you can already see. */
+  GRID: 48,
+  WORLD: 768, // TILE * GRID
 
   /** Gameplay viewport in world units. LOCKED — see DESIGN.md §6.1.
    *  Off-screen generators are inert and potions are viewport-scoped, so this is a
@@ -104,6 +110,14 @@ export const T = {
   DOOR_AUTO_OPEN_SEC_WITH_KEYS: 180,
   WALLS_BECOME_EXITS_SEC: 180,
   INVISIBILITY_SEC: 20,
+
+  /** Frames the exit sequence runs before the next level loads.
+   *
+   *  Long enough to read as an event rather than a cut, short enough that a good player
+   *  clearing forty levels does not spend a minute of the run watching it. It is part of
+   *  the SIMULATION, not the presentation: the level is over the moment you touch the
+   *  exit, and nothing may hurt you during it. */
+  EXIT_SEQUENCE_F: 78,
 
   SORCERER_VISIBLE_F: 90, // [i]
   SORCERER_INVISIBLE_F: 60, // [i]

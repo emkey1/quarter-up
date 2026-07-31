@@ -5,7 +5,7 @@ import { T } from '@/data/tuning';
 import { World } from '@/game/world';
 import { validateLevel } from '@/game/level';
 import { emptyActions } from '@/engine/actions';
-import proving from '@/data/levels/proving.json';
+import { PROVING } from '@/data/proving';
 
 /**
  * The guard that keeps the graphics upgrade from quietly becoming a gameplay change
@@ -13,9 +13,7 @@ import proving from '@/data/levels/proving.json';
  */
 
 function replayHash(): string {
-  const r = validateLevel(proving);
-  if (!r.ok) throw new Error(r.errors.join('; '));
-  const w = new World(r.data, 'elf', 12345);
+  const w = new World(PROVING, 'elf', 12345);
   const a = emptyActions();
 
   // A scripted run that exercises movement, walls, corners and the fire models.
