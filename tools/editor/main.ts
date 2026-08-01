@@ -71,6 +71,7 @@ const GLYPH_FOR: Record<string, string> = {
   mon: 'M',
   death: 'D',
   thief: '$',
+  sign: 'S',
 };
 
 /* ------------------------------------------------------------------ state */

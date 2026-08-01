@@ -185,11 +185,49 @@ describe('playability analysis', () => {
 });
 
 describe('intro level-select', () => {
-  it('offers numbered exits on the last intro level', () => {
+  it('offers six numbered exits on the last intro level', () => {
     const last = INTRO[INTRO.length - 1];
     const skips = last.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number');
-    expect(skips.length).toBe(3);
-    expect(skips.map((s) => s.skipTo)).toEqual([8, 12, 16]);
+    expect(last.name).toBe('Six Doors');
+    expect(skips.length).toBe(6);
+    expect(skips.map((s) => s.skipTo).sort((a, b) => (a as number) - (b as number)))
+      .toEqual([8, 14, 20, 26, 32, 38]);
+  });
+
+  it('labels every door with where it goes', () => {
+    // An unlabelled door asks you to gamble on a number you cannot see, which is not a
+    // choice. Each door gets a floor sign naming its destination depth.
+    const last = INTRO[INTRO.length - 1];
+    const skips = last.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number');
+    const signs = last.objects.filter((o) => o.t === 'sign');
+    expect(signs.length, 'a door is unlabelled').toBe(skips.length);
+    for (const s of skips) {
+      expect(
+        signs.some((g) => g.text === `LEVEL ${s.skipTo}`),
+        `no sign for the door to ${s.skipTo}`,
+      ).toBe(true);
+    }
+    // Each sign must be nearest the door it describes. An absolute distance would be an
+    // arbitrary number that breaks the moment the room moves; "closer to its own door
+    // than to any other" is the property that actually matters, and it stays true however
+    // the level is laid out.
+    for (const g of signs) {
+      const depth = Number(String(g.text).replace(/\D+/g, ''));
+      const dist = (o: { x: number; y: number }) => Math.abs(g.x - o.x) + Math.abs(g.y - o.y);
+      const own = skips.find((s) => s.skipTo === depth)!;
+      const nearest = skips.reduce((a, b) => (dist(a) <= dist(b) ? a : b));
+      expect(nearest.skipTo, `the sign for ${depth} sits by the door to ${nearest.skipTo}`).toBe(depth);
+      expect(own.x, `sign for ${depth} is not in line with its door`).toBe(g.x);
+    }
+  });
+
+  it('sends every door somewhere the campaign actually has', () => {
+    const last = INTRO[INTRO.length - 1];
+    for (const s of last.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number')) {
+      const depth = s.skipTo as number;
+      expect(depth, `door to ${depth} lands past the campaign`).toBeLessThanOrEqual(CAMPAIGN.length);
+      expect(CAMPAIGN[depth - 1].type, `door to ${depth} lands on an intro level`).not.toBe('intro');
+    }
   });
 
   it('jumps the run to the depth a numbered exit names', () => {
@@ -215,12 +253,12 @@ describe('skipping the tutorial', () => {
   // the same jump as a numbered exit. Both must land in the same place, or a returning
   // player gets a different game depending on which route they took to skip.
   it('starts on the level-select, not past it', () => {
-    // Skipping lands on the LAST intro level — "Three Doors" — because that level is not
+    // Skipping lands on the LAST intro level — "Six Doors" — because that level is not
     // a tutorial, it is the arcade's depth chooser. Dropping the player past it would
     // silently decide the run's difficulty for them; landing on it hands the choice over.
     const start = LOOP_START - 1;
     const r = new Run(CAMPAIGN, 'elf', 1, start, undefined, LOOP_START);
-    expect(r.levelName).toBe('Three Doors');
+    expect(r.levelName).toBe('Six Doors');
     expect(r.levelName).toBe(INTRO[INTRO.length - 1].name);
     expect(r.depth).toBe(INTRO.length);
   });

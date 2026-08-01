@@ -1242,7 +1242,11 @@ levels are built from a documented vocabulary:
 
 Shipping content:
 
-- **7 intro levels** with numbered skip exits (skip to 8 / 12 / 16, as the original did).
+- **7 intro levels**, the last of which is the level-select: **six labelled doors** to
+  depths 8, 14, 20, 26, 32 and 38, each with its destination painted on the vestibule
+  floor. Three doors reaching only depth 16 left the back half of the campaign
+  unreachable without playing through to it, and an unlabelled door asks you to gamble on
+  a number you cannot see, which is not a choice.
 - **40 hand-authored dungeon levels**, themed in blocks of 8.
 - **Treasure rooms** every 12 levels: a timed room (30 s) packed with treasure.
 

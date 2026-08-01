@@ -44,6 +44,11 @@ npm run build     # typecheck + production bundle
 
 ## Levels
 
+**50 levels ship**: 7 intro (the last being the six-door level-select), 40 dungeon levels
+and 3 treasure rooms. Past depth 50 the campaign loops from depth 8 with depth scaling
+applied to generator rates, so there is no ending — only a score.
+
+
 Levels are **48×48 tiles** — a bit over three screens each way. The forty dungeon recipes
 are still written on a 32-unit design space and mapped up when generated, under one rule:
 **regions scale, grain does not.** Lattice step, pillar pitch, corridor width and
@@ -106,9 +111,9 @@ is simulated instead.
 | Pause | `P` / `Esc` | `Start` |
 
 The menus take the **mouse** as well: click a character card to pick it, click it again
-to start, and click **START AT → THE DOORS** to skip the tutorial and begin on "Three
-Doors", the arcade's level-select, where three numbered exits let you pick depth 8, 12 or
-16. On the keyboard that is `←` `→` to choose and `↑` `↓` (or `T`) for the start point.
+to start, and click **START AT → THE DOORS** to skip the tutorial and begin on "Six
+Doors", the level-select, where six labelled doors let you start at depth 8, 14, 20, 26,
+32 or 38 — each with its destination painted on the floor in front of it. On the keyboard that is `←` `→` to choose and `↑` `↓` (or `T`) for the start point.
 The choice is remembered between runs.
 
 `Tab` opens setup, `G` controller setup, `M` mutes, `[` `]` change scale, `F`

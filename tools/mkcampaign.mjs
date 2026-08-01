@@ -161,6 +161,8 @@ const NAMES = [
 const levels = [];
 /** Where each hidden upgrade potion ended up, so the report can prove it is hidden. */
 const hidden = [];
+/** Floor signs for the level-select, written into the level so the game can paint them. */
+const DOOR_SIGNS = [];
 
 /* ================================================================== intro levels */
 /**
@@ -174,6 +176,12 @@ function intro(i, build) {
   const g = blank();
   border(g);
   const meta = build(g, i);
+  // Signs are level DATA, not renderer knowledge: the level says what is written where,
+  // so the editor can show them and a hand-authored level could use them too.
+  for (const sgn of DOOR_SIGNS) {
+    K.obj(g, { t: 'sign', x: ds(sgn.x), y: ds(sgn.y), text: `LEVEL ${sgn.depth}` });
+  }
+  DOOR_SIGNS.length = 0;
   // `start` comes back in design space like everything else the recipe wrote.
   levels.push(
     finish(g, {
@@ -267,22 +275,46 @@ intro(6, (g) => {
 
 intro(7, (g) => {
   /**
-   * The level-select. Three numbered exits, exactly as the cabinet did it — a returning
-   * player skips the tutorial and starts as deep as they think they can handle.
+   * The level-select, and the level a returning player lands on when they skip the
+   * tutorial — so it is the last thing between them and the run, and the only place the
+   * run's starting depth is chosen.
+   *
+   * Six doors rather than three, in two rows, reaching depth 38 of 43 dungeon levels. The
+   * back half of the campaign was unreachable without playing through to it, which made
+   * the deep levels effectively unplayable for anyone who wanted to practise them.
+   *
+   * Each door's destination is written on the floor in front of it (see DOOR_SIGNS): an
+   * unlabelled door asks you to gamble on a number you cannot see, which is not a choice,
+   * it is a shrug.
    */
   fill(g, 2, 2, 29, 29, '.');
-  for (const [i, x] of [7, 16, 25].entries()) {
-    box(g, x - 3, 6, x + 3, 14, 'X');
-    fill(g, x - 2, 7, x + 2, 13, '.');
-    set(g, x, 14, '.');
-    set(g, x, 8, 'E');
+  DOOR_SIGNS.length = 0;
+  const depths = [8, 14, 20, 26, 32, 38];
+  const cols = [7, 16, 25];
+  depths.forEach((depth, i) => {
+    const x = cols[i % 3];
+    const top = i < 3 ? 4 : 15;
+    box(g, x - 3, top, x + 3, top + 7, 'X');
+    fill(g, x - 2, top + 1, x + 2, top + 6, '.');
+    set(g, x, top + 7, '.'); // way in, from below
+    set(g, x, top + 2, 'E');
     // skipTo is a 1-based campaign depth; intro levels occupy 1..7.
-    obj(g, { t: 'exit', x, y: 8, skipTo: [8, 12, 16][i] });
-  }
-  obj(g, { t: 'food', x: 4, y: 26 });
-  obj(g, { t: 'food', x: 28, y: 26 });
-  obj(g, { t: 'potion', x: 16, y: 26 });
-  return { name: 'Three Doors', start: [16, 28] };
+    obj(g, { t: 'exit', x, y: top + 2, skipTo: depth });
+    // Inside the vestibule, between the way in (bottom) and the exit tile (top), so you
+    // walk over the label on the approach and read it BEFORE stepping on the exit.
+    //
+    // Not outside the room, which is where this sat first: the rooms are two rows deep,
+    // and a sign below row one lands nearer row two's door than its own. The test caught
+    // that by asserting each sign is nearest the door it names, which is the property
+    // that matters — an absolute distance would just have been a number that happened to
+    // pass.
+    DOOR_SIGNS.push({ x, y: top + 5, depth });
+  });
+
+  obj(g, { t: 'food', x: 4, y: 27 });
+  obj(g, { t: 'food', x: 28, y: 27 });
+  obj(g, { t: 'potion', x: 16, y: 27 });
+  return { name: 'Six Doors', start: [16, 29] };
 });
 
 /* ================================================================== dungeons */

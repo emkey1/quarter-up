@@ -12,6 +12,9 @@ export interface LevelObject {
   breakable?: boolean;
   skipTo?: number | null;
   opens?: [number, number][];
+  /** Text painted on the floor at this cell. Used by the level-select to say where each
+   *  door goes — an unlabelled door asks you to gamble on a number you cannot see. */
+  text?: string;
 }
 
 export interface LevelData {

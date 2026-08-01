@@ -21,6 +21,7 @@ import { ScreenFx, prefersReducedMotion } from '@/render/fx';
 import { SetupScreen } from './setup';
 import { cloneRules, DEFAULT_RULES, tierOf } from '@/data/rules';
 import { loadSettings } from '@/engine/storage';
+import { cellCentre } from '@/game/level';
 
 const FIRE_CYCLE: FireModel[] = ['arcade', 'feathered', 'free', 'twinstick'];
 
@@ -155,6 +156,10 @@ export class PlayScreen implements Screen {
     const toX = (wx: number) => pf.x + Math.round(wx * px) - camX;
     const toY = (wy: number) => pf.y + Math.round(wy * px) - camY;
 
+    // Floor text first: it is paint on the ground, so everything walks over it. Drawn
+    // after the entities it printed "LEVEL 32" across the player's head.
+    this.drawSigns(ctx, toX, toY, px);
+
     for (const it of this.world.items) {
       if (it.alive) sprites.item(ctx, it, toX(it.x), toY(it.y), px, this.animFrame);
     }
@@ -242,6 +247,43 @@ export class PlayScreen implements Screen {
     if (this.paused) this.drawPaused(ctx, layout.playfield, layout.uiScale);
     this.drawTierBadge(ctx, layout);
     this.drawPadHint(ctx, layout);
+  }
+
+  /**
+   * Floor text, painted in world space.
+   *
+   * Only the level-select uses it so far, to say where each door goes. Reading the text
+   * from the level's own objects rather than hard-coding it in the renderer means the
+   * editor can place one and a hand-authored level can use it, and it keeps the renderer
+   * ignorant of what the level-select happens to be.
+   */
+  private drawSigns(
+    ctx: CanvasRenderingContext2D,
+    toX: (n: number) => number,
+    toY: (n: number) => number,
+    px: number,
+  ): void {
+    const signs = this.world.level.objects.filter((o) => o.t === 'sign' && o.text);
+    if (!signs.length) return;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const size = Math.max(8, Math.round(px * 7));
+    ctx.font = `800 ${size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    for (const s of signs) {
+      const [wx, wy] = cellCentre(s.x, s.y);
+      const x = toX(wx);
+      const y = toY(wy);
+      // Outlined rather than plain, because this sits on floor tiles whose brightness
+      // varies by theme and a single fill colour is illegible on at least one of them.
+      ctx.lineWidth = Math.max(2, px * 1.2);
+      ctx.strokeStyle = 'rgba(4,5,9,.92)';
+      ctx.strokeText(s.text!, x, y);
+      ctx.fillStyle = '#ffd76a';
+      ctx.fillText(s.text!, x, y);
+    }
+    ctx.restore();
   }
 
   /**
