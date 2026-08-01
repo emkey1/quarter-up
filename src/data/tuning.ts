@@ -158,6 +158,16 @@ export const T = {
 
   RANK_ZERO_FOOD_SCORE: 300_000,
   RANK_MIN_FOOD_RATIO: 0.15,
+  /**
+   * Absolute floor on food pieces per level, whatever the rank curve says.
+   *
+   * The ratio alone is a proportion of what the level holds, so halving the campaign's
+   * food halved the late-game floor with it: a rich run on a level with four pieces kept
+   * ceil(4 x 0.15) = 1. One piece of food on a level is not a difficulty curve, it is a
+   * coin flip on whether you happen to walk past it. This is the "some food, always"
+   * guarantee — the ratio decides the shape, this decides the bottom. [i]
+   */
+  RANK_MIN_FOOD_ITEMS: 2,
 } as const;
 
 /** Convenience: the camera's clamp range, derived not duplicated. */

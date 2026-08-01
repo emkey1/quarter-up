@@ -128,9 +128,20 @@ function genFloor(d, reachableCells) {
   return Math.round(screens * perScreen);
 }
 
-/** Food scales with the pressure, but far more gently — the rank curve culls it anyway. */
+/**
+ * Food per level, from reachable area.
+ *
+ * Halved from 0.85 per screen after playtesting — roughly one piece every two and a half
+ * screens rather than nearly one per screen. At the old rate the drain never really bit:
+ * food turned up faster than 1/sec could burn it, so the clock that is supposed to end a
+ * run was decorative.
+ *
+ * The `max(2, ...)` is not decoration either. A level that generates no food is not hard,
+ * it is unsurvivable if you arrive on low health, and the analyser treats a foodless
+ * normal level as a warning for exactly that reason.
+ */
 function foodFloor(reachableCells) {
-  return Math.max(3, Math.round((reachableCells / TILES_PER_SCREEN) * 0.85));
+  return Math.max(2, Math.round((reachableCells / TILES_PER_SCREEN) * 0.42));
 }
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/levels');

@@ -25,7 +25,14 @@ export function cullFood(items: Item[], levelId: string, score: number): number 
   const food = items.filter((i) => i.kind === 'food');
   if (!food.length) return 0;
 
-  const keep = Math.ceil(food.length * ratio);
+  // The ratio sets the shape of the curve; the floor sets its bottom. Without the floor
+  // the two independent knobs multiply — halving the campaign's food also halved what a
+  // rich run is left with, and a level holding one piece of food is not a difficulty
+  // curve, it is a coin flip on whether you walk past it. Never keeps more than exists.
+  const keep = Math.max(
+    Math.min(food.length, T.RANK_MIN_FOOD_ITEMS),
+    Math.ceil(food.length * ratio),
+  );
   if (keep >= food.length) return 0;
 
   // Stable ordering: the same level at the same score always keeps the same pieces.

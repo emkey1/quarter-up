@@ -56,6 +56,13 @@ about nine screens. Levels run about 2.2 generators per screen early and 4.0 dee
 37 per level). Placement is greedy farthest-point sampling over the reachable floor, so
 they cover the whole map rather than clustering, with a clear ring around the spawn.
 
+Food is deliberately scarce: about **0.42 pieces per screen**, roughly 4 per level. At
+twice that the drain never bit, because food arrived faster than 1/sec could burn it and
+the clock that is supposed to end a run was decorative. Two floors stop it going too far —
+the generator never emits fewer than 2 per level, and the rank curve never culls below
+`RANK_MIN_FOOD_ITEMS` however rich you get. Without that second floor the two knobs
+multiply, and a rich run on a 4-food level keeps a single piece.
+
 Two ways to make one, and they share a definition of "playable".
 
 **The editor** — open http://localhost:5173/editor.html. Paint terrain, drop objects,

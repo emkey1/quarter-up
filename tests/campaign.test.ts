@@ -44,6 +44,27 @@ describe('campaign content', () => {
     }
   });
 
+  it('keeps food scarce enough that the drain actually bites', () => {
+    // Halved from ~7.6 per level. At the old rate food arrived faster than 1/sec could
+    // burn it, which made the clock that is supposed to end a run decorative. The lower
+    // bound matters as much as the upper: a level nobody can survive arriving at on low
+    // health is not difficulty either.
+    const tilesPerScreen = (T.VIEW_W / T.TILE) * (T.VIEW_H / T.TILE);
+    const normals = DUNGEONS.filter((l) => l.type === 'normal');
+    const counts = normals.map((l) => l.objects.filter((o) => o.t === 'food').length);
+    const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+
+    expect(mean, `mean food per level is ${mean.toFixed(1)}`).toBeGreaterThan(2.5);
+    expect(mean, `mean food per level is ${mean.toFixed(1)}`).toBeLessThan(5);
+    expect(Math.min(...counts), 'some level has almost no food').toBeGreaterThanOrEqual(2);
+
+    for (const lvl of normals) {
+      const screens = analyseLevel(lvl).reachable.size / tilesPerScreen;
+      const perScreen = lvl.objects.filter((o) => o.t === 'food').length / screens;
+      expect(perScreen, `${lvl.id}: ${perScreen.toFixed(2)} food per screen`).toBeLessThan(0.75);
+    }
+  });
+
   it('puts enough generators on every screen, not merely on every level', () => {
     // Per-level was the wrong unit and it hid this for two rounds of playtesting.
     // Off-screen generators are inert, so what a player experiences is how many sit

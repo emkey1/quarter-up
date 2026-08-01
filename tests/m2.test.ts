@@ -294,6 +294,29 @@ describe('rank curve', () => {
     expect(survivors(150_000)).toBe(survivors(150_000));
   });
 
+  it('always leaves some food on the level, however rich you get', () => {
+    // The ratio is a proportion, so it and the campaign's food count multiply: halving
+    // the campaign also halved what a late run is left with. On a level holding four
+    // pieces, ceil(4 x 0.15) is one — which is not a difficulty curve, it is a coin flip
+    // on whether you walk past it.
+    for (const total of [3, 4, 6, 10]) {
+      const items = Array.from({ length: total }, (_, i) => makeItem('food', i * 16 + 8, 100));
+      cullFood(items, 'lvl', 10_000_000);
+      const left = items.filter((i) => i.alive).length;
+      expect(left, `${total} pieces culled to ${left}`).toBeGreaterThanOrEqual(
+        Math.min(total, T.RANK_MIN_FOOD_ITEMS),
+      );
+    }
+  });
+
+  it('cannot conjure food that the level never had', () => {
+    // The floor is a minimum to KEEP, not a minimum to create.
+    const items = [makeItem('food', 10, 10)];
+    cullFood(items, 'lvl', 10_000_000);
+    expect(items.filter((i) => i.alive).length).toBe(1);
+    expect(cullFood([], 'lvl', 10_000_000)).toBe(0);
+  });
+
   it('never touches anything that is not food', () => {
     const items = [
       makeItem('food', 10, 10),

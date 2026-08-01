@@ -608,6 +608,22 @@ Three tests hold this: per-screen density stays in a band computed from the *rea
 values (so the copies in the Node tooling cannot drift), every level has a generator
 visible from the spawn point, and none is within three tiles of it.
 
+**Food is halved relative to generator pressure**: ~0.42 pieces per screen, about 4 per
+level, down from ~7.6. At the old rate the health drain never bit — food arrived faster
+than 1/sec could burn it, so the clock that is meant to end a run was decorative.
+
+Two independent floors keep that from going too far. The generator never emits fewer than
+2 per level, because a level you cannot survive arriving at on low health is not
+difficulty. And `RANK_MIN_FOOD_ITEMS` stops the rank curve culling below an absolute
+count. That second one matters more than it looks: `RANK_MIN_FOOD_RATIO` is a
+*proportion*, so halving the campaign's food silently halved the late-game floor with it —
+a rich run on a 4-food level kept `ceil(4 x 0.15)` = one piece, which is not a difficulty
+curve but a coin flip on whether you walk past it. Ratio sets the shape, the item count
+sets the bottom.
+
+Difficulty does **not** currently scale food; the ladder moves health cap, generator
+warm-up, spawn period and crowd caps only.
+
 **The exit sequence** (`T.EXIT_SEQUENCE_F`, 78 frames) is part of the **simulation**, not
 the renderer. Reaching the exit starts it; `exitReached` — which is what the run flow
 watches — only goes true at the end. During it the whole world is frozen: no monster
