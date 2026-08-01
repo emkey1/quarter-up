@@ -366,3 +366,110 @@ describe('the one-shot limit is bounded by the screen, not the level', () => {
     expect(shot.alive, 'an off-screen enemy shot was culled').toBe(true);
   });
 });
+
+describe('melee reaches only what you could actually hit', () => {
+  /** Put a grunt at a world position and see whether one swing kills it. */
+  const swingAt = (
+    mx: number,
+    my: number,
+    face: { x: number; y: number },
+    tweak?: (l: LevelData) => LevelData,
+  ) => {
+    const base = arena();
+    const w = new World(tweak ? tweak(base) : base, 'warrior', 1);
+    w.godMode = true;
+    const m = makeMonster('grunt', 1, mx, my);
+    m.alive = true;
+    w.monsters.push(m);
+    const a = emptyActions();
+    a.moveX = face.x;
+    a.moveY = face.y;
+    // Two frames only. Stepping longer measures the monster walking into range rather
+    // than the reach of the swing, which is the thing under test.
+    for (let i = 0; i < 2 && m.alive; i++) w.step(a);
+    return !m.alive;
+  };
+
+  it('hits what is directly in front of you', () => {
+    const w = new World(arena(), 'warrior', 1);
+    expect(swingAt(w.player.x + 14, w.player.y, { x: 1, y: 0 })).toBe(true);
+  });
+
+  it('does not hit what is directly behind you', () => {
+    // The old box was centred on the player and tested per axis, so facing contributed
+    // almost nothing: anything adjacent died, including things at your back.
+    const w = new World(arena(), 'warrior', 1);
+    expect(swingAt(w.player.x - 14, w.player.y, { x: 1, y: 0 })).toBe(false);
+  });
+
+  it('does not reach a monster two steps away diagonally', () => {
+    const w = new World(arena(), 'warrior', 1);
+    expect(swingAt(w.player.x + 30, w.player.y + 30, { x: 1, y: 1 })).toBe(false);
+  });
+
+  it('cannot swing through a sealed diagonal corner', () => {
+    // The reported case: an Elf diagonally adjacent to a monster, with a block above him
+    // and a block to his right. Neither can reach the other, and the monsters were dying
+    // anyway. Same corner rule the projectiles use, applied to arms.
+    const start: [number, number] = [16, 16];
+    const seal = (l: LevelData): LevelData => ({
+      ...l,
+      tiles: l.tiles.map((row, y) => {
+        if (y === start[1] - 1) return row.slice(0, start[0]) + 'X' + row.slice(start[0] + 1);
+        if (y === start[1]) return row.slice(0, start[0] + 1) + 'X' + row.slice(start[0] + 2);
+        return row;
+      }),
+    });
+    const w = new World(seal(arena()), 'warrior', 1);
+    // The monster sits in the open cell diagonally up-and-right, past the sealed corner.
+    const mx = (start[0] + 1) * T.TILE + T.TILE / 2;
+    const my = (start[1] - 1) * T.TILE + T.TILE / 2;
+    expect(w.terrain.solidAtCell(start[0] + 1, start[1]), 'setup: block to the right').toBe(true);
+    expect(w.terrain.solidAtCell(start[0], start[1] - 1), 'setup: block above').toBe(true);
+    expect(swingAt(mx, my, { x: 1, y: -1 }, seal)).toBe(false);
+  });
+
+  it('still needs movement input — standing still is not an attack', () => {
+    const w = new World(arena(), 'warrior', 1);
+    const m = makeMonster('grunt', 1, w.player.x + 12, w.player.y);
+    m.alive = true;
+    w.monsters.push(m);
+    for (let i = 0; i < 60; i++) w.step(emptyActions());
+    expect(m.alive).toBe(true);
+  });
+});
+
+describe('open doors', () => {
+  const withDoor = (): LevelData => {
+    const l = arena();
+    // A wall across the level with a single door in it, two tiles east of the player.
+    return {
+      ...l,
+      tiles: l.tiles.map((row, y) =>
+        y >= 1 && y < T.GRID - 1
+          ? row.slice(0, 18) + (y === 16 ? 'D' : 'X') + row.slice(19)
+          : row,
+      ),
+    };
+  };
+
+  it('block shots while shut', () => {
+    const w = new World(withDoor(), 'elf', 1);
+    expect(w.terrain.shotBlockedAtCell(18, 16), 'a closed door should stop a shot').toBe(true);
+  });
+
+  it('let shots through once opened', () => {
+    // You could unlock a door, walk into the opening, and still be unable to shoot down
+    // the corridor you had just paid a key to reach.
+    const w = new World(withDoor(), 'elf', 1);
+    w.terrain.openDoorGroup(18, 16);
+    expect(w.terrain.isDoorClosed(18, 16), 'setup: door should be open').toBe(false);
+    expect(w.terrain.shotBlockedAtCell(18, 16), 'an open door still blocked the shot').toBe(false);
+  });
+
+  it('walls and breakables still block regardless', () => {
+    const w = new World(withDoor(), 'elf', 1);
+    expect(w.terrain.shotBlockedAtCell(18, 15)).toBe(true);
+    expect(w.terrain.shotBlockedAtCell(-1, 0), 'out of bounds').toBe(true);
+  });
+});

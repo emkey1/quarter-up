@@ -156,6 +156,19 @@ Spawns emerge into any of the 8 tiles around the generator.
 **Movement/AI feel:** monsters zig-zag toward you when you aren't row/column aligned with them,
 which makes them hard to hit and makes a missed shot costly (only one shot on screen at a time).
 
+**Melee is a swing, not an aura.** It reaches `MELEE_REACH` (14 wu) past your own edge,
+only within `MELEE_ARC_COS` of your facing, and only if nothing solid is in the way —
+including the same sealed-diagonal rule the projectiles use. It was a `[20, 12]` box
+centred on the *player* and tested per-axis, which describes a 32 wu square reaching just
+as far backwards as forwards, with facing contributing a 6 wu nudge that changed nothing.
+Anything that wandered adjacent died, from any direction, through anything: the reported
+case was an Elf killing monsters diagonally through a corner sealed by two blocks, where
+neither party could possibly have reached the other.
+
+**An open door does not block shots.** A closed one does. It used to block either way, so
+a doorway you had just paid a key to unlock — and could walk through — was still a wall to
+your own arrows.
+
 **"On screen" is meant literally.** The shot slot is freed when the projectile leaves the
 232x240 viewport, not when it finally meets a wall. Tying it to geometry tied the fire rate
 to level size: on an open level the shot flew hundreds of world units through terrain

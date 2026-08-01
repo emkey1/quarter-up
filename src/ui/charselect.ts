@@ -206,7 +206,9 @@ export class CharSelectScreen implements Screen {
     // replay the tutorial forever, which is exactly what happened.
     centred(ctx, 'START AT', cw / 2, g.tutorial.y - 8 * s, sans(8.5, s, 600), UI.faint, 2.4 * s);
     this.option(ctx, s, g.tutorial, 'TUTORIAL', `${INTRO.length} levels, one idea each`, !this.skipTutorial);
-    this.option(ctx, s, g.dungeon, 'DUNGEON', `skip to depth ${INTRO.length + 1}`, this.skipTutorial);
+    // Skipping lands on the last intro level, the level-select, so the label promises a
+    // choice rather than a fixed depth — which is what you actually get.
+    this.option(ctx, s, g.dungeon, 'THE DOORS', 'choose your own depth', this.skipTutorial);
 
     // The begin button is drawn as a button rather than as a blinking hint. A hint tells
     // you a key exists; a button tells you where to click, and this screen had four

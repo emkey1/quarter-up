@@ -214,11 +214,23 @@ describe('skipping the tutorial', () => {
   // The character select offers this before the run starts; the last intro level offers
   // the same jump as a numbered exit. Both must land in the same place, or a returning
   // player gets a different game depending on which route they took to skip.
-  it('starts the run at the first dungeon level', () => {
-    const r = new Run(CAMPAIGN, 'elf', 1, LOOP_START, undefined, LOOP_START);
-    expect(r.depth).toBe(INTRO.length + 1);
-    expect(r.levelName).toBe(DUNGEONS[0].name);
-    expect(INTRO.map((l) => l.name)).not.toContain(r.levelName);
+  it('starts on the level-select, not past it', () => {
+    // Skipping lands on the LAST intro level — "Three Doors" — because that level is not
+    // a tutorial, it is the arcade's depth chooser. Dropping the player past it would
+    // silently decide the run's difficulty for them; landing on it hands the choice over.
+    const start = LOOP_START - 1;
+    const r = new Run(CAMPAIGN, 'elf', 1, start, undefined, LOOP_START);
+    expect(r.levelName).toBe('Three Doors');
+    expect(r.levelName).toBe(INTRO[INTRO.length - 1].name);
+    expect(r.depth).toBe(INTRO.length);
+  });
+
+  it('lands on a level that actually offers the numbered exits', () => {
+    // The whole reason to stop there. If this level ever loses its skip exits, skipping
+    // the tutorial becomes a dead end rather than a chooser.
+    const landing = CAMPAIGN[LOOP_START - 1];
+    const skips = landing.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number');
+    expect(skips.length, 'the skip landing level has no numbered exits').toBeGreaterThan(0);
   });
 
   it('agrees with the first numbered exit on the last intro level', () => {

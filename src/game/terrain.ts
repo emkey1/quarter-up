@@ -112,11 +112,20 @@ export class Terrain {
     }
   }
 
-  /** Blocks projectiles. Doors block shots whether open or shut; walls obviously do. */
+  /**
+   * Blocks projectiles.
+   *
+   * A CLOSED door blocks shots; an open one does not. It used to block either way, so a
+   * doorway you had just unlocked and could walk through was still a wall to your own
+   * arrows — you could stand in the opening and be unable to shoot down the corridor you
+   * had just paid a key to reach. Walls and breakables block regardless (shooting a
+   * breakable is how you remove it), and out of bounds always blocks.
+   */
   shotBlockedAtCell(cx: number, cy: number): boolean {
     if (!this.inBounds(cx, cy)) return true;
     const t = this.at(cx, cy);
-    return t === Tile.Wall || t === Tile.Breakable || t === Tile.Door || t === Tile.Void;
+    if (t === Tile.Door) return (this.flagsAt(cx, cy) & TileFlag.DoorOpen) === 0;
+    return t === Tile.Wall || t === Tile.Breakable || t === Tile.Void;
   }
 
   /** World-unit position -> cell. */

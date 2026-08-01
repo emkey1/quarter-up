@@ -106,9 +106,10 @@ is simulated instead.
 | Pause | `P` / `Esc` | `Start` |
 
 The menus take the **mouse** as well: click a character card to pick it, click it again
-to start, and click **START AT → DUNGEON** to skip the seven tutorial levels and begin at
-depth 8. On the keyboard that is `←` `→` to choose and `↑` `↓` (or `T`) for the start
-point. The choice is remembered between runs.
+to start, and click **START AT → THE DOORS** to skip the tutorial and begin on "Three
+Doors", the arcade's level-select, where three numbered exits let you pick depth 8, 12 or
+16. On the keyboard that is `←` `→` to choose and `↑` `↓` (or `T`) for the start point.
+The choice is remembered between runs.
 
 `Tab` opens setup, `G` controller setup, `M` mutes, `[` `]` change scale, `F`
 fullscreen. Development hotkeys: `O` cycles the fire model, `N` skips a level.

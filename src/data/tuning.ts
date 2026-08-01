@@ -78,7 +78,17 @@ export const T = {
   // ---------------------------------------------------------------- combat  (M1+)
   SHOT_SPEED_UNIT: 1.0, // [i] wu/frame per point of the 1..5 shot-speed stat
   MELEE_PERIOD: 8, // [i] frames
-  MELEE_BOX: [20, 12] as const, // [i] wu
+  /** How far past your own edge a swing lands, in wu.
+   *
+   *  This replaces a [20, 12] box that was centred on the PLAYER and tested per-axis,
+   *  which made melee a 32wu square reaching equally far behind and to the sides — two
+   *  full tiles wide, facing ignored. Anything that wandered adjacent died, including
+   *  through a sealed diagonal corner. 14 reaches something you are touching or one tile
+   *  directly ahead, and not a diagonal two steps away. [i] */
+  MELEE_REACH: 14,
+  /** Minimum cos(angle) between facing and the target for a swing to connect.
+   *  0.35 is about ±69°, so the facing octant and its two neighbours. [i] */
+  MELEE_ARC_COS: 0.35,
   MONSTER_ATTACK_PERIOD: 20, // [i] frames
 
   GHOST_DMG: [10, 20, 30] as const,

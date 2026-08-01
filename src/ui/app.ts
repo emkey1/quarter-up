@@ -126,10 +126,12 @@ export class App implements LoopHost {
     this.classId = cls;
     this.continuesLeft = 3;
 
-    // Skipping starts at the first dungeon level, which is exactly where the last intro
-    // level's first numbered exit lands you — the two routes agree by construction.
-    // Playtesting a single level has no intro to skip, hence the campaign-length guard.
-    const start = skipTutorial ? Math.min(this.loopStart, this.campaign.length - 1) : 0;
+    // Skipping drops you on the LAST intro level — "Three Doors", the level-select — not
+    // past it. That level is not a tutorial: it is the arcade's depth chooser, and landing
+    // on it is what lets a returning player pick 8, 12 or 16 rather than having the choice
+    // made for them. Skipping past it would silently decide the run's difficulty.
+    // Playtesting a single level has no intro at all, hence the guard.
+    const start = skipTutorial ? Math.max(0, Math.min(this.loopStart - 1, this.campaign.length - 1)) : 0;
     saveSettings({ rules: this.setup.rules, skipTutorial });
 
     this.run = new Run(this.campaign, cls, this.seed, start, cloneRules(this.setup.rules), this.loopStart);

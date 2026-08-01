@@ -556,15 +556,11 @@ export class World {
 
     const fx = FACE_DX[p.facing];
     const fy = FACE_DY[p.facing];
-    const reach = T.MELEE_BOX[0] / 2;
-    const cx = p.x + fx * reach * 0.6;
-    const cy = p.y + fy * reach * 0.6;
 
     let hit = false;
     for (const m of this.monsters) {
       if (!m.alive || m.kind === 'ghost') continue;
-      const r = reach + m.half;
-      if (Math.abs(m.x - cx) > r || Math.abs(m.y - cy) > r) continue;
+      if (!this.meleeConnects(fx, fy, m.x, m.y, m.half)) continue;
       damageMonster(m, roll(p.stats.meleeVsMonsters, this.rng), 'melee', this.events, this.addScore);
       hit = true;
       break;
@@ -573,8 +569,7 @@ export class World {
     if (!hit) {
       for (const g of this.generators) {
         if (!g.alive) continue;
-        const r = reach + T.TILE / 2;
-        if (Math.abs(g.x - cx) > r || Math.abs(g.y - cy) > r) continue;
+        if (!this.meleeConnects(fx, fy, g.x, g.y, T.TILE / 2)) continue;
         if (this.rng.chance(p.stats.meleeGenMissChance)) break;
         damageGenerator(g, 1, this.events, this.addScore);
         hit = true;
@@ -587,6 +582,57 @@ export class World {
       this.engage();
       this.events.emit({ t: 'melee', hit: true });
     }
+  }
+
+  /**
+   * Can a swing actually land on something at (tx, ty)?
+   *
+   * Three conditions, and the old code checked none of them properly. It compared each
+   * axis separately against a box centred on the PLAYER, which describes a 32wu square —
+   * two tiles across — reaching just as far backwards as forwards, with the facing
+   * direction contributing a 6wu nudge that made no practical difference. Anything that
+   * wandered adjacent died, from any direction, through anything.
+   *
+   *   1. RANGE, measured properly. Radial distance minus the target's own half, so "close
+   *      enough to touch" means the same for a big target as a small one.
+   *   2. IN FRONT. You swing where you are facing. A monster behind you is behind you.
+   *   3. NOT THROUGH A WALL. The reported case: an Elf diagonally adjacent to a monster
+   *      with blocks above him and to his right — the two of them cannot reach each other
+   *      through a sealed corner, and the monsters were dying anyway. This is the same
+   *      diagonal rule the projectiles use, applied to arms instead of arrows.
+   */
+  private meleeConnects(fx: number, fy: number, tx: number, ty: number, half: number): boolean {
+    const p = this.player;
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist - half > T.MELEE_REACH) return false;
+    // Dead-on overlap has no meaningful direction; anything else must be in front.
+    if (dist > 0.001 && (dx * fx + dy * fy) / dist < T.MELEE_ARC_COS) return false;
+    return this.meleeClear(tx, ty);
+  }
+
+  /** Nothing solid between the player and the target — including a sealed diagonal. */
+  private meleeClear(tx: number, ty: number): boolean {
+    const p = this.player;
+    const pcx = Math.floor(p.x / T.TILE);
+    const pcy = Math.floor(p.y / T.TILE);
+    const tcx = Math.floor(tx / T.TILE);
+    const tcy = Math.floor(ty / T.TILE);
+    if (pcx === tcx && pcy === tcy) return true;
+
+    // A diagonal step through a corner where both orthogonal neighbours are solid is not
+    // a gap you can reach through, however close the two centres are.
+    if (pcx !== tcx && pcy !== tcy) {
+      if (this.terrain.solidAtCell(tcx, pcy) && this.terrain.solidAtCell(pcx, tcy)) return false;
+    }
+
+    // And nothing solid straight between. Four samples is plenty over a 14wu reach.
+    for (let i = 1; i < 4; i++) {
+      const t = i / 4;
+      if (this.terrain.solidAt(p.x + (tx - p.x) * t, p.y + (ty - p.y) * t)) return false;
+    }
+    return true;
   }
 
   /* ------------------------------------------------------------------ monsters */
