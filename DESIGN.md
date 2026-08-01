@@ -155,6 +155,16 @@ Spawns emerge into any of the 8 tiles around the generator.
 
 **Movement/AI feel:** monsters zig-zag toward you when you aren't row/column aligned with them,
 which makes them hard to hit and makes a missed shot costly (only one shot on screen at a time).
+
+**"On screen" is meant literally.** The shot slot is freed when the projectile leaves the
+232x240 viewport, not when it finally meets a wall. Tying it to geometry tied the fire rate
+to level size: on an open level the shot flew hundreds of world units through terrain
+nobody could see, and the grid growing from 32 to 48 quietly made it worse. Measured on
+depth 20 before the fix, the Elf's shot left view at frame 40 and held the slot until frame
+189 — two and a half seconds unable to fire at something that had not been visible for most
+of it. Enemy fire is deliberately exempt: demons shoot through walls from just off screen,
+and culling their fireballs on the same rule would disarm them from the very position that
+makes them dangerous.
 Monsters block each other — deliberate traffic jams at chokepoints are a core player tactic.
 
 ### 3.5 Level furniture

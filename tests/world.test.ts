@@ -5,6 +5,7 @@ import { validateLevel, type LevelData } from '@/game/level';
 import { emptyActions } from '@/engine/actions';
 import type { ClassId } from '@/data/classes';
 import { makeMonster } from '@/game/monster';
+import { makeShot } from '@/game/projectile';
 import { PROVING } from '@/data/proving';
 
 /** The proving ground, padded to the current grid by @/data/proving. */
@@ -291,5 +292,77 @@ describe('determinism with combat', () => {
       ].join('|');
     };
     expect(hash()).toBe(hash());
+  });
+});
+
+describe('the one-shot limit is bounded by the screen, not the level', () => {
+  /** Fire east; report how long the slot was held and where the shot ended up. */
+  const fire = (cls: ClassId, lvl: LevelData) => {
+    const w = new World(lvl, cls, 1);
+    w.godMode = true;
+    const a = emptyActions();
+    a.fire = true;
+    a.moveX = 1;
+    w.step(a);
+    const pr = w.projectiles.find((p) => p.fromPlayer)!;
+    let held = 0;
+    for (let f = 1; f <= 600 && w.player.shotAlive; f++) {
+      w.step(emptyActions());
+      held = f;
+    }
+    // How far outside the viewport the shot was when it stopped being the player's problem.
+    const beyond = Math.max(
+      0,
+      pr.x - (w.camera.x + T.VIEW_W),
+      w.camera.x - pr.x,
+      pr.y - (w.camera.y + T.VIEW_H),
+      w.camera.y - pr.y,
+    );
+    return { held, beyond };
+  };
+
+  it('frees the slot at the edge of the screen, not deep into the level', () => {
+    // The invariant, stated as distance rather than frames because that is the actual
+    // complaint: the slot used to be held while the shot flew hundreds of world units
+    // through terrain nobody could see. Measured before the fix on an open level, the
+    // shot travelled 478-658wu; the viewport is only 232x240.
+    for (const cls of ['warrior', 'elf', 'wizard', 'valkyrie'] as ClassId[]) {
+      const { beyond } = fire(cls, arena());
+      expect(beyond, `${cls}: shot expired ${beyond.toFixed(0)}wu outside the viewport`).toBeLessThan(T.TILE * 2);
+    }
+  });
+
+  it('never holds the slot longer on an open level than on a cramped one', () => {
+    // A wall may still end a shot EARLY — that is ordinary. What must not happen is open
+    // ground making the slot last longer, which is how level size silently leaked into
+    // the fire rate when the grid grew from 32 to 48.
+    const boxedIn = (() => {
+      const l = arena();
+      l.tiles = l.tiles.map((row, y) =>
+        y >= 10 && y < 24 ? row.slice(0, 20) + 'X' + row.slice(21) : row,
+      );
+      return l;
+    })();
+    const open = fire('elf', arena()).held;
+    const boxed = fire('elf', boxedIn).held;
+    expect(boxed, 'a wall should end the shot no later than the screen edge').toBeLessThanOrEqual(open);
+    expect(open, `open-field hold was ${open} frames`).toBeLessThan(90);
+  });
+
+  it('still lets a slower shot hold the slot longer', () => {
+    // The Warrior's shot crosses the screen more slowly, so it occupies the slot longer.
+    // That is a real class difference and should survive the fix.
+    expect(fire('warrior', arena()).held).toBeGreaterThan(fire('elf', arena()).held);
+  });
+
+  it('does not cull enemy fire that leaves the view', () => {
+    // Demons fire through walls and can sit just off screen. Culling their fireballs on
+    // the same rule would disarm them from exactly the position that makes them dangerous.
+    const w = new World(arena(), 'elf', 1);
+    const shot = makeShot(w.player.x + 400, w.player.y, 1, 0, 2.2, 3, T.FIREBALL_DMG, false, 'fireball', null);
+    w.projectiles.push(shot);
+    expect(w.camera.contains(shot.x, shot.y, 0), 'test setup: should start off screen').toBe(false);
+    for (let i = 0; i < 20; i++) w.step(emptyActions());
+    expect(shot.alive, 'an off-screen enemy shot was culled').toBe(true);
   });
 });

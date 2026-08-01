@@ -384,6 +384,27 @@ export class World {
         if (this.terrain.destroyBreakable(cx, cy)) this.engage();
         this.events.emit({ t: 'shotHitWall', x: res.x, y: res.y });
       }
+
+      /**
+       * Your shot ends at the edge of the screen.
+       *
+       * The one-shot-at-a-time limit is what makes tapping fire beat holding it, but it
+       * only works as a rhythm if the slot comes back when the shot stops being YOUR
+       * business. Tying it to hitting a wall tied it to level geometry instead: on an open
+       * level the shot flew hundreds of world units past the edge of the viewport, and
+       * measured on depth 20, the Elf's shot left view at frame 40 and held the slot until
+       * frame 189 — two and a half seconds of not being able to fire at something that had
+       * not been visible for most of it. Bigger levels made it worse, because "distance to
+       * the next wall" grew with them.
+       *
+       * Only the player's shot. Enemy fire is deliberately NOT culled here: demons shoot
+       * through walls and can sit just outside the viewport, so culling their fireballs on
+       * the same rule would quietly disarm them from exactly the position that makes them
+       * dangerous. SHOT_LIFETIME_F still backstops everything.
+       */
+      if (pr.alive && pr.fromPlayer && !this.camera.contains(pr.x, pr.y, pr.half)) {
+        pr.alive = false;
+      }
     }
   }
 
