@@ -34,6 +34,69 @@ export class Hud {
     if (layout.leftPanel)
       this.drawDebug(ctx, layout.leftPanel, layout, world, run, input, fireModel, dbg);
     this.drawToast(ctx, layout, input);
+    if (world.isTreasureRoom) this.drawTreasureClock(ctx, layout, world);
+  }
+
+  /**
+   * The treasure-room clock, drawn over the playfield rather than in the side panel.
+   *
+   * It was not drawn at all, which made a thirty-second room a guessing game — and now
+   * that letting the clock run out forfeits the entire haul, an invisible countdown would
+   * be indefensible. It sits across the top of the playfield where the eye already is,
+   * states what is at stake in points, and turns amber then red as the time goes.
+   */
+  private drawTreasureClock(ctx: CanvasRenderingContext2D, layout: Layout, world: World): void {
+    if (world.treasureTimer < 0) return;
+    const s = layout.uiScale;
+    const pf = layout.playfield;
+    const total = T.TREASURE_ROOM_SEC * T.STEP_HZ;
+    const left = Math.max(0, world.treasureTimer);
+    const frac = Math.max(0, Math.min(1, left / total));
+    const secs = left / T.STEP_HZ;
+
+    const urgent = secs <= 5;
+    const colour = secs > 15 ? '#6bd97a' : secs > 5 ? '#e8c34a' : '#ff5e52';
+    // A pulse in the last five seconds. Tied to the simulation frame, not a wall clock,
+    // so it cannot drift out of step with the number it is warning about.
+    const pulse = urgent ? 0.72 + 0.28 * Math.abs(Math.sin(world.frame * 0.22)) : 1;
+
+    const h = 46 * s;
+    const w = Math.min(300 * s, pf.w - 24 * s);
+    const x = pf.x + (pf.w - w) / 2;
+    const y = pf.y + 10 * s;
+
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = 'rgba(6,8,14,.82)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = Math.max(1, s * (urgent ? 2 : 1.2));
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+    // Time remaining, big and monospaced so the digits do not jitter as they count down.
+    ctx.textAlign = 'center';
+    ctx.fillStyle = colour;
+    ctx.font = `800 ${23 * s}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    ctx.fillText(secs.toFixed(1).padStart(4, '0'), x + w / 2, y + 24 * s);
+
+    // What is actually at risk, in points. The number is the argument for leaving.
+    ctx.font = `700 ${9.5 * s}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillStyle = world.treasureHeld > 0 ? '#ffd76a' : 'rgba(215,219,224,.5)';
+    ctx.fillText(
+      world.treasureHeld > 0
+        ? `${world.treasureHeld + world.treasureTaken * T.SCORE.treasureRoomPerTreasure} AT RISK — REACH THE EXIT`
+        : 'REACH THE EXIT BEFORE TIME RUNS OUT',
+      x + w / 2,
+      y + 37 * s,
+    );
+    ctx.textAlign = 'left';
+
+    // Draining bar along the bottom edge of the box.
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    ctx.fillRect(x, y + h - 3 * s, w, 3 * s);
+    ctx.fillStyle = colour;
+    ctx.fillRect(x, y + h - 3 * s, w * frac, 3 * s);
+    ctx.restore();
   }
 
   private drawStatus(

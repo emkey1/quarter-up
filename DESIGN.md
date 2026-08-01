@@ -1231,8 +1231,21 @@ Shipping content:
 
 - **7 intro levels** with numbered skip exits (skip to 8 / 12 / 16, as the original did).
 - **40 hand-authored dungeon levels**, themed in blocks of 8.
-- **Treasure rooms** every 12 levels: a timed room (30 s) packed with treasure and a few ghosts,
-  exit bonus `50 × treasures`.
+- **Treasure rooms** every 12 levels: a timed room (30 s) packed with treasure.
+
+  **You only keep what you carry out.** Pickups do not score as you take them — their value
+  is escrowed and paid, with a `50 × treasures` bonus on top, if and only if you reach the
+  exit before the clock stops. Let it run out and you leave with nothing.
+
+  This is the entire point of the room and it was missing: paying out on expiry as well
+  made the exit decorative, because there was no reason to ever stop hoovering. Greed has
+  to be able to cost you something, and the tension only exists if the last piece you reach
+  for can be the one that loses you the lot.
+
+  The countdown is drawn large across the top of the playfield — green, then amber, then a
+  pulsing red under five seconds — and states the haul at risk in points, because that
+  number is the argument for leaving. An invisible timer would have been indefensible even
+  before the forfeit rule; with it, it would be a trap.
 - **Endless loop** past 40: replay the 40 with a depth multiplier applied to generator rates and
   generator levels, so it genuinely gets harder, matching the original's loop-forever structure.
 - A **browser level editor** (`/tools/editor`, served as `editor.html`) — paint tiles, place

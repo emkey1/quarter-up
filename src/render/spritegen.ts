@@ -308,7 +308,21 @@ function boneGen(level: number): Px {
   return p;
 }
 
-function blockGen(level: number): Px {
+/**
+ * Block generators, one emblem per monster kind.
+ *
+ * There used to be exactly two generator sprites — a bone pile for ghosts and one block
+ * for everything else — so grunt, demon, sorcerer and lobber nests were pixel-identical.
+ * On a level with twenty generators that is the single most important thing to be able to
+ * read at a glance, because which one you rush is the whole tactical decision.
+ *
+ * The masonry block is kept as the shared FAMILY silhouette: block generators behave
+ * alike (lobber rocks only destroy bone), so they should still look like relatives. What
+ * changes is the emblem in the recess and the palette, both taken from the monster the
+ * thing produces — so the nest reads as "that colour of trouble" before you can make out
+ * any detail.
+ */
+function blockGen(level: number, kind: MonsterKind): Px {
   const p = new Px(SPRITE, SPRITE);
   p.rect(4, 4, 24, 24, A.b);
   p.rect(4, 4, 24, 2, A.l); // lit top
@@ -317,8 +331,36 @@ function blockGen(level: number): Px {
   p.rect(26, 4, 2, 24, A.dk);
   p.rect(9, 9, 14, 14, A.o); // recess
   p.rect(11, 11, 10, 10, C.d);
-  p.rect(13, 13, 6, 6, C.ll); // the eye that spits monsters out
-  p.dither(11, 11, 10, 10, C.d, C.b, 0);
+
+  switch (kind) {
+    case 'demon':
+      // Horns over a wide slot mouth: the only generator that shoots back at you.
+      p.rect(12, 12, 2, 4, C.ll);
+      p.rect(18, 12, 2, 4, C.ll);
+      p.rect(13, 16, 6, 4, C.ll);
+      p.rect(14, 20, 4, 1, C.b);
+      break;
+    case 'sorcerer':
+      // A hollow ring — the thing that is there and then is not.
+      p.ellipse(16, 16, 5, 5, C.ll);
+      p.ellipse(16, 16, 2, 2, C.d);
+      p.dither(11, 11, 10, 10, C.ll, C.d, 1);
+      break;
+    case 'lobber':
+      // A stack of rocks, sitting low, with an arc over it.
+      p.rect(12, 18, 8, 3, C.ll);
+      p.rect(14, 15, 4, 3, C.ll);
+      p.line(11, 14, 13, 11, C.b);
+      p.line(13, 11, 17, 11, C.b);
+      p.line(17, 11, 20, 14, C.b);
+      break;
+    default:
+      // Grunt: the plain eye that spits monsters out, as it always was.
+      p.rect(13, 13, 6, 6, C.ll);
+      p.dither(11, 11, 10, 10, C.d, C.b, 0);
+      break;
+  }
+
   for (let i = 0; i < level; i++) p.rect(7 + i * 7, 29, 5, 2, C.ll);
   p.outline(A.o);
   return p;
@@ -420,6 +462,15 @@ const MONSTER_TINT: Record<MonsterKind, [string, string, string]> = {
   lobber: ['#c8b478', '#a89040', '#8a6a1e'],
 };
 
+/** Masonry tint per block-generator kind — a nudge, not a repaint; the emblem and the
+ *  accent ramp do the identifying, this just stops four nests reading as one texture. */
+const BLOCK_GEN_STONE: Record<'grunt' | 'demon' | 'sorcerer' | 'lobber', string> = {
+  grunt: '#5f6f57',
+  demon: '#7c4a42',
+  sorcerer: '#5b4a7c',
+  lobber: '#6f6550',
+};
+
 const SKIN = ramp('#e0b088');
 const METAL = ramp('#c8ccd4');
 const GOLD = ramp('#e8b83c');
@@ -481,18 +532,22 @@ export function buildSpriteAtlas(): Atlas {
     entries.push({ key: `thief:1:${frame}`, px: thiefSprite(frame, true), pal: thiefPal });
   }
 
-  // --- generators
+  // --- generators, one per monster kind so a nest is identifiable at a glance
   for (let lvl = 1; lvl <= 3; lvl++) {
     entries.push({
-      key: `gen:bone:${lvl}`,
+      key: `gen:ghost:${lvl}`,
       px: boneGen(lvl),
-      pal: palette(ramp('#d8d0c0'), SKIN, GOLD),
+      pal: palette(ramp('#d8d0c0'), SKIN, ramp(MONSTER_TINT.ghost[1])),
     });
-    entries.push({
-      key: `gen:block:${lvl}`,
-      px: blockGen(lvl),
-      pal: palette(ramp('#6a5a7c'), SKIN, ramp('#ff8b3c')),
-    });
+    // The masonry stays a muted stone so the emblem reads against it; the accent ramp is
+    // the monster's own colour, which is what actually carries the identification.
+    for (const kind of ['grunt', 'demon', 'sorcerer', 'lobber'] as const) {
+      entries.push({
+        key: `gen:${kind}:${lvl}`,
+        px: blockGen(lvl, kind),
+        pal: palette(ramp(BLOCK_GEN_STONE[kind]), SKIN, ramp(MONSTER_TINT[kind][1])),
+      });
+    }
   }
 
   // --- items

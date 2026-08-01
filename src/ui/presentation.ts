@@ -238,6 +238,16 @@ export class Presentation {
         this.fx.addFlash(0.22, '#9fe8ff');
         break;
 
+      case 'treasureForfeited':
+        // Losing a haul to the clock must not look like leaving with one. Red, a shake,
+        // and the number said out loud, so the lesson is unmistakable the first time.
+        A.play('thiefSteal');
+        this.fx.addFlash(0.5, '#ff4a3a');
+        this.fx.addShake(4);
+        // say() captions as well as speaks, so this is legible with the sound off.
+        this.speech.say(`Out of time! ${e.score} points lost.`);
+        break;
+
       case 'deathVanished':
         A.play('ghostDie');
         this.particles.spawn(e.x, e.y, 26, {

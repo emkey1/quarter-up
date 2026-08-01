@@ -6,6 +6,7 @@ import { Run } from '@/game/flow';
 import { Tile } from '@/game/terrain';
 import { emptyActions } from '@/engine/actions';
 import { analyseLevel } from '@/game/analyse';
+import { cellCentre } from '@/game/level';
 import { PROVING } from '@/data/campaign';
 
 describe('campaign content', () => {
@@ -255,35 +256,98 @@ describe('treasure rooms', () => {
     expect(w.exitReached).toBe(true);
   });
 
-  it('pays a bonus of 50 per treasure taken, on top of the pickups themselves', () => {
+  /** Sweep the room diagonally for a while and report the haul. */
+  const gather = (frames = 360) => {
     const w = new World(room(), 'elf', 1);
     w.godMode = true;
-    // The treasure field starts at row 4; the entrance is at row 2, so walking straight
-    // along the top row collects nothing at all.
     const a = emptyActions();
     a.moveX = 1;
     a.moveY = 1;
-    for (let i = 0; i < 360; i++) w.step(a);
-    const taken = w.treasureTaken;
-    expect(taken, 'should have swept up some treasure').toBeGreaterThan(0);
+    for (let i = 0; i < frames; i++) w.step(a);
+    expect(w.treasureTaken, 'should have swept up some treasure').toBeGreaterThan(0);
+    return w;
+  };
 
+  it('does not bank treasure as you pick it up — carrying it out is the point', () => {
+    const w = gather();
+    expect(w.treasureHeld, 'nothing was escrowed').toBeGreaterThan(0);
+    expect(w.player.score, 'treasure scored on pickup instead of on exit').toBe(0);
+  });
+
+  it('pays the haul plus 50 a piece when you reach the exit', () => {
+    const w = gather();
+    const taken = w.treasureTaken;
+    const held = w.treasureHeld;
     const before = w.player.score;
+
+    const [cx, cy] = w.terrain.cellsOf(Tile.Exit)[0];
+    const [x, y] = cellCentre(cx, cy);
+    w.player.x = x;
+    w.player.y = y;
+    w.step(emptyActions());
+
+    expect(w.player.score - before).toBe(held + taken * T.SCORE.treasureRoomPerTreasure);
+  });
+
+  it('forfeits the entire haul if the clock beats you to it', () => {
+    // The whole tension of the room. Paying out on expiry as well made the exit
+    // decorative: there was no reason to ever stop hoovering, because greed cost nothing.
+    const w = gather();
+    expect(w.treasureHeld).toBeGreaterThan(0);
+    const before = w.player.score;
+    const pieces = w.treasureTaken;
+
     w.treasureTimer = 1;
     w.step(emptyActions());
-    expect(w.player.score - before).toBe(taken * T.SCORE.treasureRoomPerTreasure);
+
+    expect(w.player.score, 'the clock ran out and it paid anyway').toBe(before);
+    expect(w.treasureHeld).toBe(0);
+    expect(w.treasureLost).toBe(pieces);
+  });
+
+  it('announces the forfeit rather than silently pocketing it', () => {
+    const w = gather();
+    w.events.drain();
+    w.treasureTimer = 1;
+    w.step(emptyActions());
+    const ev = w.events.drain().find((e) => e.t === 'treasureForfeited');
+    expect(ev, 'no treasureForfeited event').toBeTruthy();
+    expect((ev as { pieces: number }).pieces).toBeGreaterThan(0);
+  });
+
+  it('still ends the room with the full exit sequence when time runs out', () => {
+    // Being out of time is not the same as being cut off mid-frame.
+    const w = gather();
+    w.treasureTimer = 1;
+    w.step(emptyActions());
+    expect(w.exitFrames).toBeGreaterThanOrEqual(0);
+    expect(w.exitReached).toBe(false);
+    for (let i = 0; i < T.EXIT_SEQUENCE_F + 2; i++) w.step(emptyActions());
+    expect(w.exitReached).toBe(true);
   });
 
   it('pays nothing when you leave empty-handed', () => {
     const w = new World(room(), 'elf', 1);
     const before = w.player.score;
     w.treasureTimer = 1;
-    // The bonus is paid when the clock stops, not when the exit sequence finishes —
-    // the score must be settled before the animation, or a player who quits during it
-    // would lose the payout.
     w.step(emptyActions());
     expect(w.player.score).toBe(before);
     for (let i = 0; i < T.EXIT_SEQUENCE_F + 2; i++) w.step(emptyActions());
     expect(w.exitReached).toBe(true);
+  });
+
+  it('banks treasure immediately on an ordinary level', () => {
+    // The escrow is a treasure-ROOM rule. Everywhere else a coin is worth points the
+    // moment you touch it, and nothing about this change may alter that.
+    const lvl = DUNGEONS.find((l) => l.type === 'normal' && l.objects.some((o) => o.t === 'treasure'));
+    if (!lvl) return; // no ordinary level ships treasure; nothing to check
+    const w = new World(lvl, 'elf', 1);
+    const it = w.items.find((i) => i.kind === 'treasure')!;
+    w.player.x = it.x;
+    w.player.y = it.y;
+    w.step(emptyActions());
+    expect(w.player.score).toBeGreaterThan(0);
+    expect(w.treasureHeld).toBe(0);
   });
 });
 

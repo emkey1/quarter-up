@@ -28,6 +28,7 @@ export type GameEvent =
   | { t: 'teleported'; x: number; y: number }
   | { t: 'wallsBecameExits' }
   | { t: 'exitReached' }
+  | { t: 'treasureForfeited'; pieces: number; score: number }
   | { t: 'deathVanished'; x: number; y: number }
   | { t: 'thiefStole'; what: string }
   | { t: 'thiefKilled'; x: number; y: number }

@@ -91,9 +91,11 @@ export class Sprites {
   }
 
   generator(ctx: CanvasRenderingContext2D, g: Generator, sx: number, sy: number, px: number): void {
-    const bone = g.kind === 'ghost';
+    // Keyed by monster KIND, not by family. Keying it by family meant grunt, demon,
+    // sorcerer and lobber nests were the same four pixels, and which nest you rush first
+    // is the main decision a crowded level asks you to make.
     const lvl = Math.max(1, Math.min(3, g.level));
-    this.blit(ctx, `gen:${bone ? 'bone' : 'block'}:${lvl}`, sx, sy, px);
+    this.blit(ctx, `gen:${g.kind}:${lvl}`, sx, sy, px);
     if (g.hurtFlash > 0) this.flash(ctx, sx, sy, px);
   }
 

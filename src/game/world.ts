@@ -105,6 +105,15 @@ export class World {
    */
   treasureTimer = -1;
   treasureTaken = 0;
+  /**
+   * Score gathered in a treasure room but not yet banked.
+   *
+   * Held rather than scored on pickup, because reaching the exit is what earns it. See
+   * bankTreasureRoom(). Zero outside a treasure room, where treasure scores immediately.
+   */
+  treasureHeld = 0;
+  /** Pieces lost to the clock, for the HUD to report. */
+  treasureLost = 0;
 
   /**
    * Frames since the player last engaged: fired, was hit, dealt damage, or picked
@@ -1071,7 +1080,10 @@ export class World {
           inv.potions++;
           break;
         case 'treasure':
-          this.addScore(out.score, 'treasure');
+          // In a treasure room the value is escrowed until you carry it out; anywhere
+          // else treasure banks on the spot as usual.
+          if (this.isTreasureRoom) this.treasureHeld += out.score;
+          else this.addScore(out.score, 'treasure');
           this.treasureTaken++;
           break;
         case 'upgrade':
@@ -1103,7 +1115,7 @@ export class World {
     );
     this.exitSkipTo = (named?.skipTo as number | undefined) ?? null;
 
-    if (this.isTreasureRoom) this.awardTreasureRoom();
+    if (this.isTreasureRoom) this.bankTreasureRoom();
     this.beginExit(cellCentre(cx, cy));
   }
 
@@ -1142,20 +1154,39 @@ export class World {
     if (this.exitFrames >= T.EXIT_SEQUENCE_F) this.exitReached = true;
   }
 
-  /** Leaving a treasure room pays 50 per treasure collected, per DESIGN.md §3.6. */
-  private awardTreasureRoom(): void {
+  /**
+   * Carrying the haul out is what banks it.
+   *
+   * In a treasure room the pickups do NOT score as you take them: their value is held in
+   * `treasureHeld` and paid, with the per-piece bonus on top, only if you reach the exit.
+   * Beat the clock and you keep everything; let it run out and you leave with nothing.
+   *
+   * This is the whole point of the room and it was missing. Paying out on expiry too made
+   * the exit decorative: there was no reason to stop hoovering, because greed cost
+   * nothing. The tension only exists if the last piece you reach for can be the one that
+   * loses you the lot.
+   */
+  private bankTreasureRoom(): void {
     const bonus = this.treasureTaken * T.SCORE.treasureRoomPerTreasure;
-    if (bonus > 0) this.addScore(bonus, 'treasure room bonus');
+    const total = this.treasureHeld + bonus;
+    if (total > 0) this.addScore(total, 'treasure room');
+    this.treasureHeld = 0;
   }
 
-  /** The timer expiring ends the room exactly as reaching the exit would. */
+  /** The clock running out ends the room — and forfeits everything gathered in it. */
   private stepTreasureTimer(): void {
     if (this.treasureTimer < 0) return;
     if (--this.treasureTimer > 0) return;
     this.treasureTimer = 0;
-    this.awardTreasureRoom();
-    // The clock running out gets the same send-off as walking out, from wherever the
-    // player happens to be standing — being hurried is not the same as being cheated.
+
+    const lost = this.treasureHeld + this.treasureTaken * T.SCORE.treasureRoomPerTreasure;
+    this.treasureHeld = 0;
+    this.treasureLost = this.treasureTaken;
+    this.treasureTaken = 0;
+    if (lost > 0) this.events.emit({ t: 'treasureForfeited', pieces: this.treasureLost, score: lost });
+
+    // Still the full send-off rather than a cut: being out of time is not the same as
+    // being cheated, and the player needs to see what happened.
     this.beginExit([this.player.x, this.player.y]);
   }
 

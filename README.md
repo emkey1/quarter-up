@@ -145,6 +145,13 @@ Five rungs, at the top of the setup screen (`Tab`), left/right to move along it.
 | Champion | 1100 | 0.5 s | ×0.6 | ×1.35 |
 | Nightmare | 800 | 0.0 s | ×0.4 | ×1.8 |
 
+### Treasure rooms
+
+Every twelve levels, a room with no threat and a 30-second clock. **You only keep what you
+carry out** — treasure is escrowed as you collect it and banked, plus 50 a piece, only if
+you reach the exit in time. Let the clock run out and the whole haul is forfeit. The
+countdown is drawn across the top of the playfield and shows the points at risk.
+
 The health cap is a mechanic, not a nerf: once you cannot bank any more, food you walk
 past is genuinely wasted and the drain is a clock again. Without a cap a careful player
 just accumulates until nothing can threaten them.
