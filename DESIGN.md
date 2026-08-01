@@ -1285,6 +1285,22 @@ the exit cannot be reached. So:
   one-level campaign. Anything that behaves differently in the editor's preview than in the game
   is a lie the author will believe, so there is no preview.
 
+**Random generation.** Six archetypes — Warren, Cover field, Key vault, Serpentine,
+Pillar hall, Death run — parameterised by depth and seed (`tools/levelgen.mjs`). Same
+type + depth + seed always yields the same level, which is what makes a seed worth showing
+the user: find one you like, note the number, get it back.
+
+It shares `levelkit.mjs` with the campaign generator rather than reimplementing the
+patterns, so a fix to `nest()` reaches the editor and the shipped campaign at once, and
+the density floors live in the kit for the same reason — two copies of "how much should a
+level hold" drift, and the units are subtle enough to get wrong twice.
+
+Randomness varies *where* and *how much*, never *what the level is about*. Each type is a
+kind of problem; a level that could be anything is a level about nothing. And every
+generated level is re-checked for reachability at the end, with a corridor carved from the
+start to anything stranded, because a generator that can emit an unplayable level is one
+you cannot trust — "usually fine" is not a property worth having.
+
 The verdict comes from `analyseLevel()` in `src/game/analyse.ts`, which is the *same* function a
 test runs over every shipped level. This matters more than it looks: an editor that blesses a
 level CI later rejects is worse than no editor, because it teaches the author to trust it. One

@@ -78,6 +78,11 @@ rather than editing JSON by hand:
   floor tinted red directly on the grid. Sealed rooms are visible, not discovered.
 - **Playtest opens the real game** with your level as a one-level campaign — not a
   preview of the game, which would only teach you to trust a lie.
+- **Generate** a level from six archetypes — Warren, Cover field, Key vault, Serpentine,
+  Pillar hall, Death run — with a depth and a seed. Same type + depth + seed always gives
+  the same level, so a good one can be written down and got back. Generated levels are
+  built from the same `levelkit.mjs` vocabulary as the shipped campaign and meet the same
+  density floors, so they are a starting point you edit, not throwaway noise.
 
 **The generator** — `node tools/mkcampaign.mjs` rebuilds the whole 50-level campaign
 from recipes written against the design vocabulary in `tools/levelkit.mjs` (`nest`,

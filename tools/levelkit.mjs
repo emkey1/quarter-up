@@ -499,6 +499,36 @@ export function spreadCells(g, start, want, startGap = 6, taken = []) {
   return chosen;
 }
 
+/**
+ * Content density, shared by the campaign generator and the editor's random generator.
+ *
+ * These live here rather than in either caller because two copies of "how much should a
+ * level hold" drift, and the units are subtle enough to get wrong twice. Generators are
+ * counted per SCREEN, not per level: off-screen ones are inert, so what a player
+ * experiences is how many sit inside the viewport, and a 48x48 level is about nine
+ * screens. The constants mirror tuning.ts; tests/campaign.test.ts recomputes from the
+ * real values and fails if they drift.
+ */
+export const VIEW_W = 232;
+export const VIEW_H = 240;
+export const TILE = 16;
+export const TILES_PER_SCREEN = (VIEW_W / TILE) * (VIEW_H / TILE);
+
+export function screensIn(reachableCells) {
+  return Math.max(1, reachableCells / TILES_PER_SCREEN);
+}
+
+/** Generators for a level of this depth: ~2.2 per screen early, ~4.0 deep. */
+export function genFloor(depth, reachableCells) {
+  const perScreen = 2.2 + (Math.min(depth, 40) / 40) * 1.8;
+  return Math.round(screensIn(reachableCells) * perScreen);
+}
+
+/** Food is deliberately scarce — but never zero, or arriving on low health is fatal. */
+export function foodFloor(reachableCells) {
+  return Math.max(2, Math.round(screensIn(reachableCells) * 0.42));
+}
+
 export function finish(g, meta) {
   return {
     id: meta.id,

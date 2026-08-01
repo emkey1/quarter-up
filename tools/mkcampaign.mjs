@@ -15,7 +15,9 @@ import { writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as K from './levelkit.mjs';
-import { N, ds, dsExtent, analyse, relocateStrays, remotestCell, rng, finish } from './levelkit.mjs';
+import {
+  N, ds, dsExtent, analyse, relocateStrays, remotestCell, rng, finish, genFloor, foodFloor,
+} from './levelkit.mjs';
 
 /**
  * Design space.
@@ -100,49 +102,8 @@ function nestCount(base) {
   return Math.max(base, Math.round(base * ramp));
 }
 
-/**
- * Generators per level, derived from generators per SCREEN.
- *
- * Per-level was the wrong unit and it hid the problem for two rounds. Off-screen
- * generators are inert (DESIGN.md §6.1), so what a player experiences is how many are
- * within the 232x240 viewport — and a 48x48 level is about nine screens. Eight
- * generators spread over nine screens is 0.9 per screen, which means most screens have
- * none at all and you walk through empty rooms between set pieces. Measured on the
- * shipped campaign before this change: 0.53 per screen at depth 1, 1.19 at depth 40.
- *
- * Targeting density directly instead. Roughly two generators per screen early, rising to
- * nearly four deep, so there is essentially always something producing.
- *
- * These three constants mirror tuning.ts. They are duplicated because the level tools are
- * plain Node and tuning.ts is TypeScript; tests/campaign.test.ts recomputes the density
- * from the REAL values and fails if the two ever drift apart.
- */
-const VIEW_W = 232;
-const VIEW_H = 240;
-const TILE = 16;
-const TILES_PER_SCREEN = (VIEW_W / TILE) * (VIEW_H / TILE);
-
-function genFloor(d, reachableCells) {
-  const screens = Math.max(1, reachableCells / TILES_PER_SCREEN);
-  const perScreen = 2.2 + (Math.min(d, 40) / 40) * 1.8;
-  return Math.round(screens * perScreen);
-}
-
-/**
- * Food per level, from reachable area.
- *
- * Halved from 0.85 per screen after playtesting — roughly one piece every two and a half
- * screens rather than nearly one per screen. At the old rate the drain never really bit:
- * food turned up faster than 1/sec could burn it, so the clock that is supposed to end a
- * run was decorative.
- *
- * The `max(2, ...)` is not decoration either. A level that generates no food is not hard,
- * it is unsurvivable if you arrive on low health, and the analyser treats a foodless
- * normal level as a warning for exactly that reason.
- */
-function foodFloor(reachableCells) {
-  return Math.max(2, Math.round((reachableCells / TILES_PER_SCREEN) * 0.42));
-}
+// Density lives in levelkit so the editor's random generator uses the same numbers.
+// Two copies of "how much should a level hold" drift, and these units are subtle.
 
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../src/data/levels');
 const THEMES = ['stone', 'crypt', 'iron', 'ember', 'moss', 'bone'];

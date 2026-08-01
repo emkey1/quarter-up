@@ -4,6 +4,7 @@ import { analyseLevel } from '@/game/analyse';
 import { CAMPAIGN } from '@/data/campaign';
 import { UPGRADES } from '@/data/classes';
 import { PLAYTEST_KEY } from '@/playtest';
+import { LEVEL_TYPES, generateLevel } from '../levelgen.mjs';
 
 /**
  * The level editor.
@@ -95,6 +96,16 @@ function emptyLevel(): LevelData {
 }
 
 let level = emptyLevel();
+/**
+ * Set by any paint stroke, cleared whenever the level is replaced wholesale.
+ *
+ * Generating replaces everything, and doing that to hand-drawn work without asking is
+ * the kind of data loss an editor never gets forgiven for.
+ */
+let edited = false;
+let genType = LEVEL_TYPES[0].id;
+let genDepth = 12;
+let genSeed = 1;
 let brush: Brush = TERRAIN[1];
 let monsterKind = 'grunt';
 let monsterLevel = 1;
@@ -120,6 +131,7 @@ function objectsAt(x: number, y: number): LevelObject[] {
 
 function apply(x: number, y: number): void {
   if (x < 0 || y < 0 || x >= N || y >= N) return;
+  edited = true;
 
   if (brush.glyph !== undefined) {
     setTile(x, y, brush.glyph);
@@ -376,11 +388,68 @@ function renderStatus(report: Report): void {
     '<option value="">— new blank level —</option>' +
     CAMPAIGN.map((l, i) => `<option value="${i}">${l.id}  ${l.name}</option>`).join('');
   load.onchange = () => {
+    if (!confirmReplace()) {
+      load.value = '';
+      return;
+    }
     level = load.value === '' ? emptyLevel() : JSON.parse(JSON.stringify(CAMPAIGN[Number(load.value)]));
+    edited = false;
     buildChrome();
     draw();
   };
   right.appendChild(load);
+
+  /* ---------------------------------------------------------------- generate */
+
+  h('Generate');
+  const gen = document.createElement('div');
+  gen.innerHTML = `
+    <div class="row"><label>Type</label><select id="gt">${LEVEL_TYPES.map(
+      (t) => `<option value="${t.id}" ${t.id === genType ? 'selected' : ''}>${t.label}</option>`,
+    ).join('')}</select></div>
+    <div id="gblurb" style="color:rgba(215,219,224,.4);font-size:11px;margin:-2px 0 8px"></div>
+    <div class="row"><label>Depth</label><input id="gd" type="number" min="1" max="50" value="${genDepth}"></div>
+    <div class="row"><label>Seed</label><input id="gs" type="number" min="1" value="${genSeed}"></div>`;
+  right.appendChild(gen);
+
+  const blurb = gen.querySelector('#gblurb') as HTMLDivElement;
+  const showBlurb = () => {
+    blurb.textContent = LEVEL_TYPES.find((t) => t.id === genType)?.blurb ?? '';
+  };
+  showBlurb();
+
+  (gen.querySelector('#gt') as HTMLSelectElement).onchange = (e) => {
+    genType = (e.target as HTMLSelectElement).value;
+    showBlurb();
+  };
+  (gen.querySelector('#gd') as HTMLInputElement).oninput = (e) => {
+    genDepth = Math.max(1, Math.min(50, Number((e.target as HTMLInputElement).value) || 1));
+  };
+  (gen.querySelector('#gs') as HTMLInputElement).oninput = (e) => {
+    genSeed = Math.max(1, Number((e.target as HTMLInputElement).value) || 1);
+  };
+
+  const runGen = (seed: number) => {
+    if (!confirmReplace()) return;
+    genSeed = seed;
+    level = generateLevel({ type: genType, depth: genDepth, seed, id: `gen${String(seed).slice(-4)}` });
+    edited = false;
+    buildChrome();
+    draw();
+  };
+
+  const genBtn = document.createElement('button');
+  genBtn.className = 'act primary';
+  genBtn.textContent = 'Generate';
+  genBtn.onclick = () => runGen(genSeed);
+  right.appendChild(genBtn);
+
+  const rollBtn = document.createElement('button');
+  rollBtn.className = 'act';
+  rollBtn.textContent = 'Generate — new seed';
+  rollBtn.title = 'A fresh random seed. The seed is shown above so you can get it back.';
+  rollBtn.onclick = () => runGen(1 + Math.floor(Math.random() * 999_999));
+  right.appendChild(rollBtn);
 
   h('Playtest');
   const test = document.createElement('button');
@@ -430,6 +499,12 @@ function renderStatus(report: Report): void {
     draw();
   };
   right.appendChild(toggle);
+}
+
+/** Ask before throwing away hand-drawn work. Silence on data loss is unforgivable. */
+function confirmReplace(): boolean {
+  if (!edited) return true;
+  return confirm('Replace the current level? Your edits have not been exported.');
 }
 
 /* ------------------------------------------------------------------ input */
