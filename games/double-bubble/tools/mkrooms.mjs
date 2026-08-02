@@ -300,8 +300,43 @@ function makeSecret(spec) {
 mkdirSync(OUT, { recursive: true });
 for (const f of readdirSync(OUT)) if (f.endsWith('.json')) unlinkSync(resolve(OUT, f));
 
+/**
+ * Room 100 — the boss arena.
+ *
+ * Open, symmetrical, and nothing like the ninety-nine rooms before it. Wide tiers with
+ * clear sight lines, because the fight is about steering a lightning bolt across the
+ * room and a cluttered arena would make that luck rather than aim.
+ *
+ * Only lightning drifts in here. Water and fire cannot hurt the boss, so offering them
+ * would be a cruel joke on a player who has not yet worked out what does.
+ */
+function makeBossRoom() {
+  // Rows 25 / 22 / 17: gaps of three and five. Four is the one spacing no room may have
+  // — it sits exactly at the jump apex — and a hand-written room is just as bound by
+  // that as a generated one.
+  const platforms = [
+    [25, 2, 29],
+    [22, 2, 10],
+    [22, 21, 29],
+    [17, 12, 19],
+  ];
+  return {
+    id: `r${FINAL_ROOM}`,
+    tiles: buildTiles({ platforms }),
+    drift: buildDrift({ right: rows(0, 3), left: rows(10, 13) }),
+    driftSpeed: 0.4,
+    playerStart: { x: 15, y: 24 },
+    spawns: [],
+    escapeFrames: 420,
+    timer: 5400,
+    specialBubbles: ['lightning'],
+    boss: true,
+  };
+}
+
 const all = [];
-for (let n = 1; n <= FINAL_ROOM; n++) all.push(makeRoom(n));
+for (let n = 1; n < FINAL_ROOM; n++) all.push(makeRoom(n));
+all.push(makeBossRoom());
 for (const s of SECRETS) all.push(makeSecret(s));
 
 for (const room of all) {

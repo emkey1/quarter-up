@@ -170,11 +170,18 @@ describe('the room library', () => {
     }
   });
 
-  /** A room with no monsters can never be cleared; one with a monster in a wall is
-   *  unwinnable in a subtler way. */
-  it('gives every room monsters, all of them inside the room', () => {
+  /**
+   * A room with no monsters can never be cleared — the exit condition is an empty room.
+   * The boss room is the one exception: the boss is what has to die there, so it ships
+   * with no ordinary spawns at all and would fail a blanket rule.
+   */
+  it('gives every room something to kill, all of it inside the room', () => {
     for (let n = 1; n <= FINAL_ROOM; n++) {
       const room = roomFor(n);
+      if (room.boss) {
+        expect(room.spawns.length, `boss room ${n} should be the boss alone`).toBe(0);
+        continue;
+      }
       expect(room.spawns.length, `room ${n}`).toBeGreaterThan(0);
       for (const s of room.spawns) {
         expect(s.x).toBeGreaterThan(0);

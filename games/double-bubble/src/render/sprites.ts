@@ -584,3 +584,66 @@ export function buildElementSprites(): {
     flame: flame.toCanvas(palette(ramp('#ff8a3d'))),
   };
 }
+
+/* ------------------------------------------------------------------ the boss */
+
+/**
+ * The thing at the bottom of the cave.
+ *
+ * Built from the Drunk's silhouette — pointed hat, staff, bottle — but four times the
+ * size, so it reads instantly as "that thing from room fifty, except now it is the
+ * room". Recognition does more work here than novelty would: the player already knows
+ * what a Drunk does, and the fight is about discovering that what worked then does not
+ * work now.
+ */
+export function bossFrame(step: number): Px {
+  const n = T.BOSS_HALF * 2 * T.ART_SCALE;
+  const p = new Px(n, n);
+  const c = Math.round(n / 2);
+  const r = Math.round(n * 0.36);
+
+  // Body
+  p.ellipse(c, c + r * 0.35, r, r * 0.95, P.Base);
+  p.ellipse(c, c + r * 0.7, r * 0.8, r * 0.5, P.Base2);
+
+  // Hat: a tall cone, the Drunk's read at four times the scale.
+  // Point at the TOP, brim at the bottom. Running this the other way round draws a
+  // funnel rather than a hat, which reads as a completely different creature.
+  const hatH = Math.round(r * 1.15);
+  for (let i = 0; i < hatH; i++) {
+    const w = Math.round((r * 0.95 * i) / hatH);
+    if (w > 0) p.rect(c - w, c - r * 0.5 - hatH + i, w * 2, 1, P.Dark);
+  }
+  p.rect(c - r, Math.round(c - r * 0.55), r * 2, 3, P.Light);
+
+  // Eyes, wide apart and low under the brim.
+  const bob = step === 0 ? 0 : 1;
+  p.ellipse(c - r * 0.42, c + bob, r * 0.2, r * 0.22, P.Base3);
+  p.ellipse(c + r * 0.42, c + bob, r * 0.2, r * 0.22, P.Base3);
+  p.ellipse(c - r * 0.38, c + bob, r * 0.09, r * 0.11, P.Outline3);
+  p.ellipse(c + r * 0.46, c + bob, r * 0.09, r * 0.11, P.Outline3);
+
+  // Staff along one side.
+  p.rect(c + r - 2, Math.round(c - r * 0.9), 3, Math.round(r * 2), P.Dark2);
+  p.ellipse(c + r - 1, Math.round(c - r), 3.5, 3.5, P.Light2);
+
+  p.shadePass(P.Outline);
+  p.outline(P.Outline);
+  return p;
+}
+
+export interface BossSprites {
+  /** [hurt][step] — hurt frames flash pale so a landed hit is unmistakable. */
+  readonly frames: [HTMLCanvasElement, HTMLCanvasElement][];
+}
+
+export function buildBossSprites(): BossSprites {
+  const calm = palette(ramp('#7ad85a'), ramp('#ffd166'), ramp('#ffffff'));
+  const hurt = palette(ramp('#ffffff'), ramp('#ffd166'), ramp('#ffffff'));
+  const frames = [bossFrame(0), bossFrame(1)];
+  return {
+    frames: [calm, hurt].map(
+      (pal) => frames.map((f) => f.toCanvas(pal)) as [HTMLCanvasElement, HTMLCanvasElement],
+    ),
+  };
+}

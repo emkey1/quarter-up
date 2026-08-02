@@ -20,8 +20,10 @@ import {
   buildElementSprites,
   buildItemSprites,
   buildProjectileSprites,
+  buildBossSprites,
   buildSpecialBubbleSprites,
   SPRITE_PX,
+  type BossSprites,
   type MonsterSprites,
   type PlayerSprites,
 } from '@/render/sprites';
@@ -33,6 +35,7 @@ import { EXTEND_WORD, hasLetter } from '@/game/score';
 import {
   advance,
   doorFor,
+  SILVER_DOOR_ROOMS,
   newCampaign,
   persist,
   recordDeath,
@@ -78,6 +81,7 @@ export class App implements LoopHost {
   private readonly itemArt: Partial<Record<ItemKind, HTMLCanvasElement>>;
   private readonly specialArt: Record<SpecialBubble, HTMLCanvasElement>;
   private readonly elementArt: ReturnType<typeof buildElementSprites>;
+  private readonly bossArt: BossSprites;
   private readonly fx = new Fx();
 
   /** The counter readout. Toggled with F2. Without it the hidden system is untestable
@@ -94,6 +98,9 @@ export class App implements LoopHost {
   private interludeText = '';
   /** The secret room being visited, if any — the campaign returns here afterwards. */
   private inSecret: number | null = null;
+  /** Set when the cave was beaten the hard way. See §4 on why this replaces the
+   *  original's two-player gate. */
+  private trueEnding = false;
 
   constructor(
     private readonly display: Display,
@@ -112,6 +119,7 @@ export class App implements LoopHost {
     this.itemArt = buildItemSprites();
     this.specialArt = buildSpecialBubbleSprites();
     this.elementArt = buildElementSprites();
+    this.bossArt = buildBossSprites();
     this.world = new World(room, roomNumber);
   }
 
@@ -173,6 +181,26 @@ export class App implements LoopHost {
     if (w.phase === 'dead') {
       this.interludeText = 'GAME OVER';
       this.interlude = T.INTERLUDE_FRAMES * 2;
+      return;
+    }
+
+    /*
+     * The cave is beaten.
+     *
+     * The original gates its true ending behind a second player joining mid-boss, which
+     * is simply unreachable alone. §4 replaces that gate with a mastery one of the same
+     * spirit — you must have done it the hard way, not merely done it — by requiring
+     * Super Mode AND all three secret rooms. Both demand a deathless run to reach, so
+     * the true ending still means "you truly know this game"; it just no longer means
+     * "you had a friend".
+     */
+    if (w.phase === 'won') {
+      const foundEverySecret = SILVER_DOOR_ROOMS.every((g) => this.campaign.doorsTaken.includes(g));
+      this.trueEnding = this.campaign.superMode && foundEverySecret;
+      this.interludeText = this.trueEnding ? 'THE CAVE OPENS' : 'THE CAVE IS QUIET';
+      this.interlude = T.INTERLUDE_FRAMES * 3;
+      advance(this.campaign); // rolls past 100 into Super Mode
+      persist(this.campaign);
       return;
     }
 
@@ -251,6 +279,7 @@ export class App implements LoopHost {
     this.drawShots(ctx, layout);
     this.drawElements(ctx, layout);
     this.drawBubbles(ctx, layout);
+    this.drawBoss(ctx, layout);
     this.drawBaron(ctx, layout);
     // Over everything in the room, but still inside the clip — a burst at the edge
     // must not spray across the HUD.
@@ -402,6 +431,67 @@ export class App implements LoopHost {
     }
   }
 
+  /**
+   * The boss, and the bar that tells you whether lightning is working.
+   *
+   * The health bar matters more than it looks. Every other tool in the game does
+   * nothing to this thing, so without visible feedback a player who tries water and
+   * fire and then finally lands a bolt has no way to know the bolt was the answer.
+   */
+  private drawBoss(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const b = this.world.boss;
+    if (!b || b.state === 'dead') return;
+    const { playfield, pxPerWu } = layout;
+
+    const art = this.bossArt.frames[b.hitFlash > 0 ? 1 : 0][
+      Math.floor(this.world.frame / 14) % 2
+    ];
+    const wu = art.width / T.ART_SCALE;
+
+    ctx.save();
+    // Held in a bubble: draw it wobbling and translucent, so "you did it, now pop it"
+    // needs no words.
+    if (b.state === 'bubbled') ctx.globalAlpha = 0.75;
+    ctx.drawImage(
+      art,
+      playfield.x + (b.x - wu / 2) * pxPerWu,
+      playfield.y + (b.y - wu / 2) * pxPerWu,
+      wu * pxPerWu,
+      wu * pxPerWu,
+    );
+    ctx.restore();
+
+    if (b.state === 'bubbled') {
+      ctx.save();
+      ctx.strokeStyle = '#7fe9ff';
+      ctx.lineWidth = Math.max(2, pxPerWu);
+      ctx.beginPath();
+      ctx.arc(
+        playfield.x + b.x * pxPerWu,
+        playfield.y + b.y * pxPerWu,
+        (b.half + 4) * pxPerWu,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const barW = playfield.w * 0.5;
+    const barH = Math.max(4, 5 * layout.dpr);
+    const bx = playfield.x + (playfield.w - barW) / 2;
+    const by = playfield.y + Math.round(8 * layout.dpr);
+    ctx.save();
+    ctx.fillStyle = 'rgba(4,6,10,.7)';
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillStyle = b.state === 'bubbled' ? '#7fe9ff' : '#7ad85a';
+    ctx.fillRect(bx, by, barW * (b.hp / b.maxHp), barH);
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, barW - 1, barH - 1);
+    ctx.restore();
+  }
+
   private drawBaron(ctx: CanvasRenderingContext2D, layout: Layout): void {
     const b = this.world.baron;
     if (!b) return;
@@ -545,7 +635,11 @@ export class App implements LoopHost {
         ctx,
         layout,
         this.interludeText,
-        this.interludeText === 'GAME OVER' ? '#8a9099' : '#6fe3c4',
+        this.interludeText === 'GAME OVER'
+          ? '#8a9099'
+          : this.trueEnding
+            ? '#ffd166'
+            : '#6fe3c4',
       );
     } else if (w.hurryUp) {
       this.drawBanner(ctx, layout, 'HURRY UP!', '#ff5b4a');

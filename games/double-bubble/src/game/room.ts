@@ -110,6 +110,8 @@ export interface RoomData {
    * means the game can offer a decoded version once the player has earned it.
    */
   secret?: { plain: string; cipher: string };
+  /** Room 100. The boss counts as the room's monster, so `spawns` may be empty. */
+  boss?: true;
 }
 
 export type ValidationResult =
@@ -187,7 +189,10 @@ export function validateRoom(input: unknown): ValidationResult {
     });
     // A room with no monsters can never be cleared: the exit condition is an empty room,
     // so it would complete on frame 1 or hang forever depending on how flow is written.
-    if (o.spawns.length === 0) errors.push('spawns: a room needs at least one monster');
+    // A boss room is the exception — the boss is what has to die.
+    if (o.spawns.length === 0 && o.boss !== true) {
+      errors.push('spawns: a room needs at least one monster');
+    }
   }
 
   const ps = o.playerStart as Record<string, unknown> | undefined;
@@ -232,6 +237,7 @@ export function validateRoom(input: unknown): ValidationResult {
       timer: num(o.timer, T.ROOM_TIMER),
       specialBubbles,
       ...(secret ? { secret } : {}),
+      ...(o.boss === true ? { boss: true as const } : {}),
     },
   };
 }

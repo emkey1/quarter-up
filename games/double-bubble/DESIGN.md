@@ -2,9 +2,9 @@
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** M4 complete — the hidden counter system, items, fruit and EXTEND letters,
-> and the three special bubbles with water that flows along the geometry. Next is M5:
-> the 100 rooms, the editor, the secret rooms and the boss. See §11.
+> **Status:** M5 all but the editor. The campaign runs end to end: a hundred generated
+> rooms, the secret doors and cryptograms, Super Mode, and the boss at room 100. The
+> room editor is the last piece. See §11.
 >
 > Debug keys: **F1** jump meter, **F2** counter readout.
 >

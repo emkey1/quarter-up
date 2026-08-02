@@ -38,6 +38,7 @@ import {
 } from './special';
 import { projectileHits, stepProjectile, type Projectile } from './projectile';
 import { baronHits, spawnBaron, stepBaron, type Baron } from './baron';
+import { bossHits, finish, spawnBoss, stepBoss, zap, type Boss } from './boss';
 import {
   chainScore,
   collectLetter,
@@ -47,7 +48,7 @@ import {
   type ScoreState,
 } from './score';
 
-export type RoomPhase = 'playing' | 'cleared' | 'dead';
+export type RoomPhase = 'playing' | 'cleared' | 'dead' | 'won';
 
 /**
  * Things worth showing the player.
@@ -105,6 +106,8 @@ export class World {
 
   /** Invincible, unbubbleable, and only ever closer. Null until the hurry-up. */
   baron: Baron | null = null;
+  /** Room 100 only. */
+  boss: Boss | null = null;
 
   phase: RoomPhase = 'playing';
   frame = 0;
@@ -135,6 +138,7 @@ export class World {
     this.timer = room.timer;
     this.counters = counters;
     for (const s of room.spawns) this.monsters.push(spawnMonster(s.kind, s.x, s.y, s.dir));
+    if (room.boss) this.boss = spawnBoss();
 
     this.awarded = walkThresholds(this.counters, roomNumber);
     if (this.awarded.item) {
@@ -209,15 +213,73 @@ export class World {
     for (const p of this.pickups) stepPickup(this.room, p);
     this.collectPickups();
     this.stepSpecials();
+    this.stepBossFight();
     this.stepBaron();
 
     this.carryCaptives();
     this.checkPlayerHit();
     this.sweep();
 
-    if (this.liveMonsters.length === 0) {
+    // A boss room ends when the boss does, not when the room empties.
+    if (this.boss) {
+      if (this.boss.state === 'dead') {
+        this.phase = 'won';
+        this.baron = null;
+      }
+    } else if (this.liveMonsters.length === 0) {
       this.phase = 'cleared';
       this.baron = null;
+    }
+  }
+
+  /**
+   * The boss fight.
+   *
+   * Only lightning touches it, which is the point: every tool the player spent
+   * ninety-nine rooms mastering stops working, and the fight is an exam on the one
+   * special bubble they were least likely to have practised with. Beaten down, it
+   * becomes bubbleable — the ordinary verb works again, and popping it ends the game.
+   */
+  private stepBossFight(): void {
+    const boss = this.boss;
+    if (!boss || boss.state === 'dead') return;
+
+    const r = stepBoss(boss, this.player.body.x, this.player.body.y);
+    if (r.threw) this.projectiles.push(r.threw);
+    if (r.brokeFree) {
+      this.events.push({ kind: 'escape', x: boss.x, y: boss.y });
+    }
+
+    // Lightning is the only thing that hurts it.
+    for (const bolt of this.bolts) {
+      if (bolt.dead) continue;
+      if (!touches(bolt.x, bolt.y, T.LIGHTNING_HALF, boss.x, boss.y, boss.half, boss.half)) {
+        continue;
+      }
+      bolt.dead = true;
+      const beaten = zap(boss);
+      this.events.push({ kind: 'monsterPop', x: boss.x, y: boss.y, colour: '#7ad85a' });
+      if (beaten) this.events.push({ kind: 'chain', x: boss.x, y: boss.y, monsters: 0, points: 0 });
+      break;
+    }
+
+    // Held: now an ordinary pop finishes it.
+    if (boss.state === 'bubbled') {
+      const b0 = this.player.body;
+      const reach = boss.half + b0.halfW;
+      if (Math.abs(boss.x - b0.x) < reach && Math.abs(boss.y - b0.y) < boss.half + b0.halfH) {
+        if (finish(boss)) {
+          this.score.points += T.BOSS_SCORE;
+          this.events.push({ kind: 'monsterPop', x: boss.x, y: boss.y, colour: '#ffd166' });
+          this.events.push({
+            kind: 'chain',
+            x: boss.x,
+            y: boss.y,
+            monsters: 8,
+            points: T.BOSS_SCORE,
+          });
+        }
+      }
     }
   }
 
@@ -662,7 +724,13 @@ export class World {
       }
     }
 
-    if (this.baron && baronHits(this.baron, b0.x, b0.y, b0.halfW, b0.halfH)) this.killPlayer();
+    if (this.baron && baronHits(this.baron, b0.x, b0.y, b0.halfW, b0.halfH)) {
+      this.killPlayer();
+      return;
+    }
+    // Touching the boss is fatal only while it is still fighting — once it is held,
+    // walking into it is exactly how you finish it.
+    if (this.boss && bossHits(this.boss, b0.x, b0.y, b0.halfW, b0.halfH)) this.killPlayer();
   }
 
   /**

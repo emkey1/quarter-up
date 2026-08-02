@@ -245,6 +245,30 @@ export const T = {
   CLOCK_FREEZE_FRAMES: 480,
   /** Grace period after respawning. Losing a life must never cost you the next one. */
   RESPAWN_INVULN_FRAMES: 120,
+
+  // ---------------------------------------------------------------- the boss [i]
+  /** Four tiles across — unmistakably not another monster. */
+  BOSS_HALF: 16,
+  /**
+   * Lightning hits to bring it down.
+   *
+   * Eight is deliberately a lot when lightning is the rarest special: the fight is an
+   * exam on the one mechanic a player is least likely to have practised, so it has to
+   * last long enough to actually test it rather than being ended by one lucky bolt.
+   */
+  BOSS_HP: 8,
+  BOSS_SPEED: 0.62,
+  BOSS_THROW_COOLDOWN: 96,
+  /** Shortest gap between bottles, reached as the health bar empties. */
+  BOSS_THROW_MIN: 34,
+  BOSS_HIT_FLASH: 22,
+  /** How long it stays held once beaten down. Miss the window and the fight resumes —
+   *  which is what stops the last hit being a formality. */
+  BOSS_BUBBLE_FRAMES: 300,
+  /** It never comes below this row, so the player always has ground to work from. */
+  BOSS_FLOOR_ROW: 18,
+  /** What the cave is worth. Deliberately enormous — it is the last thing you do. */
+  BOSS_SCORE: 100000,
   /** How long a heart makes the player untouchable. */
   HEART_INVULN_FRAMES: 600,
   /** Points a ring pays per jump / per bubble popped / per step taken. */
