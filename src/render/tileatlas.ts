@@ -24,11 +24,26 @@ import {
  * blob index and the rest of the pipeline are unchanged.
  */
 
-export const enum AtlasRow {
-  Wall = 0, // BLOB_COUNT columns
-  Floor = 1, // 4 variants
-  Misc = 2, // breakable, door closed, door open, exit, teleport, trap
-}
+/**
+ * How many differently-weathered copies of each wall mask to bake.
+ *
+ * The atlas used to bake one tile per blob mask, always with salt 1, so every wall in the
+ * game sharing a mask was pixel-identical. That was survivable when levels were mostly
+ * open; at 27% wall coverage a screen holds dozens of them and the repeat is the first
+ * thing you see. Three variants, chosen by cell position, breaks the pattern for the cost
+ * of two extra atlas rows.
+ */
+export const WALL_VARIANTS = 3;
+/** Floor stamps. Eight, because a level is 2000+ floor tiles and four reads as wallpaper. */
+export const FLOOR_VARIANTS = 8;
+
+/** Atlas rows. Walls occupy the first WALL_VARIANTS rows, one per weathering. */
+export const AtlasRow = {
+  Wall: 0,
+  Floor: WALL_VARIANTS,
+  Misc: WALL_VARIANTS + 1,
+} as const;
+export type AtlasRow = number;
 
 export const MISC = {
   breakable: 0,
@@ -58,9 +73,9 @@ export class TileAtlas {
   rebuild(theme: Theme, _pxPerWu: number): void {
     this.theme = theme;
     this.tilePx = TILE_PX;
-    const cols = Math.max(BLOB_COUNT, 8);
+    const cols = Math.max(BLOB_COUNT, FLOOR_VARIANTS);
     this.canvas.width = cols * this.tilePx;
-    this.canvas.height = 3 * this.tilePx;
+    this.canvas.height = (WALL_VARIANTS + 2) * this.tilePx;
 
     const ctx = this.canvas.getContext('2d');
     if (!ctx) return;
@@ -68,10 +83,19 @@ export class TileAtlas {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     const pal = themePalette(theme);
-    for (let i = 0; i < BLOB_COUNT; i++) {
-      wallTile(this.maskForIndex(i), 1).blitTo(ctx, i * TILE_PX, AtlasRow.Wall * TILE_PX, pal);
+    for (let v = 0; v < WALL_VARIANTS; v++) {
+      for (let i = 0; i < BLOB_COUNT; i++) {
+        // Salt varies per variant AND per mask, so two variants of the same mask differ
+        // and the same variant of two masks does not share its weathering either.
+        wallTile(this.maskForIndex(i), 1 + v * 97 + i).blitTo(
+          ctx,
+          i * TILE_PX,
+          (AtlasRow.Wall + v) * TILE_PX,
+          pal,
+        );
+      }
     }
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < FLOOR_VARIANTS; i++) {
       floorTile(i).blitTo(ctx, i * TILE_PX, AtlasRow.Floor * TILE_PX, pal);
     }
     const misc = [
@@ -127,10 +151,11 @@ export function tileCell(
   blob: number,
   doorOpen: boolean,
   floorVariant: number,
+  wallVariant = 0,
 ): [AtlasRow, number] {
   switch (tile) {
     case Tile.Wall:
-      return [AtlasRow.Wall, blob];
+      return [AtlasRow.Wall + (wallVariant % WALL_VARIANTS), blob];
     case Tile.Breakable:
       return [AtlasRow.Misc, MISC.breakable];
     case Tile.Door:
@@ -142,7 +167,7 @@ export function tileCell(
     case Tile.Trap:
       return [AtlasRow.Misc, MISC.trap];
     case Tile.Void:
-      return [AtlasRow.Wall, blob];
+      return [AtlasRow.Wall + (wallVariant % WALL_VARIANTS), blob];
     default:
       return [AtlasRow.Floor, floorVariant];
   }

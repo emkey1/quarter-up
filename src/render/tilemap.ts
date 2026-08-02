@@ -4,7 +4,7 @@ import { Terrain, Tile, TileFlag } from '@/game/terrain';
 import type { Layout } from '@/engine/display';
 import { hash32 } from '@/engine/rng';
 import { blobIndex, neighbourMask } from './autotile';
-import { AtlasRow, TileAtlas, tileCell } from './tileatlas';
+import { AtlasRow, FLOOR_VARIANTS, TileAtlas, tileCell, WALL_VARIANTS } from './tileatlas';
 import type { Theme } from './theme';
 
 /**
@@ -86,7 +86,10 @@ export class TilemapRenderer {
         const tile = t.at(cx, cy);
         const blob = this.maskCache[i];
         const doorOpen = (t.flags[i] & TileFlag.DoorOpen) !== 0;
-        const variant = hash32(cx, cy, 'floor') % 4;
+        // Keyed by CELL, so a tile's appearance is a property of where it is and never
+        // changes between frames or between runs.
+        const variant = hash32(cx, cy, 'floor') % FLOOR_VARIANTS;
+        const wallVariant = hash32(cx, cy, 'wall') % WALL_VARIANTS;
 
         const dx = pf.x + cx * dstPx - camX;
         const dy = pf.y + cy * dstPx - camY;
@@ -101,7 +104,7 @@ export class TilemapRenderer {
 
         if (tile === Tile.Floor) continue;
 
-        const [row, col] = tileCell(tile, blob < 0 ? 0 : blob, doorOpen, variant);
+        const [row, col] = tileCell(tile, blob < 0 ? 0 : blob, doorOpen, variant, wallVariant);
         const [sx, sy, sw, sh] = this.atlas.src(row, col);
         ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, dstPx, dstPx);
       }

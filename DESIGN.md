@@ -466,6 +466,21 @@ Everything is authored at **A=2** — 32×32 px per 16 wu block. That is the swe
 more detailed than the original, still hand-authorable by one person, and it scales to integer
 multiples cleanly.
 
+*Second pass, after the maze density went up.* Two things that were survivable on sparse
+levels became the first thing you noticed at 27% wall coverage:
+
+- The atlas baked **one tile per blob mask, always with salt 1**, so every wall in the game
+  sharing a mask was pixel-identical. Now three weathering variants per mask, chosen by
+  cell position — appearance is a property of *where a tile is*, so it never changes
+  between frames or between runs.
+- **Four floor stamps** across 2000+ floor tiles read as wallpaper: the eye finds the
+  period before it finds the dungeon. Now eight, with per-flagstone tone variation and
+  distinct cracks, chips and loose stones per variant.
+- The south edge of a wall is its **front face**, and it does most of the work of making a
+  top-down block read as having height. Three pixels was too thin to register once scaled
+  up next to a dozen neighbours; it is six now, in two tones with the mortar carried down
+  it.
+
 - **Tiles**: 32×32. **Wall autotiling** with a 47-piece blob set driven by an 8-neighbour bitmask,
   so mazes read as built structures with corners, caps and junctions instead of loose cubes. This
   is the single biggest visual upgrade per hour spent. Plus floor variants (4 per theme, chosen by

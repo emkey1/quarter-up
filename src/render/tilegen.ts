@@ -83,12 +83,20 @@ export function wallTile(mask: number, salt: number): Px {
   } else {
     p.rect(0, 0, 1, TILE_PX, S.dk);
   }
+  // The south edge is the FRONT FACE of the block, and it does most of the work of making
+  // a top-down wall read as something with height rather than a coloured square. Six
+  // pixels of it, in two tones, plus a hard outline: a 3px band was too thin to register
+  // once the tile is scaled up and sitting next to a dozen identical neighbours.
   if (open(NB.S)) {
-    p.rect(0, TILE_PX - 3, TILE_PX, 3, S.dk);
+    p.rect(0, TILE_PX - 6, TILE_PX, 3, S.d);
+    p.rect(0, TILE_PX - 3, TILE_PX, 2, S.dk);
     p.rect(0, TILE_PX - 1, TILE_PX, 1, S.o);
+    // Mortar lines carried down the face, so the courses do not stop dead at the edge.
+    for (let bx = 4; bx < TILE_PX; bx += 16) p.rect(bx, TILE_PX - 6, 1, 5, S.o);
   }
   if (open(NB.E)) {
-    p.rect(TILE_PX - 3, 0, 3, TILE_PX, S.dk);
+    p.rect(TILE_PX - 4, 0, 3, TILE_PX, S.d);
+    p.rect(TILE_PX - 2, 0, 1, TILE_PX, S.dk);
     p.rect(TILE_PX - 1, 0, 1, TILE_PX, S.o);
   }
 
@@ -105,7 +113,17 @@ export function wallTile(mask: number, salt: number): Px {
   return p;
 }
 
-/** Floor: flagstones with grout, plus occasional cracks and grit. */
+/**
+ * Floor: flagstones with grout, plus cracks, chips and grit.
+ *
+ * Eight variants rather than four. At 48x48 a level is over two thousand floor tiles, and
+ * with four stamps the repeat is obvious enough to read as wallpaper — the eye finds the
+ * period long before it finds the dungeon. Eight is still cheap (eight 32px tiles) and
+ * pushes the repeat past the point where a screenful gives it away.
+ *
+ * The decoration is keyed off the variant rather than randomised per draw, because the
+ * atlas is baked once: a tile has to look the same every frame or the floor crawls.
+ */
 export function floorTile(variant: number): Px {
   const p = new Px(TILE_PX, TILE_PX);
   p.rect(0, 0, TILE_PX, TILE_PX, M.b);
@@ -117,16 +135,55 @@ export function floorTile(variant: number): Px {
   p.rect(offset, 0, 1, half, M.dk);
   p.rect((offset + half) % TILE_PX, half, 1, half, M.dk);
 
+  // Per-flagstone tone, so neighbouring stones are not the same shade of nothing.
+  const stones: [number, number][] = [
+    [offset === 0 ? 1 : half + 1, 1],
+    [offset === 0 ? half + 1 : 1, 1],
+    [1, half + 1],
+    [half + 1, half + 1],
+  ];
+  stones.forEach(([sx, sy], i) => {
+    const t = hash(sx, sy, variant * 17 + i);
+    if (t > 0.66) p.rect(sx, sy, half - 2, half - 3, M.l);
+    else if (t < 0.33) p.rect(sx, sy, half - 2, half - 3, M.d);
+  });
+
   speckle(p, 0, 0, TILE_PX, TILE_PX, variant * 31 + 3, M.l, M.d);
 
-  // a crack on some stones, so a big floor is not a repeating stamp
-  if (variant % 4 === 1) {
-    p.line(6, 4, 11, 12, M.d);
-    p.line(11, 12, 9, 20, M.d);
+  // Cracks and chips, distributed so no two variants carry the same damage.
+  switch (variant % 8) {
+    case 1:
+      p.line(6, 4, 11, 12, M.d);
+      p.line(11, 12, 9, 20, M.d);
+      break;
+    case 2:
+      p.rect(22, 6, 3, 2, M.d); // chipped corner
+      p.rect(23, 8, 1, 1, M.o);
+      break;
+    case 3:
+      p.line(20, 18, 27, 24, M.d);
+      break;
+    case 4:
+      p.line(3, 26, 12, 29, M.d);
+      p.rect(14, 14, 2, 2, M.o); // a loose stone
+      break;
+    case 5:
+      p.line(17, 3, 19, 11, M.d);
+      p.rect(6, 21, 3, 1, M.d);
+      break;
+    case 6:
+      p.rect(9, 8, 2, 2, M.o);
+      p.rect(25, 20, 2, 1, M.o);
+      p.line(26, 4, 29, 10, M.d);
+      break;
+    case 7:
+      p.line(4, 15, 13, 17, M.d);
+      p.line(13, 17, 15, 25, M.d);
+      break;
+    default:
+      break;
   }
-  if (variant % 4 === 3) {
-    p.line(20, 18, 27, 24, M.d);
-  }
+
   // top-lit grout so the floor has a light direction like everything else
   p.rect(0, half, TILE_PX, 1, M.l);
   return p;
