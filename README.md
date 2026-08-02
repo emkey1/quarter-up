@@ -55,6 +55,11 @@ are still written on a 32-unit design space and mapped up when generated, under 
 serpentine gap stay as authored, so a bigger grid holds *more* lattice and *more*
 switchbacks rather than bigger ones. Scaling the grain too would just zoom the level out.
 
+Wall coverage is about **27%**, up from 16% — and 8.2% of that 16% was the outer border,
+so internal walls have gone from roughly one tile in twelve to one in five. The structure
+comes from a recursive-division maze plus scattered rubble, laid down *after* each recipe
+so it fills the space between the designed features rather than replacing them.
+
 Generator density is targeted **per screen, not per level** — off-screen generators are
 inert, so what you experience is how many are inside the 232×240 viewport, and a level is
 about nine screens. Levels run about 2.2 generators per screen early and 4.0 deep (21 and

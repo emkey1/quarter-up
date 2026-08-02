@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import * as K from './levelkit.mjs';
 import {
   N, ds, dsExtent, analyse, relocateStrays, remotestCell, rng, finish, genFloor, foodFloor,
+  maze, rubble, protectedCells, connectPockets,
 } from './levelkit.mjs';
 
 /**
@@ -410,6 +411,33 @@ for (let d = 1; d <= 40; d++) {
   depthNow = d;
   const out = recipe(g, d, r);
   depthNow = 0;
+
+  /**
+   * Fill the empty space between the recipe's features.
+   *
+   * The vocabulary describes FEATURES; nothing described what lay between them, and the
+   * answer had quietly been "nothing". Measured before this: 16% wall coverage of which
+   * 8.2% was the outer border, so internal walls were about one tile in twelve. You could
+   * cross most levels in a straight line without turning, where the original is a warren.
+   *
+   * Runs AFTER the recipe, not before — a recipe opens with fill('.') across the whole
+   * interior and would erase a maze drawn first. It only ever builds on open ground, and
+   * `protectedCells` keeps it off everything the recipe placed and out of every doorway
+   * the recipe carved.
+   */
+  const structure = rng(9000 + d * 13);
+  const keepClear = protectedCells(g, [P(...out.start), P(...out.exit)]);
+  maze(g, {
+    x0: 2, y0: 2, x1: N - 3, y1: N - 3,
+    min: 2 + (d % 2), // alternates 2/3 so consecutive levels do not share a rhythm
+    gaps: 2,
+    r: structure,
+    avoid: keepClear,
+  });
+  rubble(g, { x0: 3, y0: 3, x1: N - 4, y1: N - 4, count: 55 + (d % 20), r: structure, avoid: keepClear });
+  // Rubble can seal an alcove. Repair rather than lowering the density — the density is
+  // the point, and the build gate below is not a substitute for producing valid output.
+  connectPockets(g, P(...out.start));
 
   // From here down we work in OUTPUT-grid coordinates, because everything below either
   // reads the finished tile grid (remotestCell) or lands in the level JSON. Mixing the

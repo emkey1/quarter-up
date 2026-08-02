@@ -610,6 +610,28 @@ a bigger grid gets *more* lattice, *more* pillars and *more* switchbacks — not
 ones. Scaling the grain too would give a level that is simply zoomed out: identical
 content spread further apart, which plays worse than the small version, not better.
 
+**The space between the features is now built.** The §11 vocabulary describes features —
+a nest, a lattice, a gallery — and said nothing about what lies between them, so the answer
+was quietly "nothing". Measured: 16% wall coverage of which 8.2% was the outer border, so
+internal walls were about one tile in twelve. You could cross most levels in a straight
+line without turning, where the original is a warren.
+
+A recursive-division maze plus scattered rubble now runs *after* each recipe, taking wall
+coverage to ~27%. Recursive division specifically, for one property: every wall it draws
+is gapped before it recurses, so it cannot disconnect a level. Rubble can — a stub across
+an alcove mouth seals it — so `connectPockets` floods from the start and knocks out the
+single wall tile between any stranded pocket and reachable ground. Repairing beats backing
+the density off, which would trade away the whole point for safety.
+
+Walls stay ONE tile thick deliberately. Two-thick reads chunkier and more arcade, but the
+diagonal cover rule (§8.2) depends on diagonally adjacent single blocks, and thick walls
+would quietly delete the Elf and Wizard's signature move.
+
+`protectedCells` keeps the structural pass off everything the recipe placed and out of
+every doorway it carved, by finding chokepoints — open cells with walls on opposite sides —
+before any new wall is drawn. Computing that as it went would be self-referential: the
+growing wall line makes its own cells look like chokepoints.
+
 **Generator density is targeted per SCREEN, not per level**, and getting that unit wrong
 hid the problem through two rounds of playtesting. Off-screen generators are inert (§6.1),
 so what a player experiences is how many sit inside the viewport — and a 48×48 level is

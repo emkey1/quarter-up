@@ -500,6 +500,205 @@ export function spreadCells(g, start, want, startGap = 6, taken = []) {
 }
 
 /**
+ * MAZE — the connective tissue.
+ *
+ * The §11 vocabulary describes FEATURES: a nest, a lattice, a gallery. It says nothing
+ * about what fills the space between them, and the answer had quietly been "nothing". The
+ * campaign measured 16% wall coverage of which 8.2% was the outer border, so internal
+ * walls were about one tile in twelve — an open field with a few blobs on it, where the
+ * original is a dense warren of rooms and corridors. You could cross most levels in a
+ * straight line without turning.
+ *
+ * Recursive division, because of one property: every wall it draws gets at least one gap
+ * punched in it before recursing, so a region that was connected stays connected. It
+ * cannot seal anything off. That matters more than the aesthetics — a maze generator that
+ * can strand a nest is one whose output has to be checked and repaired, and repairs are
+ * where levels lose their shape.
+ *
+ * Walls stay ONE tile thick on purpose. Two-thick reads chunkier and more arcade, but the
+ * diagonal cover rule (§8.2) depends on diagonally adjacent single blocks, and thick walls
+ * would quietly delete the Elf and Wizard's signature move.
+ *
+ * `avoid` protects what the recipe already placed: rectangles the divider will not cut
+ * through, so a nest keeps its walls and a corridor its doorway.
+ */
+export function maze(g, o) {
+  const { x0, y0, x1, y1, min = 7, r = rng(3), avoid = [], gaps = 2 } = o;
+
+  const blocked = (bx, by) =>
+    avoid.some((a) => bx >= a.x0 - 1 && bx <= a.x1 + 1 && by >= a.y0 - 1 && by <= a.y1 + 1);
+
+  const divide = (ax, ay, bx, by, depth) => {
+    const w = bx - ax;
+    const h = by - ay;
+    if (depth > 12) return;
+    // Stop when either side is too small to hold a room worth having.
+    if (w < min * 2 + 1 && h < min * 2 + 1) return;
+
+    const vertical = w === h ? r() < 0.5 : w > h;
+    if (vertical) {
+      if (w < min * 2 + 1) return divide(ax, ay, bx, by, depth + 1);
+      // Wall on an interior column, kept `min` away from both edges.
+      const wx = ax + min + Math.floor(r() * (w - min * 2));
+      let drew = false;
+      for (let y = ay; y <= by; y++) {
+        if (!blocked(wx, y) && get(g, wx, y) === '.') {
+          set(g, wx, y, 'X');
+          drew = true;
+        }
+      }
+      if (drew) {
+        // Punch the doorways BEFORE recursing, so connectivity is never in question.
+        for (let i = 0; i < gaps; i++) {
+          const gy = ay + Math.floor(r() * (h + 1));
+          set(g, wx, gy, '.');
+          if (gy + 1 <= by) set(g, wx, gy + 1, '.');
+        }
+      }
+      divide(ax, ay, wx - 1, by, depth + 1);
+      divide(wx + 1, ay, bx, by, depth + 1);
+    } else {
+      if (h < min * 2 + 1) return divide(ax, ay, bx, by, depth + 1);
+      const wy = ay + min + Math.floor(r() * (h - min * 2));
+      let drew = false;
+      for (let x = ax; x <= bx; x++) {
+        if (!blocked(x, wy) && get(g, x, wy) === '.') {
+          set(g, x, wy, 'X');
+          drew = true;
+        }
+      }
+      if (drew) {
+        for (let i = 0; i < gaps; i++) {
+          const gx = ax + Math.floor(r() * (w + 1));
+          set(g, gx, wy, '.');
+          if (gx + 1 <= bx) set(g, gx + 1, wy, '.');
+        }
+      }
+      divide(ax, ay, bx, wy - 1, depth + 1);
+      divide(ax, wy + 1, bx, by, depth + 1);
+    }
+  };
+
+  divide(x0, y0, x1, y1, 0);
+}
+
+/**
+ * Reconnect anything the structural pass cut off.
+ *
+ * `maze` cannot disconnect a level — every wall it draws is gapped before it recurses —
+ * but `rubble` can: a stub laid across the mouth of an alcove seals it, and the alcove
+ * may hold a generator. Rather than backing the density off until that stops happening,
+ * which trades the whole point away for safety, find the pockets and open them.
+ *
+ * Flood from the start, take any open cell that was not reached, and knock out the single
+ * wall tile between it and reachable ground. One tile, not a corridor: the pocket was open
+ * a moment ago and only needs its doorway back.
+ */
+export function connectPockets(g, start) {
+  const solid = (x, y) => {
+    const c = get(g, x, y);
+    return c === 'X' || c === ' ';
+  };
+  const openCell = (x, y) => inb(x, y) && !solid(x, y);
+
+  for (let pass = 0; pass < 12; pass++) {
+    const seen = new Set([start.join(',')]);
+    const queue = [[start[0], start[1]]];
+    for (let head = 0; head < queue.length; head++) {
+      const [x, y] = queue[head];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const k = `${nx},${ny}`;
+        if (!openCell(nx, ny) || seen.has(k)) continue;
+        seen.add(k);
+        queue.push([nx, ny]);
+      }
+    }
+
+    // A wall tile with reachable ground on one side and a stranded pocket on the other.
+    let opened = 0;
+    for (let y = 1; y < N - 1 && opened < 40; y++) {
+      for (let x = 1; x < N - 1 && opened < 40; x++) {
+        if (g.tiles[y][x] !== 'X') continue;
+        let touchesReached = false;
+        let touchesStranded = false;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (!openCell(nx, ny)) continue;
+          if (seen.has(`${nx},${ny}`)) touchesReached = true;
+          else touchesStranded = true;
+        }
+        if (touchesReached && touchesStranded) {
+          g.tiles[y][x] = '.';
+          opened++;
+        }
+      }
+    }
+    if (!opened) return;
+  }
+}
+
+/**
+ * Cells that must not be built on, derived from what a recipe already drew.
+ *
+ * Two kinds. Anything the recipe PLACED gets a one-tile cushion, so the maze cannot bury
+ * a generator or wall a key into the rock. And every CHOKEPOINT — an open cell with walls
+ * on opposite sides, which is what a doorway looks like from the grid's point of view —
+ * is protected, because filling one seals a room the recipe deliberately opened.
+ *
+ * Computed before any maze wall is drawn. Doing it as we go would be self-referential:
+ * the growing wall line makes its own cells look like chokepoints.
+ */
+export function protectedCells(g, extra = []) {
+  const out = [];
+  for (const o of g.objects) out.push({ x0: o.x - 1, y0: o.y - 1, x1: o.x + 1, y1: o.y + 1 });
+  for (const [x, y] of extra) out.push({ x0: x - 1, y0: y - 1, x1: x + 1, y1: y + 1 });
+
+  const solid = (x, y) => {
+    const c = get(g, x, y);
+    return c === 'X' || c === ' ';
+  };
+  for (let y = 1; y < N - 1; y++) {
+    for (let x = 1; x < N - 1; x++) {
+      if (g.tiles[y][x] !== '.') continue;
+      const horizGap = solid(x, y - 1) && solid(x, y + 1);
+      const vertGap = solid(x - 1, y) && solid(x + 1, y);
+      if (horizGap || vertGap) out.push({ x0: x, y0: y, x1: x, y1: y });
+    }
+  }
+  return out;
+}
+
+/**
+ * RUBBLE — short wall stubs scattered through open ground.
+ *
+ * The maze gives a level its rooms; this gives the rooms texture, so a chamber is
+ * something to fight around rather than an empty box. Stubs are 2-4 tiles and never
+ * placed where they would touch an existing wall on both ends, which is what stops them
+ * accidentally sealing a doorway.
+ */
+export function rubble(g, o) {
+  const { x0, y0, x1, y1, count = 14, r = rng(4), avoid = [] } = o;
+  const blocked = (bx, by) =>
+    avoid.some((a) => bx >= a.x0 - 1 && bx <= a.x1 + 1 && by >= a.y0 - 1 && by <= a.y1 + 1);
+
+  for (let i = 0; i < count; i++) {
+    const len = 2 + Math.floor(r() * 3);
+    const horiz = r() < 0.5;
+    const sx = x0 + Math.floor(r() * (x1 - x0 - len));
+    const sy = y0 + Math.floor(r() * (y1 - y0 - len));
+    const cells = [];
+    for (let k = 0; k < len; k++) cells.push([sx + (horiz ? k : 0), sy + (horiz ? 0 : k)]);
+    // Only lay it on genuinely open ground, clear of anything the recipe placed.
+    if (cells.every(([cx, cy]) => get(g, cx, cy) === '.' && !blocked(cx, cy))) {
+      for (const [cx, cy] of cells) set(g, cx, cy, 'X');
+    }
+  }
+}
+
+/**
  * Content density, shared by the campaign generator and the editor's random generator.
  *
  * These live here rather than in either caller because two copies of "how much should a
