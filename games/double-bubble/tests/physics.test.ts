@@ -419,3 +419,118 @@ describe('player poses', () => {
     expect(p.pose).toBe('fall');
   });
 });
+
+/* ------------------------------------------------------------------ riding bubbles */
+
+/**
+ * Riding is the primary route to platforms a jump cannot reach (DESIGN.md §3.3), and it
+ * was completely broken: the player fell straight through every bubble.
+ *
+ * The one-way test asks whether the body's underside CROSSED the lip this step. With a
+ * static platform the lip's old and new positions are the same, so the distinction never
+ * comes up. A bubble RISES — it can climb past the body's previous underside, at which
+ * point the test answers "you were already below it" against the lip's new position and
+ * waves the body through. Every assertion below is about that.
+ */
+describe('riding a bubble', () => {
+  const ridable = (x: number, y: number) => ({
+    x,
+    y,
+    prevY: y,
+    halfW: T.BUBBLE_RADIUS,
+    halfH: T.BUBBLE_RADIUS,
+  });
+
+  it('lands on a stationary bubble in open air', () => {
+    const r = room({ platforms: [[25, 1, 30]] });
+    const b = body(15, 60);
+    const bubble = ridable(b.x, 110);
+
+    for (let i = 0; i < 80 && b.ridingIndex < 0; i++) stepBody(r, b, [bubble]);
+    expect(b.ridingIndex).toBe(0);
+    expect(b.onGround).toBe(true);
+    expect(b.y + b.halfH).toBeCloseTo(bubble.y - bubble.halfH, 4);
+  });
+
+  /** The one that was broken. A rising lip must still catch a falling body. */
+  it('lands on a bubble that is rising to meet it', () => {
+    const r = room({ platforms: [[25, 1, 30]] });
+    const b = body(15, 60);
+    const bubble = ridable(b.x, 130);
+
+    for (let i = 0; i < 200 && b.ridingIndex < 0; i++) {
+      bubble.prevY = bubble.y;
+      bubble.y -= T.BUBBLE_RISE_SPEED;
+      stepBody(r, b, [bubble]);
+    }
+    expect(b.ridingIndex).toBe(0);
+    expect(b.y + b.halfH).toBeCloseTo(bubble.y - bubble.halfH, 4);
+  });
+
+  it('stays on a rising bubble rather than sinking through or bouncing off', () => {
+    const r = room({ platforms: [[25, 1, 30]] });
+    const b = body(15, 60);
+    const bubble = ridable(b.x, 130);
+
+    for (let i = 0; i < 200 && b.ridingIndex < 0; i++) {
+      bubble.prevY = bubble.y;
+      bubble.y -= T.BUBBLE_RISE_SPEED;
+      stepBody(r, b, [bubble]);
+    }
+    expect(b.ridingIndex).toBe(0);
+
+    // Now ride it for a while: the player must keep going up with it.
+    const startedAt = b.y;
+    for (let i = 0; i < 60; i++) {
+      bubble.prevY = bubble.y;
+      bubble.y -= T.BUBBLE_RISE_SPEED;
+      stepBody(r, b, [bubble]);
+      expect(b.ridingIndex, `lost the bubble on frame ${i}`).toBe(0);
+      expect(b.y + b.halfH).toBeCloseTo(bubble.y - bubble.halfH, 4);
+    }
+    expect(b.y).toBeLessThan(startedAt - 10); // carried meaningfully upward
+  });
+
+  /** Bouncing off a bubble is how you reach the top of a room — a ride that cannot be
+   *  jumped from is just a slow lift. */
+  it('can be jumped from, and the jump clears more than the bubble alone', () => {
+    const r = room({ platforms: [[25, 1, 30]] });
+    const p = new Player(15, 24);
+    const idle = emptyActions();
+    p.step(r, idle);
+    expect(p.body.onGround).toBe(true);
+
+    // Hung so the feet clear its lip at the apex. The jump raises the feet 32wu, so a
+    // lip more than that above them is unreachable however correct the riding code is.
+    const bubble = ridable(p.body.x, p.body.y - 14);
+    for (let i = 0; i < 200 && p.body.ridingIndex < 0; i++) {
+      p.step(r, i === 0 ? { ...idle, jumpPressed: true } : idle, [bubble]);
+    }
+    expect(p.body.ridingIndex).toBe(0);
+
+    const fromBubble = p.body.y;
+    p.step(r, { ...idle, jumpPressed: true }, [bubble]);
+    expect(p.body.vy).toBeLessThan(0); // it launched
+
+    let peak = p.body.y;
+    for (let i = 0; i < 40; i++) {
+      p.step(r, idle, [bubble]);
+      peak = Math.min(peak, p.body.y);
+    }
+    // Higher than the bubble it launched from, by roughly a jump's worth.
+    expect(peak).toBeLessThan(fromBubble - T.TILE * 2);
+  });
+
+  it('passes up through a bubble from below, exactly as it does a platform', () => {
+    const r = room({ platforms: [[25, 1, 30]] });
+    const b = body(15, 120);
+    const bubble = ridable(b.x, 100);
+    b.vy = -T.JUMP_VELOCITY;
+
+    for (let i = 0; i < 10; i++) {
+      stepBody(r, b, [bubble]);
+      expect(b.ridingIndex).toBe(-1);
+    }
+    expect(b.y).toBeLessThan(100);
+  });
+});

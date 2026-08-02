@@ -76,6 +76,8 @@ export type ItemKind =
   | 'crossBlue'
   | 'crossRed'
   | 'diamond'
+  | 'doorSilver'
+  | 'doorGold'
   /** Dropped by chains, not by counters. */
   | 'extend'
   /** Dropped by dead monsters. */
@@ -109,6 +111,8 @@ export const ITEM_SPECS: Record<ItemKind, ItemSpec> = {
   crossBlue: { kind: 'crossBlue', label: 'Blue cross', points: 3000, colour: '#4a9cff', note: 'THE ROOM FLOODS' },
   crossRed: { kind: 'crossRed', label: 'Red cross', points: 3000, colour: '#ff5a4a', note: 'THE ROOM BURNS' },
   diamond: { kind: 'diamond', label: 'Diamond', points: 7000, colour: '#9ce8ff', note: '' },
+  doorSilver: { kind: 'doorSilver', label: 'Silver door', points: 1000, colour: '#c8d0d8', note: 'A WAY THROUGH' },
+  doorGold: { kind: 'doorGold', label: 'Gold door', points: 3000, colour: '#ffd166', note: 'A LONG WAY THROUGH' },
   extend: { kind: 'extend', label: 'EXTEND letter', points: 500, colour: '#ffd166', note: '' },
   fruit: { kind: 'fruit', label: 'Fruit', points: 0, colour: '#7ad85a', note: '' },
 };

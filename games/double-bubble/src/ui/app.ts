@@ -30,6 +30,16 @@ import type { SpecialBubble } from '@/game/room';
 import { tierFor, type ItemKind } from '@/data/items';
 import { readCounters } from '@/game/counters';
 import { EXTEND_WORD, hasLetter } from '@/game/score';
+import {
+  advance,
+  doorFor,
+  newCampaign,
+  persist,
+  recordDeath,
+  secretRoomFor,
+  type CampaignState,
+} from '@/game/campaign';
+import { roomFor, secretRoom } from '@/data/rooms';
 
 /** Frames per walk-cycle frame. */
 const RUN_ANIM_PERIOD = 7;
@@ -77,6 +87,14 @@ export class App implements LoopHost {
   /** The M1 measurement readout. Toggled with F1. */
   showMeter = false;
 
+  /** The run. Owns the room number, the score, the counters and the deathless flags. */
+  private readonly campaign: CampaignState = newCampaign();
+  /** Frames the between-rooms card is held before the next room loads. */
+  private interlude = 0;
+  private interludeText = '';
+  /** The secret room being visited, if any — the campaign returns here afterwards. */
+  private inSecret: number | null = null;
+
   constructor(
     private readonly display: Display,
     private readonly devices: Devices<Action>,
@@ -123,11 +141,91 @@ export class App implements LoopHost {
       if (this.devices.keyboard.wasCodePressed('KeyR')) this.setRoom(this.room, this.roomNumber);
     }
 
+    if (this.interlude > 0) {
+      if (--this.interlude === 0) this.loadNextRoom();
+      this.fx.step();
+      return;
+    }
+
     this.world.step(a);
     // Drained every step rather than every frame, so a burst is never missed when the
     // loop catches up on a backlog and steps twice between draws.
     this.fx.consume(this.world.events);
     this.fx.step();
+
+    if (this.world.phase !== 'playing') this.endRoom();
+  }
+
+  /**
+   * The room is over, one way or another.
+   *
+   * A death is recorded against the RUN, not the room, because that is what the secret
+   * doors are gated on — one life lost anywhere closes every door for the rest of the
+   * run, and the tracking has to survive the room that lost it.
+   */
+  private endRoom(): void {
+    const w = this.world;
+    if (w.livesLostHere > 0) {
+      for (let i = 0; i < w.livesLostHere; i++) recordDeath(this.campaign);
+      w.livesLostHere = 0;
+    }
+
+    if (w.phase === 'dead') {
+      this.interludeText = 'GAME OVER';
+      this.interlude = T.INTERLUDE_FRAMES * 2;
+      return;
+    }
+
+    if (w.doorTaken) {
+      const secret = secretRoomFor(this.campaign.room);
+      if (w.doorTaken === 'silver' && secret) {
+        this.inSecret = this.campaign.room;
+        advance(this.campaign, { door: 'silver' });
+        this.interludeText = 'A DOOR OPENS';
+      } else {
+        advance(this.campaign, { door: 'gold' });
+        this.interludeText = 'A LONG WAY THROUGH';
+      }
+    } else if (this.inSecret !== null) {
+      // Coming back out of a secret room resumes the run where it paused.
+      this.inSecret = null;
+      advance(this.campaign);
+      this.interludeText = 'ROOM CLEAR';
+    } else {
+      advance(this.campaign, { warp: w.warpRooms || 1 });
+      this.interludeText = w.warpRooms > 1 ? `SKIP ${w.warpRooms}` : 'ROOM CLEAR';
+    }
+
+    persist(this.campaign);
+    this.interlude = T.INTERLUDE_FRAMES;
+  }
+
+  private loadNextRoom(): void {
+    if (this.world.phase === 'dead') {
+      // Start over, but the counters survive — they belong to the player, not the run.
+      const counters = this.campaign.counters;
+      Object.assign(this.campaign, newCampaign(counters));
+    }
+
+    const secret = this.inSecret !== null ? secretRoom(this.inSecret) : null;
+    const next = secret ?? roomFor(this.campaign.room);
+    this.roomNumber = this.campaign.room;
+    this.room = next;
+
+    const theme = themeForRoom(this.roomNumber);
+    if (theme !== this.theme) {
+      this.theme = theme;
+      this.tiles = buildTileSet(theme);
+    }
+
+    this.world = new World(next, this.roomNumber, this.campaign.score, this.campaign.counters);
+    this.fx.clear();
+
+    // Only offer a door in a real room — a secret room does not lead to another one.
+    if (!secret) {
+      const door = doorFor(this.campaign);
+      if (door) this.world.offerDoor(door);
+    }
   }
 
   draw(): void {
@@ -442,9 +540,52 @@ export class App implements LoopHost {
     }
     ctx.restore();
 
-    if (w.hurryUp && w.phase === 'playing') this.drawBanner(ctx, layout, 'HURRY UP!', '#ff5b4a');
-    if (w.phase === 'cleared') this.drawBanner(ctx, layout, 'ROOM CLEAR', '#6fe3c4');
-    if (w.phase === 'dead') this.drawBanner(ctx, layout, 'GAME OVER', '#8a9099');
+    if (this.interlude > 0) {
+      this.drawBanner(
+        ctx,
+        layout,
+        this.interludeText,
+        this.interludeText === 'GAME OVER' ? '#8a9099' : '#6fe3c4',
+      );
+    } else if (w.hurryUp) {
+      this.drawBanner(ctx, layout, 'HURRY UP!', '#ff5b4a');
+    }
+
+    // A secret room's whole point is the message on the wall. Show it in cipher — a
+    // player who wants the gems can take them and leave, and one who wants the lore has
+    // something to chew on. DESIGN.md §3.10.
+    if (this.room.secret) this.drawCryptogram(ctx, layout, this.room.secret.cipher);
+  }
+
+  /** The encoded message carved into a secret room. */
+  private drawCryptogram(ctx: CanvasRenderingContext2D, layout: Layout, cipher: string): void {
+    const pf = layout.playfield;
+    const s = layout.uiScale;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(10 * s)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+
+    // Wrap by words so it never runs off the playfield at a narrow window.
+    const words = cipher.split(' ');
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width > pf.w * 0.8 && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(line);
+
+    const lh = Math.round(15 * s);
+    const top = pf.y + pf.h * 0.16;
+    ctx.fillStyle = 'rgba(255,255,255,.34)';
+    lines.forEach((l, i) => ctx.fillText(l, pf.x + pf.w / 2, top + i * lh));
+    ctx.restore();
   }
 
   private drawBanner(

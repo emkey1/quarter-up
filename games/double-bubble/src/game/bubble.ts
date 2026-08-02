@@ -52,6 +52,9 @@ export interface Bubble {
   /** Frames of push still being applied, so a shove coasts rather than stopping dead. */
   pushFrames: number;
   pushDir: -1 | 1;
+  /** Where this bubble was before the current step. A rider's one-way test needs the
+   *  lip's previous position to mean anything — see physics.ts Ridable.prevY. */
+  prevY: number;
   /** Frames spent floating, driving the wobble. */
   age: number;
   /** Wobble offset, derived from the spawn position so identical starts stay identical
@@ -86,6 +89,7 @@ export function spawnBubble(x: number, y: number, dir: -1 | 1, range: 'normal' |
     dead: false,
     pushFrames: 0,
     pushDir: 1,
+    prevY: y,
     age: 0,
     // Position, not an id or a counter: identical starts must trace identical paths.
     wobblePhase:
@@ -170,6 +174,10 @@ function collide(room: RoomData, b: Bubble): void {
  * the room and this module has no business doing that.
  */
 export function stepBubble(room: RoomData, b: Bubble): void {
+  // Recorded before anything moves: a rider's one-way test is evaluated against where
+  // this lip was, not where it ends up.
+  b.prevY = b.y;
+
   if (b.phase === 'fired') {
     b.fireFrames--;
     const total = T.BUBBLE_FIRE_FRAMES;

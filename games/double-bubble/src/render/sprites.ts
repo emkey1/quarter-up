@@ -411,6 +411,14 @@ const ITEM_SHAPES: Partial<Record<ItemKind, (p: Px, c: number) => void>> = {
   sweetYellow: (p, c) => sweet(p, c),
   sweetBlue: (p, c) => sweet(p, c),
   sweetPurple: (p, c) => sweet(p, c),
+  doorSilver: (p, c) => door(p, c),
+  doorGold: (p, c) => door(p, c),
+  diamond: (p, c) => {
+    // A cut stone: flat top, tapering to a point.
+    for (let i = 0; i < 5; i++) p.rect(c - 5 + i, c + 1 + i, 11 - i * 2, 1, P.Base);
+    p.rect(c - 5, c - 3, 11, 4, P.Light);
+    p.rect(c - 3, c - 3, 2, 4, P.Lightest);
+  },
   potion: (p, c) => {
     // A flask: narrow neck, round belly, stopper.
     p.ellipse(c, c + 2, 4.6, 4.2, P.Base);
@@ -473,6 +481,14 @@ function umbrella(p: Px, c: number): void {
   p.rect(c - 6, c + 2, 13, 1, P.Dark);
   p.rect(c, c + 2, 1, 5, P.Outline);
   p.rect(c - 2, c + 6, 3, 1, P.Outline);
+}
+
+/** An arched doorway. It has to read as a way OUT, not as another thing to collect. */
+function door(p: Px, c: number): void {
+  p.rect(c - 5, c - 2, 10, 8, P.Base);
+  for (let i = 0; i < 4; i++) p.rect(c - 5 + i, c - 6 + i, 10 - i * 2, 1, P.Base);
+  p.rect(c - 3, c + 1, 6, 5, P.Outline);
+  p.ellipse(c + 2, c + 3, 1, 1, P.Lightest);
 }
 
 function ring(p: Px, c: number): void {

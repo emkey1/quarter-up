@@ -98,6 +98,8 @@ export class World {
   freezeFrames = 0;
   /** Rooms to skip, set by an umbrella. The caller advances and clears it. */
   warpRooms = 0;
+  /** Set when the player walks into a secret door. The caller decides where it leads. */
+  doorTaken: 'silver' | 'gold' | null = null;
   /** Distance walked since the last screen crossing was counted. */
   private walked = 0;
 
@@ -265,13 +267,18 @@ export class World {
       this.bump('screenCrossings');
     }
 
-    // A rider gets carried by whatever it is standing on. Doing it here rather than
-    // inside the physics keeps that layer ignorant of bubbles.
+    /*
+     * A rider gets carried sideways by whatever it is standing on. Doing it here rather
+     * than inside the physics keeps that layer ignorant of bubbles.
+     *
+     * HORIZONTALLY ONLY. resolveY has already snapped the rider onto the lip at its
+     * current height, so the vertical carry is baked in; adding it again moves the
+     * player a second time, lifting them clear of the bubble every frame and dropping
+     * them back next frame. The ride is meant to be a lift, not a vibration.
+     */
     const idx = this.player.body.ridingIndex;
     if (idx >= 0 && idx < this.bubbles.length) {
-      const b = this.bubbles[idx];
-      this.player.body.x += b.vx;
-      this.player.body.y += b.vy;
+      this.player.body.x += this.bubbles[idx].vx;
     }
   }
 
@@ -389,6 +396,13 @@ export class World {
         }
         break;
       case 'diamond':
+        break;
+      case 'doorSilver':
+      case 'doorGold':
+        // A door is a way out of the room, not a reward taken inside it. The campaign
+        // decides where it leads; the room's job is only to end.
+        this.doorTaken = kind === 'doorGold' ? 'gold' : 'silver';
+        this.phase = 'cleared';
         break;
       case 'fruit':
         this.bump('fruitEaten');
@@ -651,13 +665,40 @@ export class World {
     if (this.baron && baronHits(this.baron, b0.x, b0.y, b0.halfW, b0.halfH)) this.killPlayer();
   }
 
+  /**
+   * Offer a secret door.
+   *
+   * Placed by the campaign, which is the only thing that knows whether the run is still
+   * clean. It goes on the far side of the room: a door you fall into by accident is not
+   * a reward for a deathless run, it is a coin toss.
+   */
+  offerDoor(kind: 'silver' | 'gold'): void {
+    const startX = this.room.playerStart.x * T.TILE + T.TILE / 2;
+    const x = Math.max(T.TILE * 2, Math.min(ROOM_W - T.TILE * 2, ROOM_W - startX));
+    this.pickups.push(spawnPickup(kind === 'gold' ? 'doorGold' : 'doorSilver', x, T.TILE * 2));
+  }
+
+  /** True while the player has lost no lives in this room. The campaign tracks the run. */
+  livesLostHere = 0;
+
   private killPlayer(): void {
     this.score.lives--;
+    this.livesLostHere++;
     if (this.score.lives <= 0) {
       this.phase = 'dead';
       return;
     }
     this.player.respawn(this.room.playerStart.x, this.room.playerStart.y);
+
+    /*
+     * A moment of grace on respawn.
+     *
+     * The generator now keeps monsters clear of the start point, but monsters MOVE — one
+     * can be standing there by the time you come back, and without this you die on the
+     * frame you reappear, respawn onto it again, and lose every remaining life in about
+     * a second with no input possible. Losing a life must never cost you the next one.
+     */
+    this.player.invulnFrames = T.RESPAWN_INVULN_FRAMES;
 
     // The Baron leaves when it takes a life, and the clock starts over. Otherwise a
     // player who dies at speed 3.0 respawns into something already unsurvivable and

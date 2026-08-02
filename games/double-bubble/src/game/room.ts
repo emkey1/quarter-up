@@ -102,6 +102,14 @@ export interface RoomData {
   /** Frames before HURRY UP flashes and the Baron starts his approach. */
   timer: number;
   specialBubbles: SpecialBubble[];
+  /**
+   * Present only on secret rooms: an encoded message hinting at the true ending.
+   *
+   * The plaintext ships alongside the cipher deliberately. This is lore hidden behind a
+   * puzzle, not a secret being kept from the process that renders it, and having both
+   * means the game can offer a decoded version once the player has earned it.
+   */
+  secret?: { plain: string; cipher: string };
 }
 
 export type ValidationResult =
@@ -199,6 +207,16 @@ export function validateRoom(input: unknown): ValidationResult {
     }
   }
 
+  const rawSecret = o.secret as Record<string, unknown> | undefined;
+  let secret: { plain: string; cipher: string } | undefined;
+  if (rawSecret !== undefined) {
+    if (typeof rawSecret?.plain !== 'string' || typeof rawSecret?.cipher !== 'string') {
+      errors.push('secret: needs both a plain and a cipher string');
+    } else {
+      secret = { plain: rawSecret.plain, cipher: rawSecret.cipher };
+    }
+  }
+
   if (errors.length > 0 || !grid || !drift || !id || !ps) return { ok: false, errors };
 
   return {
@@ -213,6 +231,7 @@ export function validateRoom(input: unknown): ValidationResult {
       escapeFrames: num(o.escapeFrames, T.ESCAPE_FRAMES),
       timer: num(o.timer, T.ROOM_TIMER),
       specialBubbles,
+      ...(secret ? { secret } : {}),
     },
   };
 }

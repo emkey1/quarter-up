@@ -7,6 +7,7 @@ import { capture, spawnBubble, resetBubbleIds } from '@/game/bubble';
 import { resetMonsterIds } from '@/game/monster';
 import { MONSTER_SPECS } from '@/data/roster';
 import room001Json from '@/data/rooms/r001.json';
+import { predictJump } from '@/game/physics';
 
 function room(spec: {
   platforms?: [number, number, number][];
@@ -507,5 +508,116 @@ describe('projectiles in play', () => {
     expect(w.monsters.length).toBe(2);
     expect(Number.isFinite(w.player.body.x)).toBe(true);
     expect(Number.isFinite(w.player.body.y)).toBe(true);
+  });
+});
+
+describe('riding a bubble in play', () => {
+  /**
+   * The physics-level test covers the one-way rule against a rising lip. This covers the
+   * wiring: that World actually hands the bubbles to the player as ridables, that the
+   * horizontal carry works, and that the rider is not shaken off by the vertical carry
+   * being applied twice.
+   *
+   * Riding is the primary route to platforms a jump cannot reach (DESIGN.md §3.3), so
+   * "the player falls through every bubble" is not a cosmetic bug — it removes a whole
+   * traversal verb.
+   */
+  const open = () =>
+    room({
+      platforms: [[25, 1, 30]], // floor only; everything above is clear air
+      spawns: [{ kind: 'zenchan', x: 29, y: 24, dir: 1 }],
+      playerStart: { x: 15, y: 24 },
+    });
+
+  function bubbleUnder(w: World, x: number, y: number) {
+    w.bubbles.length = 0;
+    w.step(blow());
+    const b = w.bubbles[0];
+    b.phase = 'free';
+    b.fireFrames = 0;
+    b.life = 1_000_000;
+    b.x = x;
+    b.y = y;
+    b.prevY = y;
+    return b;
+  }
+
+  it('catches a falling player on a rising bubble', () => {
+    const w = new World(open());
+    const p = w.player.body;
+    const b = bubbleUnder(w, 120, 150);
+    p.x = 120;
+    p.y = 60;
+    p.vx = 0;
+    p.vy = 0;
+
+    for (let f = 0; f < 300 && p.ridingIndex < 0; f++) w.step(idle());
+
+    expect(p.ridingIndex).toBeGreaterThanOrEqual(0);
+    expect(p.onGround).toBe(true);
+    expect(p.y + p.halfH).toBeCloseTo(b.y - b.halfH, 3);
+  });
+
+  it('carries the rider upward instead of shaking them off', () => {
+    const w = new World(open());
+    const p = w.player.body;
+    const b = bubbleUnder(w, 120, 150);
+    p.x = 120;
+    p.y = 60;
+    p.vx = 0;
+    p.vy = 0;
+
+    for (let f = 0; f < 300 && p.ridingIndex < 0; f++) w.step(idle());
+    expect(p.ridingIndex).toBeGreaterThanOrEqual(0);
+
+    const startedAt = p.y;
+    let ridden = 0;
+    for (let f = 0; f < 120; f++) {
+      w.step(idle());
+      if (p.ridingIndex >= 0) ridden++;
+    }
+    // Still aboard for most of the ride, and meaningfully higher than it started.
+    expect(ridden).toBeGreaterThan(90);
+    expect(p.y).toBeLessThan(startedAt - T.TILE);
+    void b;
+  });
+
+  /**
+   * The point of the whole mechanic: a ride goes higher than a jump can.
+   *
+   * The apex is four tiles, so anything beyond that is bubble-only territory. If a ride
+   * cannot beat a jump there is no reason to ever stand on one.
+   */
+  it('carries the player higher than a jump could reach', () => {
+    const w = new World(open());
+    const p = w.player.body;
+    const floor = 25 * T.TILE;
+
+    // What an ordinary jump from the floor achieves, for comparison.
+    const jumpApex = predictJump().apex;
+
+    // The real sequence: a bubble leaves at head height and rises, and you jump on top
+    // of it as it goes past. Starting it resting on the floor gives a window where its
+    // lip is within a jump of the player's feet — start it higher and it is already
+    // out of reach on frame one, however correct the riding code is.
+    bubbleUnder(w, 120, floor - 24);
+    p.x = 120;
+    p.y = 60;
+    p.vx = 0;
+    p.vy = 0;
+
+    for (let f = 0; f < 400 && p.ridingIndex < 0; f++) w.step(idle());
+    expect(p.ridingIndex).toBeGreaterThanOrEqual(0);
+
+    const boardedAt = p.y;
+    let highest = p.y;
+    for (let f = 0; f < 900; f++) {
+      w.step(idle());
+      if (p.ridingIndex >= 0) highest = Math.min(highest, p.y);
+      if (w.bubbles.length === 0) break;
+    }
+
+    // A bubble climbs to the ceiling, so the ride is worth far more than one jump.
+    expect(boardedAt - highest).toBeGreaterThan(jumpApex);
   });
 });

@@ -184,6 +184,12 @@ export const T = {
    *  really about herding — see DESIGN.md §3.8. */
   CHAIN_BASE: 1000,
   STARTING_LIVES: 3,
+  /** Super Mode is the same hundred rooms run faster, so one dial rather than a second
+   *  tuning table. See DESIGN.md §4. */
+  SUPER_MODE_SPEED: 1.35,
+  /** How long the between-rooms card is held. Long enough to read, short enough that
+   *  a run of forty rooms is not mostly card. */
+  INTERLUDE_FRAMES: 90,
 
   // ---------------------------------------------------------------- items [i]
   /** Frames a dropped pickup survives before fading. Long enough to chase one down
@@ -237,6 +243,8 @@ export const T = {
   POTION_FRUIT_COUNT: 14,
   /** How long a clock holds the monsters still. */
   CLOCK_FREEZE_FRAMES: 480,
+  /** Grace period after respawning. Losing a life must never cost you the next one. */
+  RESPAWN_INVULN_FRAMES: 120,
   /** How long a heart makes the player untouchable. */
   HEART_INVULN_FRAMES: 600,
   /** Points a ring pays per jump / per bubble popped / per step taken. */

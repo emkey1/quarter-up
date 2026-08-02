@@ -49,13 +49,34 @@ describe('validateRoom', () => {
     expect([...r.data.drift].every((d) => d === Drift.None)).toBe(true);
   });
 
-  it('reads the drift field when present', () => {
+  /**
+   * Tests the FORMAT, not the content. This used to assert which rows of room 1 carried
+   * a current, which quietly became a test of one hand-authored room — and broke the
+   * moment the rooms were generated instead. What matters here is that a drift grid
+   * round-trips; whether room 1 flows right along row 3 is a level-design question and
+   * belongs with the level tests.
+   */
+  it('reads a drift field when present', () => {
+    const rows = new Array<string>(T.GRID_H).fill('.'.repeat(T.GRID_W));
+    rows[4] = 'r'.repeat(T.GRID_W);
+    rows[5] = 'l'.repeat(T.GRID_W);
+    rows[6] = 'u'.repeat(T.GRID_W);
+    rows[7] = 'd'.repeat(T.GRID_W);
+
+    const r = validateRoom(goodRoom({ drift: rows }));
+    if (!r.ok) throw new Error(r.errors.join('\n'));
+
+    expect(driftAt(r.data, 10, 4)).toBe(Drift.Right);
+    expect(driftAt(r.data, 10, 5)).toBe(Drift.Left);
+    expect(driftAt(r.data, 10, 6)).toBe(Drift.Up);
+    expect(driftAt(r.data, 10, 7)).toBe(Drift.Down);
+    expect(driftAt(r.data, 10, 8)).toBe(Drift.None);
+  });
+
+  it('gives the shipped first room a current somewhere, so bubbles are never static', () => {
     const r = validateRoom(room001);
     if (!r.ok) throw new Error('unreachable');
-    // Room 1 runs a rightward current along the top four rows.
-    expect(driftAt(r.data, 10, 0)).toBe(Drift.Right);
-    expect(driftAt(r.data, 10, 3)).toBe(Drift.Right);
-    expect(driftAt(r.data, 10, 4)).toBe(Drift.None);
+    expect([...r.data.drift].some((d) => d !== Drift.None)).toBe(true);
   });
 
   it('applies tuning defaults for the optional clocks', () => {

@@ -90,6 +90,21 @@ export interface Ridable {
   y: number;
   halfW: number;
   halfH: number;
+  /**
+   * Where it was before this frame's move.
+   *
+   * Load-bearing, and the reason riding a bubble did not work at all. The one-way test
+   * asks whether the body's underside CROSSED the lip this step, and with a static
+   * platform the current lip is the same as the previous one so the distinction never
+   * comes up. A bubble rises. It can climb past the body's previous underside, at which
+   * point "was I above the lip last frame?" answers no — against the lip's *new*
+   * position — and the body is waved through as though it had been below all along.
+   * The player fell straight through every bubble they tried to stand on.
+   *
+   * Comparing against where the lip WAS puts the test back in the platform's own frame
+   * of reference, which is the only frame in which "did I cross it" means anything.
+   */
+  prevY: number;
 }
 
 /**
@@ -135,7 +150,8 @@ export function resolveY(room: RoomData, b: Body, ridables: readonly Ridable[] =
       const r = ridables[i];
       if (b.x + b.halfW <= r.x - r.halfW || b.x - b.halfW >= r.x + r.halfW) continue;
       const surface = r.y - r.halfH;
-      if (prevBottom > surface) continue; // already below it when the step began
+      // Against where the lip WAS, not where it now is — see Ridable.prevY.
+      if (prevBottom > r.prevY - r.halfH) continue;
       if (bottom < surface) continue;
       if (surface < bestSurface) {
         bestSurface = surface;

@@ -24,6 +24,11 @@ export interface JumpMeter {
   lastAirtime: number;
 }
 
+/** Which way to look from a given start column: inward, never at the nearest wall. */
+export function facingInto(tileX: number): -1 | 1 {
+  return tileX < T.GRID_W / 2 ? 1 : -1;
+}
+
 export class Player {
   readonly body: Body;
   facing: -1 | 1 = 1;
@@ -55,6 +60,7 @@ export class Player {
   private launchY = 0;
 
   constructor(startTileX: number, startTileY: number) {
+    this.facing = facingInto(startTileX);
     // Spawn standing ON the given tile: its centre column, its top edge under our feet.
     this.body = makeBody(
       startTileX * T.TILE + T.TILE / 2,
@@ -64,7 +70,15 @@ export class Player {
     );
   }
 
-  /** Put the player back at the room's start, keeping upgrades but clearing motion. */
+  /**
+   * Put the player back at the room's start, keeping upgrades but clearing motion.
+   *
+   * Facing is derived from where in the room you land, not fixed. Always facing right
+   * means a right-hand start has you looking at a wall with the room — and whatever is
+   * coming out of it — behind you. You cannot blow a bubble at something you are not
+   * facing, so the first thing a player did on those rooms was turn around, and on a
+   * bad one they were dead before they managed it.
+   */
   respawn(tileX: number, tileY: number): void {
     const b = this.body;
     b.x = tileX * T.TILE + T.TILE / 2;
@@ -73,7 +87,7 @@ export class Player {
     b.vy = 0;
     b.onGround = false;
     b.ridingIndex = -1;
-    this.facing = 1;
+    this.facing = facingInto(tileX);
     this.pose = 'idle';
     this.jump.airborne = 0;
     this.jump.apex = 0;
