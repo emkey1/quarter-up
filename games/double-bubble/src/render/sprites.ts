@@ -1,5 +1,7 @@
 import { Px, P, ramp, palette } from './pixel';
 import { T } from '@/data/tuning';
+import { MONSTER_SPECS, type ProjectileKind } from '@/data/roster';
+import type { MonsterKind } from '@/game/room';
 import type { PlayerPose } from '@/game/player';
 
 /**
@@ -172,62 +174,230 @@ export function buildBubbleSprites(): HTMLCanvasElement[] {
 
 /* ------------------------------------------------------------------ monsters */
 
-const ZEN_CALM = palette(ramp('#4a7de8'), ramp('#ffd166'), ramp('#ffffff'));
-const ZEN_ANGRY = palette(ramp('#e8564a'), ramp('#ffd166'), ramp('#ffffff'));
-
 /**
- * Zen-Chan: a box-shaped clockwork walker.
- *
- * Boxy on purpose. It is the first thing the player ever sees and it has to read as
- * "mechanical, predictable, patrols" at 24 pixels — every later monster is a deviation
- * from this silhouette, so this one needs to be the plainest.
+ * Every monster is drawn in the same box at the same size, so the roster reads as a
+ * family and the differences carry meaning. What varies is the silhouette — and it has
+ * to vary enough to tell them apart in a crowded room at speed, because knowing which
+ * one is the flier decides whether the tier you are standing on is safety.
  */
-function zenChan(step: number): Px {
+function eyes(p: Px, cx: number, cy: number, spacing = 4): void {
+  p.ellipse(cx + 1, cy, 2.6, 2.8, P.Base3);
+  p.ellipse(cx + 1 + spacing, cy, 2.6, 2.8, P.Base3);
+  p.ellipse(cx + 2, cy, 1.2, 1.5, P.Outline3);
+  p.ellipse(cx + 2 + spacing, cy, 1.2, 1.5, P.Outline3);
+}
+
+type ShapeFn = (p: Px, cx: number, cy: number, half: number, step: number) => void;
+
+const SHAPES: Record<MonsterKind, ShapeFn> = {
+  /** Boxy on purpose — the plainest silhouette, so the rest can deviate from it. */
+  zenchan: (p, cx, cy, half, step) => {
+    p.rect(cx - half, cy - half, half * 2, half * 2, P.Base);
+    p.rect(cx - half + 2, cy - half + 2, half * 2 - 4, 3, P.Light);
+    p.rect(cx - half - 3, cy - 3, 3, 6, P.Base2); // wind-up key on the back
+    eyes(p, cx, cy - 2);
+    const lift = step === 0 ? 1 : -1;
+    p.rect(cx - half + 1, cy + half - lift, 4, 3, P.Dark);
+    p.rect(cx + half - 5, cy + half + lift, 4, 3, P.Dark);
+  },
+
+  /** A robe: narrow at the shoulders, flared at the hem, and no legs showing. */
+  mighta: (p, cx, cy, half, step) => {
+    for (let i = 0; i < half * 2; i++) {
+      const w = 5 + (i / (half * 2)) * (half - 1);
+      p.rect(cx - w, cy - half + i, w * 2, 1, P.Base);
+    }
+    p.ellipse(cx, cy - half + 3, 6, 5, P.Base);
+    eyes(p, cx, cy - half + 3);
+    p.rect(cx - half + (step === 0 ? 0 : 2), cy + half - 1, half * 2 - 2, 2, P.Dark);
+  },
+
+  /** A finned blob. No feet at all — the read has to be "this does not walk". */
+  monsta: (p, cx, cy, half, step) => {
+    p.ellipse(cx, cy, half + 2, half - 1, P.Base);
+    const flap = step === 0 ? 2 : -2;
+    p.ellipse(cx - half - 1, cy + flap, 4, 2.5, P.Base2);
+    p.ellipse(cx + half + 1, cy - flap, 4, 2.5, P.Base2);
+    p.ellipse(cx, cy + half - 3, half - 2, 2.5, P.Light);
+    eyes(p, cx, cy - 2);
+  },
+
+  /** Round and soft with heavy lobes; drifts rather than travels. */
+  pulpul: (p, cx, cy, half, step) => {
+    p.ellipse(cx, cy, half, half, P.Base);
+    const bob = step === 0 ? 1 : -1;
+    p.ellipse(cx - half + 1, cy + 2 + bob, 3.5, 4, P.Base2);
+    p.ellipse(cx + half - 1, cy + 2 - bob, 3.5, 4, P.Base2);
+    p.ellipse(cx, cy + half - 4, half - 3, 3, P.Light);
+    eyes(p, cx, cy - 3);
+  },
+
+  /** A coil. Reads as "stored energy", which is exactly what it is. */
+  banebou: (p, cx, cy, half, step) => {
+    const squash = step === 0 ? 1 : -1;
+    p.ellipse(cx, cy - 2, half, half - 2 + squash, P.Base);
+    for (let i = 0; i < 3; i++) {
+      const y = cy + half - 5 + i * 2 + squash;
+      p.rect(cx - half + 2 + (i % 2), y, half * 2 - 4, 1, P.Base2);
+    }
+    eyes(p, cx, cy - 4);
+  },
+
+  /** Spined and lean — the first monster whose shots you cannot outrun. */
+  hidegons: (p, cx, cy, half, step) => {
+    p.ellipse(cx, cy, half, half - 1, P.Base);
+    for (let i = 0; i < 4; i++) {
+      const sx = cx - half + 1 + i * 3;
+      p.line(sx, cy - half + 2, sx - 2, cy - half - 2, P.Base2);
+    }
+    p.ellipse(cx + half - 3, cy + 1, 4, 3, P.Light);
+    eyes(p, cx, cy - 3);
+    const lift = step === 0 ? 1 : -1;
+    p.rect(cx - 4, cy + half - 1 - lift, 3, 3, P.Dark);
+    p.rect(cx + 2, cy + half - 1 + lift, 3, 3, P.Dark);
+  },
+
+  /** Pointed hat and a staff. Height stops being safety when this one appears. */
+  drunk: (p, cx, cy, half, step) => {
+    p.ellipse(cx, cy + 1, half - 1, half - 1, P.Base);
+    for (let i = 0; i < 7; i++) {
+      const w = half - 1 - i * 1.4;
+      if (w > 0) p.rect(cx - w, cy - half - 2 + i, w * 2, 1, P.Base2);
+    }
+    p.rect(cx + half - 1, cy - half + 2, 2, half * 2 - 2, P.Dark2); // staff
+    eyes(p, cx - 1, cy);
+    const lift = step === 0 ? 1 : -1;
+    p.rect(cx - 4, cy + half - 1 - lift, 3, 3, P.Dark);
+    p.rect(cx + 1, cy + half - 1 + lift, 3, 3, P.Dark);
+  },
+
+  /** Blocky and symmetrical, with legs that alternate. An obvious late arrival. */
+  invader: (p, cx, cy, half, step) => {
+    p.rect(cx - half, cy - half + 2, half * 2, half + 2, P.Base);
+    p.rect(cx - half + 2, cy - half, half * 2 - 4, 3, P.Base);
+    p.rect(cx - half - 2, cy - 2, 2, 5, P.Base2);
+    p.rect(cx + half, cy - 2, 2, 5, P.Base2);
+    eyes(p, cx, cy - 2);
+    const legs = step === 0 ? 0 : 2;
+    p.rect(cx - half + legs, cy + half, 3, 3, P.Dark);
+    p.rect(cx + half - 3 - legs, cy + half, 3, 3, P.Dark);
+  },
+};
+
+function monsterFrame(kind: MonsterKind, step: number): Px {
   const n = SPRITE_PX;
   const p = new Px(n, n);
-  const cx = n / 2;
+  const cx = Math.round(n / 2);
   const cy = Math.round(n * 0.56);
-  const half = T.MONSTER_HALF * T.ART_SCALE;
+  SHAPES[kind](p, cx, cy, T.MONSTER_HALF * T.ART_SCALE, step);
+  p.shadePass(P.Outline);
+  p.outline(P.Outline);
+  return p;
+}
 
-  p.rect(cx - half, cy - half, half * 2, half * 2, P.Base);
-  p.rect(cx - half + 2, cy - half + 2, half * 2 - 4, 3, P.Light);
+/** Angry monsters shift toward red, so the state is readable across the room. */
+function monsterPalette(kind: MonsterKind, angry: boolean): string[] {
+  const base = MONSTER_SPECS[kind].colour;
+  return palette(
+    ramp(angry ? lerpHex(base, '#ff3020', 0.72) : base),
+    ramp('#ffd166'),
+    ramp('#ffffff'),
+  );
+}
 
-  // Wind-up key on the back, so facing is legible even when it is standing still.
-  p.rect(cx - half - 3, cy - 3, 3, 6, P.Base2);
-  p.set(cx - half - 4, cy - 1, P.Dark2);
+export interface MonsterSprites {
+  /** [kind][angry][step][facing] — facing 0 = left, 1 = right. */
+  readonly byKind: Record<MonsterKind, [HTMLCanvasElement, HTMLCanvasElement][][]>;
+}
 
-  // Eyes
-  p.ellipse(cx + 1, cy - 2, 2.6, 2.8, P.Base3);
-  p.ellipse(cx + 5, cy - 2, 2.6, 2.8, P.Base3);
-  p.ellipse(cx + 2, cy - 2, 1.2, 1.5, P.Outline3);
-  p.ellipse(cx + 6, cy - 2, 1.2, 1.5, P.Outline3);
+/** Raw buffers, measurable without a DOM. */
+export function buildMonsterFrames(kind: MonsterKind = 'zenchan'): Px[] {
+  return [monsterFrame(kind, 0), monsterFrame(kind, 1)];
+}
 
-  // Feet alternate so the walk cycle is visible at this size.
-  const lift = step === 0 ? 1 : -1;
-  p.rect(cx - half + 1, cy + half - lift, 4, 3, P.Dark);
-  p.rect(cx + half - 5, cy + half + lift, 4, 3, P.Dark);
+export function buildMonsterSprites(): MonsterSprites {
+  const byKind = {} as MonsterSprites['byKind'];
+  for (const kind of Object.keys(MONSTER_SPECS) as MonsterKind[]) {
+    const frames = buildMonsterFrames(kind);
+    byKind[kind] = [false, true].map((angry) => {
+      const pal = monsterPalette(kind, angry);
+      return frames.map((px) => {
+        const right = px.toCanvas(pal);
+        const left = px.mirrorX().toCanvas(pal);
+        return [left, right] as [HTMLCanvasElement, HTMLCanvasElement];
+      });
+    });
+  }
+  return { byKind };
+}
+
+/* ------------------------------------------------------------------ the Baron */
+
+/**
+ * Baron von Blubba: a bleached Monsta with nothing behind the eyes.
+ *
+ * Deliberately built from the flier's silhouette. It should read as something that used
+ * to be a monster — familiar shape, wrong colour, hollow — rather than as a new enemy,
+ * because it is not an enemy. It is the clock.
+ */
+export function baronFrame(step: number): Px {
+  const n = SPRITE_PX;
+  const p = new Px(n, n);
+  const cx = Math.round(n / 2);
+  const cy = Math.round(n * 0.56);
+  const half = T.BARON_HALF * T.ART_SCALE;
+
+  p.ellipse(cx, cy, half + 2, half - 1, P.Base);
+  const flap = step === 0 ? 2 : -2;
+  p.ellipse(cx - half - 1, cy + flap, 4, 2.5, P.Base);
+  p.ellipse(cx + half + 1, cy - flap, 4, 2.5, P.Base);
+
+  // Hollow sockets rather than eyes.
+  p.ellipse(cx - 4, cy - 2, 3, 3.4, P.Outline);
+  p.ellipse(cx + 4, cy - 2, 3, 3.4, P.Outline);
+  // Ribs.
+  for (let i = 0; i < 3; i++) p.rect(cx - half + 3, cy + 3 + i * 2, half * 2 - 6, 1, P.Darkest);
 
   p.shadePass(P.Outline);
   p.outline(P.Outline);
   return p;
 }
 
-export interface MonsterSprites {
-  /** [angry][step][facing] — facing 0 = left, 1 = right. */
-  readonly zenchan: [HTMLCanvasElement, HTMLCanvasElement][][];
+export function buildBaronSprites(): HTMLCanvasElement[] {
+  const pal = palette(ramp('#e8ecf0'));
+  return [baronFrame(0).toCanvas(pal), baronFrame(1).toCanvas(pal)];
 }
 
-export function buildMonsterFrames(): Px[] {
-  return [zenChan(0), zenChan(1)];
+/* ------------------------------------------------------------------ projectiles */
+
+const PROJECTILE_COLOURS: Record<ProjectileKind, string> = {
+  boulder: '#9a9384',
+  fireball: '#ff8a3d',
+  bottle: '#7ad85a',
+};
+
+export function projectileFrame(kind: ProjectileKind): Px {
+  const n = 16;
+  const p = new Px(n, n);
+  const c = n / 2;
+  const r = T.PROJECTILE_HALF * T.ART_SCALE;
+
+  if (kind === 'bottle') {
+    p.rect(c - 2, c - r, 4, r * 2, P.Base);
+    p.rect(c - 1, c - r - 2, 2, 3, P.Dark);
+  } else {
+    p.ellipse(c, c, r, r, P.Base);
+    if (kind === 'fireball') p.ellipse(c - 1, c - 1, r - 1.5, r - 1.5, P.Lightest);
+    else p.ellipse(c + 1, c + 1, r - 2, r - 2, P.Dark);
+  }
+  p.outline(P.Outline);
+  return p;
 }
 
-export function buildMonsterSprites(): MonsterSprites {
-  const frames = buildMonsterFrames();
-  const forPalette = (pal: string[]) =>
-    frames.map((px) => {
-      const right = px.toCanvas(pal);
-      const left = px.mirrorX().toCanvas(pal);
-      return [left, right] as [HTMLCanvasElement, HTMLCanvasElement];
-    });
-  return { zenchan: [forPalette(ZEN_CALM), forPalette(ZEN_ANGRY)] };
+export function buildProjectileSprites(): Record<ProjectileKind, HTMLCanvasElement> {
+  const out = {} as Record<ProjectileKind, HTMLCanvasElement>;
+  for (const kind of Object.keys(PROJECTILE_COLOURS) as ProjectileKind[]) {
+    out[kind] = projectileFrame(kind).toCanvas(palette(ramp(PROJECTILE_COLOURS[kind])));
+  }
+  return out;
 }

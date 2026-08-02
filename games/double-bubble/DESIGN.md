@@ -2,13 +2,18 @@
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** M2 complete — bubbles work: lifecycle, drift, packing, riding, pushing and
-> chain pops, against Zen-Chan. A room is clearable and a three-chain pays 4,000.
-> The rest of the roster, the hurry-up and the Baron are M3. See §11.
+> **Status:** M3 complete — the full eight-monster roster on its introduction schedule,
+> projectiles, the hurry-up and Baron von Blubba. Items and the counter system are M4.
+> See §11.
 >
 > Outstanding from M1: the physics constants are still `[i]` placeholders. They are
 > internally consistent and instrumented (F1 shows measured against predicted, in the
 > units a frame-stepped clip yields) but they have not been measured against footage.
+>
+> Two behaviours flagged in play, both awaiting a look at reference footage before
+> anyone "fixes" them: a captive that escapes at point-blank range kills with no
+> reaction time, and the Baron closes continuously rather than in discrete timed steps
+> (§3.7 documents the latter as a deliberate deviation).
 
 ---
 

@@ -126,24 +126,39 @@ export const T = {
   BUBBLE_SPAWN_CLEARANCE: 4,
 
   // ---------------------------------------------------------------- monsters [i]
-  MONSTER_SPEED: 0.55,
-  MONSTER_SPEED_ANGRY: 0.95,
-  /** Per-frame chance of jumping for a higher tier while the player is above. Low on
-   *  purpose — a walker that beelines the instant you climb is a meaner game. */
-  MONSTER_JUMP_CHANCE: 0.012,
-  MONSTER_JUMP_CHANCE_ANGRY: 0.03,
+  // Per-kind speeds, climb rates and projectiles live in data/roster.ts — they are the
+  // roster's shape, not loose constants. Only what every monster shares is here.
+  /** Multiplier applied to a kind's climb chance once it is angry. */
+  ANGRY_CLIMB_MULTIPLIER: 2.5,
+  /** Frames a hopper spends grounded between hops. */
+  HOP_INTERVAL: 26,
+  /** How far a flier drifts vertically per frame while sweeping. */
+  FLOAT_AMPLITUDE: 0.35,
+  FLOAT_PERIOD: 150,
+
+  // ---------------------------------------------------------------- projectiles [i]
+  PROJECTILE_HALF: 3,
+  /** Upward kick on a lobbed bottle, so it clears the thrower's own tier. */
+  BOTTLE_LAUNCH_SPEED: 1.9,
+  /** A monster will not throw unless the player is roughly on its level — otherwise
+   *  flat shots are fired uselessly at the ceiling all room. */
+  THROW_ALIGN_WU: 24,
 
   // ---------------------------------------------------------------- room clock [i]
   /** Frames before HURRY UP flashes. */
   ROOM_TIMER: 1800,
   /** Frames between HURRY UP and the Baron entering. */
   BARON_DELAY: 600,
-  /** The Baron's step interval in frames, and how fast that interval decays. It must
-   *  read as inexorable rather than merely dangerous — DESIGN.md §8.4. */
-  BARON_INTERVAL_START: 26,
-  BARON_INTERVAL_MIN: 5,
-  BARON_INTERVAL_DECAY: 0.982,
-  BARON_STEP: 8,
+  /**
+   * The Baron closes at BARON_SPEED_START and gains BARON_ACCEL every frame until it
+   * caps. Tuned so a competent player has roughly 20–30 seconds before it becomes
+   * genuinely unsurvivable — long enough to finish a room you were nearly done with,
+   * short enough that camping is never the answer. DESIGN.md §8.4.
+   */
+  BARON_HALF: 7,
+  BARON_SPEED_START: 0.35,
+  BARON_SPEED_MAX: 3.2,
+  BARON_ACCEL: 0.0022,
 
   // ---------------------------------------------------------------- scoring
   /** Chain pops are exponential: 2^(n-1) * BASE. This single curve is why the game is

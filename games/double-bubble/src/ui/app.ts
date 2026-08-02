@@ -12,13 +12,16 @@ import { themeForRoom, type Theme } from '@/render/theme';
 import { drawRoom } from '@/render/room';
 import {
   ANGER_STEPS,
+  buildBaronSprites,
   buildBubbleSprites,
   buildMonsterSprites,
   buildPlayerSprites,
+  buildProjectileSprites,
   SPRITE_PX,
   type MonsterSprites,
   type PlayerSprites,
 } from '@/render/sprites';
+import type { ProjectileKind } from '@/data/roster';
 
 /** Frames per walk-cycle frame. */
 const RUN_ANIM_PERIOD = 7;
@@ -32,6 +35,9 @@ const FOOT_INSET_WU = 0.75;
 
 /** Sprite boxes are square and sized in world units. */
 const SPRITE_WU = SPRITE_PX / T.ART_SCALE;
+
+/** Above this many lives the HUD counts rather than drawing one glyph each. */
+const HEART_CAP = 5;
 
 /**
  * The cabinet shell and the play loop.
@@ -49,6 +55,8 @@ export class App implements LoopHost {
   private readonly playerArt: PlayerSprites;
   private readonly monsterArt: MonsterSprites;
   private readonly bubbleArt: HTMLCanvasElement[];
+  private readonly baronArt: HTMLCanvasElement[];
+  private readonly shotArt: Record<ProjectileKind, HTMLCanvasElement>;
 
   /** The M1 measurement readout. Toggled with F1. */
   showMeter = false;
@@ -65,6 +73,8 @@ export class App implements LoopHost {
     this.playerArt = buildPlayerSprites();
     this.monsterArt = buildMonsterSprites();
     this.bubbleArt = buildBubbleSprites();
+    this.baronArt = buildBaronSprites();
+    this.shotArt = buildProjectileSprites();
     this.world = new World(room, roomNumber);
   }
 
@@ -114,7 +124,9 @@ export class App implements LoopHost {
     // through the rim of the bubble holding it.
     this.drawMonsters(ctx, layout);
     this.drawPlayer(ctx, layout);
+    this.drawShots(ctx, layout);
     this.drawBubbles(ctx, layout);
+    this.drawBaron(ctx, layout);
 
     ctx.restore();
 
@@ -154,10 +166,39 @@ export class App implements LoopHost {
     const step = Math.floor(this.world.frame / MONSTER_ANIM_PERIOD) % 2;
     for (const m of this.world.monsters) {
       if (m.state === 'dead') continue;
-      const set = this.monsterArt.zenchan[m.angry ? 1 : 0];
+      const set = this.monsterArt.byKind[m.kind][m.angry ? 1 : 0];
       const art = set[step][m.dir < 0 ? 0 : 1];
       this.blit(ctx, layout, art, m.body.x, m.body.y + m.body.halfH);
     }
+  }
+
+  private drawShots(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const { playfield, pxPerWu } = layout;
+    for (const p of this.world.projectiles) {
+      const art = this.shotArt[p.kind];
+      const wu = art.width / T.ART_SCALE;
+      ctx.drawImage(
+        art,
+        playfield.x + (p.x - wu / 2) * pxPerWu,
+        playfield.y + (p.y - wu / 2) * pxPerWu,
+        wu * pxPerWu,
+        wu * pxPerWu,
+      );
+    }
+  }
+
+  private drawBaron(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const b = this.world.baron;
+    if (!b) return;
+    const { playfield, pxPerWu } = layout;
+    const step = Math.floor(this.world.frame / 6) % 2;
+    ctx.drawImage(
+      this.baronArt[step],
+      playfield.x + (b.x - SPRITE_WU / 2) * pxPerWu,
+      playfield.y + (b.y - SPRITE_WU / 2) * pxPerWu,
+      SPRITE_WU * pxPerWu,
+      SPRITE_WU * pxPerWu,
+    );
   }
 
   private drawBubbles(ctx: CanvasRenderingContext2D, layout: Layout): void {
@@ -195,7 +236,12 @@ export class App implements LoopHost {
 
     const top = pf.y - Math.round(18 * s);
     const score = w.score.points.toLocaleString();
-    const centre = `ROOM ${String(this.roomNumber).padStart(3, '0')}   ${w.liveMonsters.length} left   ${'♥'.repeat(Math.max(0, w.score.lives))}`;
+    // Hearts stop being countable past a handful, and repeating a glyph unbounded lets
+    // an extra-life run push a 99-character string through a width test that then hides
+    // the rest of the HUD. Past the cap, say the number.
+    const lives = Math.max(0, w.score.lives);
+    const hearts = lives <= HEART_CAP ? '♥'.repeat(lives) : `♥ x${lives}`;
+    const centre = `ROOM ${String(this.roomNumber).padStart(3, '0')}   ${w.liveMonsters.length} left   ${hearts}`;
     const pad = this.devices.gamepad.status;
     const device = pad.connected ? pad.label : `${this.devices.lastDevice} — no pad`;
 

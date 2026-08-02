@@ -295,6 +295,117 @@ describe('the room', () => {
     for (let i = 0; i < 3; i++) w.step(idle());
     expect(w.hurryUp).toBe(true);
   });
+});
+
+describe('the hurry-up and the Baron', () => {
+  /**
+   * A room the player can genuinely sit in unmolested, so only the clock is under test.
+   *
+   * The monster goes on an isolated tier it cannot leave — a walker turns at ledges, and
+   * only climbs toward a player *above* it. Sharing a floor with the player is not quiet:
+   * it crosses the room in about 350 frames, kills them, and the death resets the very
+   * clock these tests are timing.
+   */
+  const quiet = () =>
+    room({
+      platforms: [
+        [25, 1, 30],
+        [8, 10, 16],
+      ],
+      spawns: [{ kind: 'zenchan', x: 13, y: 7, dir: 1 }],
+      playerStart: { x: 5, y: 24 },
+      timer: 2,
+    });
+
+  /**
+   * The warning has to actually be a warning. If the Baron arrived with the text, a
+   * player reacting to HURRY UP would already be too late, and the whole point of
+   * flashing it would be lost.
+   */
+  it('gives the player a beat between HURRY UP and the Baron', () => {
+    const w = new World(quiet());
+    for (let i = 0; i < 3; i++) w.step(idle());
+    expect(w.hurryUp).toBe(true);
+    expect(w.baron).toBe(null);
+
+    for (let i = 0; i < T.BARON_DELAY - 2; i++) w.step(idle());
+    expect(w.baron).toBe(null);
+
+    for (let i = 0; i < 4; i++) w.step(idle());
+    expect(w.baron).not.toBe(null);
+  });
+
+  it('cannot be bubbled, popped, or killed — it is not an enemy, it is the clock', () => {
+    const w = new World(quiet());
+    for (let i = 0; i < T.BARON_DELAY + 8; i++) w.step(idle());
+    const baron = w.baron!;
+    expect(baron).toBeTruthy();
+
+    // Blow bubbles straight at it for a good while; it must still be there.
+    for (let i = 0; i < 200; i++) w.step(i % T.BUBBLE_COOLDOWN === 0 ? blow() : idle());
+    expect(w.baron).toBe(baron);
+  });
+
+  it('eventually kills a player who does nothing', () => {
+    const w = new World(quiet());
+    const lives = w.score.lives;
+    for (let i = 0; i < 60 * 90 && w.score.lives === lives; i++) w.step(idle());
+    expect(w.score.lives).toBeLessThan(lives);
+  });
+
+  /**
+   * Without this a player who dies at full Baron speed respawns into something already
+   * unsurvivable and loses their remaining lives in a couple of seconds.
+   */
+  it('leaves when it takes a life, and resets the clock', () => {
+    const w = new World(quiet());
+    for (let i = 0; i < 60 * 90 && w.baron === null; i++) w.step(idle());
+    expect(w.baron).not.toBe(null);
+
+    const lives = w.score.lives;
+    for (let i = 0; i < 60 * 90 && w.score.lives === lives; i++) w.step(idle());
+
+    expect(w.baron).toBe(null);
+    expect(w.hurryUp).toBe(false);
+    expect(w.timer).toBeGreaterThan(0);
+  });
+
+  it('leaves when the room is cleared', () => {
+    const w = new World(quiet());
+    for (let i = 0; i < 60 * 90 && w.baron === null; i++) w.step(idle());
+    expect(w.baron).not.toBe(null);
+
+    for (const m of w.monsters) m.state = 'dead';
+    w.step(idle());
+    expect(w.phase).toBe('cleared');
+    expect(w.baron).toBe(null);
+  });
+});
+
+describe('projectiles in play', () => {
+  it('costs a life when a thrown shot connects', () => {
+    const w = new World(
+      room({
+        spawns: [{ kind: 'hidegons', x: 14, y: 24, dir: -1 }],
+        playerStart: { x: 6, y: 24 },
+      }),
+    );
+    const lives = w.score.lives;
+    for (let i = 0; i < 60 * 20 && w.score.lives === lives; i++) w.step(idle());
+    expect(w.score.lives).toBeLessThan(lives);
+  });
+
+  it('clears shots in flight when the player dies, so a respawn is not walked into', () => {
+    const w = new World(
+      room({
+        spawns: [{ kind: 'hidegons', x: 14, y: 24, dir: -1 }],
+        playerStart: { x: 6, y: 24 },
+      }),
+    );
+    const lives = w.score.lives;
+    for (let i = 0; i < 60 * 20 && w.score.lives === lives; i++) w.step(idle());
+    expect(w.projectiles.length).toBe(0);
+  });
 
   it('runs room 1 for a while without throwing or losing its monsters', () => {
     const r = validateRoom(room001Json);

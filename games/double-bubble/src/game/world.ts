@@ -15,6 +15,8 @@ import {
   type Bubble,
 } from './bubble';
 import { spawnMonster, stepMonster, type Monster } from './monster';
+import { projectileHits, stepProjectile, type Projectile } from './projectile';
+import { baronHits, spawnBaron, stepBaron, type Baron } from './baron';
 import { chainScore, extendLetters, initialScore, type ScoreState } from './score';
 
 export type RoomPhase = 'playing' | 'cleared' | 'dead';
@@ -31,13 +33,19 @@ export class World {
   readonly player: Player;
   readonly bubbles: Bubble[] = [];
   readonly monsters: Monster[] = [];
+  readonly projectiles: Projectile[] = [];
   readonly score: ScoreState;
+
+  /** Invincible, unbubbleable, and only ever closer. Null until the hurry-up. */
+  baron: Baron | null = null;
 
   phase: RoomPhase = 'playing';
   frame = 0;
-  /** Counts down to HURRY UP. The Baron arrives in M3. */
+  /** Counts down to HURRY UP. */
   timer: number;
   hurryUp = false;
+  /** Frames since HURRY UP, counting down to the Baron's entrance. */
+  private baronDelay = 0;
 
   private blowCooldown = 0;
   private readonly rng: Rng;
@@ -65,7 +73,10 @@ export class World {
     if (this.phase !== 'playing') return;
     this.frame++;
 
-    if (this.timer > 0 && --this.timer === 0) this.hurryUp = true;
+    if (this.timer > 0 && --this.timer === 0) {
+      this.hurryUp = true;
+      this.baronDelay = T.BARON_DELAY;
+    }
 
     // Bubbles move first: the player's ride, push and pop decisions this frame are made
     // against where the bubbles actually are now, not where they were last frame.
@@ -79,15 +90,45 @@ export class World {
     this.resolveExpiry();
     this.interactWithBubbles();
 
+    const px = this.player.body.x;
+    const py = this.player.body.y;
     for (const m of this.monsters) {
-      if (m.state === 'walking') stepMonster(this.room, m, this.player.body.y, this.rng);
+      if (m.state !== 'walking') continue;
+      const r = stepMonster(this.room, m, px, py, this.rng);
+      if (r.threw) this.projectiles.push(r.threw);
     }
+
+    for (const p of this.projectiles) stepProjectile(this.room, p);
+    this.stepBaron();
 
     this.carryCaptives();
     this.checkPlayerHit();
     this.sweep();
 
-    if (this.liveMonsters.length === 0) this.phase = 'cleared';
+    if (this.liveMonsters.length === 0) {
+      this.phase = 'cleared';
+      this.baron = null;
+    }
+  }
+
+  /**
+   * The hurry-up, and what arrives after it.
+   *
+   * HURRY UP flashes first and the Baron follows a beat later, rather than both landing
+   * together: the warning has to be a warning. A player who reacts to the text should
+   * still be able to finish the room.
+   */
+  private stepBaron(): void {
+    if (!this.baron) {
+      if (!this.hurryUp) return;
+      if (this.baronDelay > 0) {
+        this.baronDelay--;
+        return;
+      }
+      this.baron = spawnBaron(this.player.body.x, this.player.body.y);
+      return;
+    }
+    stepBaron(this.baron, this.player.body.x, this.player.body.y);
   }
 
   private stepPlayer(a: ActionState): void {
@@ -247,6 +288,7 @@ export class World {
 
   private checkPlayerHit(): void {
     const b0 = this.player.body;
+
     for (const m of this.monsters) {
       if (m.state !== 'walking') continue;
       if (
@@ -257,6 +299,17 @@ export class World {
         return;
       }
     }
+
+    for (const p of this.projectiles) {
+      if (p.dead) continue;
+      if (projectileHits(p, b0.x, b0.y, b0.halfW, b0.halfH)) {
+        p.dead = true;
+        this.killPlayer();
+        return;
+      }
+    }
+
+    if (this.baron && baronHits(this.baron, b0.x, b0.y, b0.halfW, b0.halfH)) this.killPlayer();
   }
 
   private killPlayer(): void {
@@ -266,12 +319,24 @@ export class World {
       return;
     }
     this.player.respawn(this.room.playerStart.x, this.room.playerStart.y);
+
+    // The Baron leaves when it takes a life, and the clock starts over. Otherwise a
+    // player who dies at speed 3.0 respawns into something already unsurvivable and
+    // loses the rest of their lives in a couple of seconds.
+    this.baron = null;
+    this.hurryUp = false;
+    this.timer = this.room.timer;
+    this.projectiles.length = 0;
   }
 
-  /** Drop resolved bubbles. Done once at the end so indices stay stable all step. */
+  /** Drop resolved bubbles and spent shots. Done once at the end so indices stay stable
+   *  all step — the player's ridingIndex refers into the bubble array. */
   private sweep(): void {
     for (let i = this.bubbles.length - 1; i >= 0; i--) {
       if (this.bubbles[i].dead) this.bubbles.splice(i, 1);
+    }
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      if (this.projectiles[i].dead) this.projectiles.splice(i, 1);
     }
   }
 
