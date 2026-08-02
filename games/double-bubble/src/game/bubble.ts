@@ -116,6 +116,24 @@ function collide(room: RoomData, b: Bubble): void {
       b.y = ny;
     }
   }
+
+  /*
+   * The top of the room is a ceiling.
+   *
+   * Tile collision alone does not provide one: the rows above the highest tier are open
+   * air, so a bubble blown up there kept rising straight out of the playfield and drifted
+   * off to nowhere while its life ran down. Bubbles are supposed to *collect* along the
+   * ceiling — that pool is where the big clusters come from, and the exponential chain
+   * curve assumes you can build one. Losing them over the top quietly removed the best
+   * source of chains in every room.
+   *
+   * A room boundary rather than level data, because every room needs it and no room
+   * should have to remember to draw one.
+   */
+  if (b.y - b.halfH < 0) {
+    b.y = b.halfH;
+    b.vy = 0;
+  }
 }
 
 /**
@@ -241,6 +259,13 @@ export function separate(room: RoomData, bubbles: readonly Bubble[]): void {
  * out.
  */
 function unstick(room: RoomData, b: Bubble): void {
+  // The ceiling is a room boundary rather than a tile, so the tile scan below cannot
+  // see it. Separation happens after the motion pass, which means a crowded pool along
+  // the top can shove one member up through the ceiling, where it sits until the next
+  // step's clamp catches it. Clamp here too, so the invariant holds at every point in
+  // the frame rather than only at the end of it.
+  if (b.y - b.halfH < 0) b.y = b.halfH;
+
   const x0 = tileOf(b.x - b.halfW);
   const x1 = tileOf(b.x + b.halfW - 0.001);
   const y0 = tileOf(b.y - b.halfH);

@@ -86,7 +86,15 @@ export const T = {
   /** Purple sweet: bubbles travel *further*, not faster — more frames of push, same
    *  speed, so the arc a player has learned to aim still holds. */
   BUBBLE_FIRE_FRAMES_FAR: 32,
-  BUBBLE_RISE_SPEED: 0.35,
+  /**
+   * How fast a free bubble rises. [i]
+   *
+   * Lowered from 0.35 on a playtest note that bubbles climbed faster than the original's
+   * — at 0.35 a bubble crossed the full 28-tile room in about ten seconds, which reads
+   * as rising rather than floating. At 0.22 the same trip takes around seventeen, which
+   * leaves time to get under one and ride it.
+   */
+  BUBBLE_RISE_SPEED: 0.22,
   /** Frames a shove keeps acting, so a push coasts instead of stopping the instant
    *  contact breaks. Too short and herding a cluster is impossible; too long and
    *  bubbles feel magnetic. */

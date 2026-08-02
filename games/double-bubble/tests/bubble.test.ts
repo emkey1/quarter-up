@@ -168,6 +168,36 @@ describe('bubble lifecycle', () => {
     expect(b.life).toBe(0);
   });
 
+  /**
+   * Tile collision alone gives no ceiling: the rows above the highest tier are open air,
+   * so a bubble blown up there used to rise straight out of the playfield and drift off
+   * to nowhere. Bubbles are meant to POOL along the ceiling — that pool is where the big
+   * clusters come from, and the exponential chain curve assumes you can build one.
+   * Losing them over the top quietly removed the best source of chains in every room.
+   */
+  it('collects against the top of the room instead of leaving the playfield', () => {
+    const r = room({}); // nothing overhead at all
+    const b = spawnBubble(100, 40, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+    for (let i = 0; i < 2000; i++) stepBubble(r, b);
+    expect(b.y - b.halfH).toBeGreaterThanOrEqual(0);
+    expect(b.y - b.halfH).toBeCloseTo(0, 4);
+  });
+
+  it('never lets any bubble escape the room, wherever it starts', () => {
+    const r = room({ platforms: [[20, 4, 12]] });
+    for (let startY = 20; startY < 200; startY += 17) {
+      const b = spawnBubble(120, startY, 1, 'normal');
+      b.phase = 'free';
+      b.fireFrames = 0;
+      for (let i = 0; i < 1200; i++) {
+        stepBubble(r, b);
+        expect(b.y - b.halfH).toBeGreaterThanOrEqual(-0.001);
+      }
+    }
+  });
+
   /** Unlike a body, a bubble has no one-way behaviour — it collects under a platform. */
   it('rests against the underside of a platform rather than passing through', () => {
     const r = room({ platforms: [[10, 2, 20]] });
@@ -327,6 +357,19 @@ describe('separation', () => {
     const bubbles = [free(100, surface - 10), free(100, surface - 14)];
     separate(floored, bubbles);
     for (const b of bubbles) expect(b.y + b.halfH).toBeLessThanOrEqual(surface + 0.001);
+  });
+
+  /**
+   * The ceiling is a room boundary, not a tile, so the tile scan in unstick cannot see
+   * it. A crowded pool along the top shoves one member up through it, and nothing
+   * corrects that until the next motion step — the invariant has to hold at every point
+   * in the frame, not just at the end.
+   */
+  it('keeps a crowded ceiling pool inside the room', () => {
+    const open = room({});
+    const bubbles = [free(100, 8), free(100, 10), free(104, 9), free(96, 9)];
+    for (let i = 0; i < 20; i++) separate(open, bubbles);
+    for (const b of bubbles) expect(b.y - b.halfH).toBeGreaterThanOrEqual(-0.001);
   });
 
   it('lifts a bubble back out of a wall it was pushed into', () => {
