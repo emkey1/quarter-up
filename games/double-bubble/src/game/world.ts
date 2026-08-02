@@ -1,4 +1,4 @@
-import { T } from '@/data/tuning';
+import { T, ROOM_W } from '@/data/tuning';
 import { Rng } from '@/engine/rng';
 import type { ActionState } from './controls';
 import type { RoomData } from './room';
@@ -15,9 +15,24 @@ import {
   type Bubble,
 } from './bubble';
 import { spawnMonster, stepMonster, type Monster } from './monster';
+import { ITEM_SPECS, type CounterName, type ItemKind } from '@/data/items';
+import {
+  loadCounters,
+  saveCounters,
+  walkThresholds,
+  type Counters,
+} from './counters';
+import { fruitValue, pickupTouches, spawnPickup, stepPickup, type Pickup } from './item';
 import { projectileHits, stepProjectile, type Projectile } from './projectile';
 import { baronHits, spawnBaron, stepBaron, type Baron } from './baron';
-import { chainScore, extendLetters, initialScore, type ScoreState } from './score';
+import {
+  chainScore,
+  collectLetter,
+  extendLetters,
+  hasLetter,
+  initialScore,
+  type ScoreState,
+} from './score';
 
 export type RoomPhase = 'playing' | 'cleared' | 'dead';
 
@@ -36,7 +51,8 @@ export type WorldEvent =
   | { kind: 'bubblePop'; x: number; y: number }
   | { kind: 'monsterPop'; x: number; y: number; colour: string }
   | { kind: 'escape'; x: number; y: number }
-  | { kind: 'chain'; x: number; y: number; monsters: number; points: number };
+  | { kind: 'chain'; x: number; y: number; monsters: number; points: number }
+  | { kind: 'pickup'; x: number; y: number; item: ItemKind; note: string; points: number };
 
 /**
  * One room in play: the player, its bubbles, its monsters, and the clock.
@@ -51,7 +67,20 @@ export class World {
   readonly bubbles: Bubble[] = [];
   readonly monsters: Monster[] = [];
   readonly projectiles: Projectile[] = [];
+  readonly pickups: Pickup[] = [];
   readonly score: ScoreState;
+
+  /** The behaviour counters. Persist across sessions — see counters.ts. */
+  readonly counters: Counters;
+  /** What the counter walk awarded on entering this room, for the debug overlay. */
+  readonly awarded: { item: ItemKind | null; counter: CounterName | null };
+
+  /** Frames the monsters are held still by a clock. */
+  freezeFrames = 0;
+  /** Rooms to skip, set by an umbrella. The caller advances and clears it. */
+  warpRooms = 0;
+  /** Distance walked since the last screen crossing was counted. */
+  private walked = 0;
 
   /** Invincible, unbubbleable, and only ever closer. Null until the hurry-up. */
   baron: Baron | null = null;
@@ -75,14 +104,48 @@ export class World {
 
   constructor(
     readonly room: RoomData,
-    seed = 1,
+    readonly roomNumber = 1,
     score: ScoreState = initialScore(),
+    counters: Counters = loadCounters(),
   ) {
     this.player = new Player(room.playerStart.x, room.playerStart.y);
     this.score = score;
-    this.rng = new Rng(seed);
+    this.rng = new Rng(roomNumber);
     this.timer = room.timer;
+    this.counters = counters;
     for (const s of room.spawns) this.monsters.push(spawnMonster(s.kind, s.x, s.y, s.dir));
+
+    // Entering a room is itself a tracked behaviour, and the walk happens after it —
+    // so a player who simply keeps starting rooms eventually earns something.
+    this.counters.roomsStarted++;
+    this.awarded = walkThresholds(this.counters, roomNumber);
+    if (this.awarded.item) {
+      const at = this.itemSpawnPoint();
+      this.pickups.push(spawnPickup(this.awarded.item, at.x, at.y));
+    }
+    saveCounters(this.counters);
+  }
+
+  /**
+   * Where the room's award lands.
+   *
+   * Mirrored across the room from the player's start, and dropped from near the ceiling
+   * so it falls through the tiers on its way down. Spawning it above the player's head
+   * meant it fell straight onto them and was absorbed within a few frames of the room
+   * opening — the reward for thirty-five jumps arrived with no moment of noticing it,
+   * let alone going to get it. An item you have to cross the room for is the whole
+   * difference between a prize and a rounding error on the score.
+   */
+  private itemSpawnPoint(): { x: number; y: number } {
+    const startX = this.room.playerStart.x * T.TILE + T.TILE / 2;
+    const mirrored = ROOM_W - startX;
+    // Keep it off the walls, which are solid and would trap it.
+    const x = Math.max(T.TILE * 2, Math.min(ROOM_W - T.TILE * 2, mirrored));
+    return { x, y: T.TILE * 2 };
+  }
+
+  bump(name: CounterName, n = 1): void {
+    this.counters[name] += n;
   }
 
   get liveMonsters(): Monster[] {
@@ -96,7 +159,11 @@ export class World {
     if (this.timer > 0 && --this.timer === 0) {
       this.hurryUp = true;
       this.baronDelay = T.BARON_DELAY;
+      this.bump('hurryUps');
     }
+
+    if (this.freezeFrames > 0) this.freezeFrames--;
+    if (this.player.invulnFrames > 0) this.player.invulnFrames--;
 
     // Bubbles move first: the player's ride, push and pop decisions this frame are made
     // against where the bubbles actually are now, not where they were last frame.
@@ -112,13 +179,17 @@ export class World {
 
     const px = this.player.body.x;
     const py = this.player.body.y;
-    for (const m of this.monsters) {
-      if (m.state !== 'walking') continue;
-      const r = stepMonster(this.room, m, px, py, this.rng);
-      if (r.threw) this.projectiles.push(r.threw);
+    if (this.freezeFrames === 0) {
+      for (const m of this.monsters) {
+        if (m.state !== 'walking') continue;
+        const r = stepMonster(this.room, m, px, py, this.rng);
+        if (r.threw) this.projectiles.push(r.threw);
+      }
     }
 
     for (const p of this.projectiles) stepProjectile(this.room, p);
+    for (const p of this.pickups) stepPickup(this.room, p);
+    this.collectPickups();
     this.stepBaron();
 
     this.carryCaptives();
@@ -152,7 +223,30 @@ export class World {
   }
 
   private stepPlayer(a: ActionState): void {
+    const wasOnGround = this.player.body.onGround;
+    const beforeX = this.player.body.x;
+
     this.player.step(this.room, a, this.bubbles);
+
+    const p = this.player;
+
+    // --- behaviour tracking. Every one of these is a counter someone can learn to farm,
+    // which is the point: the reward system is discoverable by experiment alone.
+    if (a.jumpPressed && wasOnGround) {
+      this.bump('jumps');
+      if (p.rings.jump) this.score.points += T.RING_JUMP_POINTS;
+    }
+    if (p.body.wrapped) this.bump('falls');
+
+    // A "screen crossing" is cumulative distance rather than a literal wall-to-wall
+    // trip: pacing back and forth is the same behaviour and should count the same.
+    const moved = Math.abs(p.body.x - beforeX);
+    this.walked += moved;
+    if (p.rings.step) this.score.points += Math.round(moved) * T.RING_STEP_POINTS;
+    while (this.walked >= ROOM_W) {
+      this.walked -= ROOM_W;
+      this.bump('screenCrossings');
+    }
 
     // A rider gets carried by whatever it is standing on. Doing it here rather than
     // inside the physics keeps that layer ignorant of bubbles.
@@ -178,6 +272,97 @@ export class World {
       ),
     );
     this.blowCooldown = p.blowCooldown;
+    this.bump('bubblesBlown');
+  }
+
+  /**
+   * Collect anything the player is standing in.
+   *
+   * Eating is a tracked behaviour too — the heart is bought with fruit, and the rings
+   * are bought with sweets, so the item system feeds itself.
+   */
+  private collectPickups(): void {
+    const b0 = this.player.body;
+    for (const p of this.pickups) {
+      if (p.dead) continue;
+      if (!pickupTouches(p, b0.x, b0.y, b0.halfW, b0.halfH)) continue;
+
+      p.dead = true;
+      this.score.points += p.points;
+      this.applyItem(p.kind, p.letter);
+
+      this.events.push({
+        kind: 'pickup',
+        x: p.body.x,
+        y: p.body.y,
+        item: p.kind,
+        note: ITEM_SPECS[p.kind].note,
+        points: p.points,
+      });
+    }
+  }
+
+  /** What an item does. See data/items.ts for what each one is for. */
+  private applyItem(kind: ItemKind, letter: number): void {
+    const p = this.player;
+    switch (kind) {
+      case 'sweetYellow':
+        p.blowCooldown = T.BUBBLE_COOLDOWN_RAPID;
+        this.bump('sweetsYellow');
+        break;
+      case 'sweetBlue':
+        p.fastBubbles = true;
+        this.bump('sweetsBlue');
+        break;
+      case 'sweetPurple':
+        p.bubbleRange = 'far';
+        this.bump('sweetsPurple');
+        break;
+      case 'shoe':
+        p.speed = T.RUN_SPEED_FAST;
+        break;
+      case 'clock':
+        this.freezeFrames = T.CLOCK_FREEZE_FRAMES;
+        break;
+      case 'heart':
+        p.invulnFrames = T.HEART_INVULN_FRAMES;
+        break;
+      case 'ringPurple':
+        p.rings.jump = true;
+        break;
+      case 'ringRed':
+        p.rings.pop = true;
+        break;
+      case 'ringBlue':
+        p.rings.step = true;
+        break;
+      case 'umbrellaOrange':
+        this.warpRooms = 3;
+        this.phase = 'cleared';
+        break;
+      case 'umbrellaRed':
+        this.warpRooms = 5;
+        this.phase = 'cleared';
+        break;
+      case 'umbrellaPurple':
+        this.warpRooms = 7;
+        this.phase = 'cleared';
+        break;
+      case 'potion':
+        this.showerFruit();
+        break;
+      case 'fruit':
+        this.bump('fruitEaten');
+        break;
+      case 'extend':
+        // Completing the word grants a life AND ends the room — that is what makes the
+        // letters worth arranging a chain for rather than a bonus you drift into.
+        if (collectLetter(this.score, letter)) this.phase = 'cleared';
+        break;
+      case 'bell':
+        // Cosmetic: it chimes before a special appears. The event carries the note.
+        break;
+    }
   }
 
   /** A travelling bubble that touches a free monster traps it. */
@@ -188,6 +373,7 @@ export class World {
         if (m.state !== 'walking') continue;
         if (!overlaps(b, m.body.x, m.body.y, m.body.halfW, m.body.halfH)) continue;
         capture(b, m, this.room.escapeFrames);
+        this.bump('monstersBubbled');
         break;
       }
     }
@@ -302,6 +488,8 @@ export class World {
       } else {
         this.events.push({ kind: 'bubblePop', x: b.x, y: b.y });
         empties++;
+        this.bump('emptyPops');
+        if (this.player.rings.pop) this.score.points += T.RING_POP_POINTS;
       }
     }
 
@@ -323,6 +511,58 @@ export class World {
         points,
       });
     }
+
+    this.dropSpoils(chain, monsters, letters);
+  }
+
+  /**
+   * Fruit and EXTEND letters from a chain.
+   *
+   * Both scale with the chain, and both are scattered rather than stacked — a pile of
+   * pickups on one pixel reads as a single item and robs the player of the moment the
+   * chain was for. The fruit is half the reward the curve pays out; a player who never
+   * chains never sees the expensive kind and may not know it exists.
+   */
+  private dropSpoils(chain: readonly number[], monsters: number, letters: number): void {
+    if (monsters <= 0) return;
+    const value = fruitValue(monsters);
+
+    let dropped = 0;
+    for (const i of chain) {
+      const b = this.bubbles[i];
+      if (dropped >= monsters) break;
+      // Alternate the kick left and right so a big chain fans out.
+      const kick = (dropped % 2 === 0 ? 1 : -1) * T.FRUIT_SCATTER;
+      this.pickups.push(
+        spawnPickup('fruit', b.x, b.y, { points: value, vx: kick, vy: -0.8 }),
+      );
+      dropped++;
+    }
+
+    for (let i = 0; i < letters; i++) {
+      const slot = this.nextMissingLetter(i);
+      if (slot < 0) break;
+      const b = this.bubbles[chain[i % chain.length]];
+      this.pickups.push(
+        spawnPickup('extend', b.x, b.y, {
+          letter: slot,
+          vx: (i % 2 === 0 ? -1 : 1) * T.FRUIT_SCATTER * 1.4,
+          vy: -1.4,
+        }),
+      );
+    }
+  }
+
+  /** Letters the player still needs, skipping `skip` of them so one chain can drop
+   *  several distinct letters rather than several copies of the same one. */
+  private nextMissingLetter(skip: number): number {
+    let seen = 0;
+    for (let i = 0; i < 6; i++) {
+      if (hasLetter(this.score, i)) continue;
+      if (this.pickups.some((p) => !p.dead && p.kind === 'extend' && p.letter === i)) continue;
+      if (seen++ === skip) return i;
+    }
+    return -1;
   }
 
   /** A trapped monster rides inside its bubble. */
@@ -337,6 +577,8 @@ export class World {
   }
 
   private checkPlayerHit(): void {
+    // A heart makes the player untouchable outright — not merely harder to hit.
+    if (this.player.invulnFrames > 0) return;
     const b0 = this.player.body;
 
     for (const m of this.monsters) {
@@ -388,6 +630,32 @@ export class World {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       if (this.projectiles[i].dead) this.projectiles.splice(i, 1);
     }
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      if (this.pickups[i].dead) this.pickups.splice(i, 1);
+    }
+  }
+
+  /**
+   * A potion's payout: fruit rains across the whole room.
+   *
+   * Deliberately spread across the full width rather than dropped on the player. The
+   * reward is not the points, it is the thirty seconds of sprinting around collecting
+   * them — and it also quietly feeds the fruit counter that buys the heart.
+   */
+  private showerFruit(): void {
+    const n = T.POTION_FRUIT_COUNT;
+    for (let i = 0; i < n; i++) {
+      // Evenly spaced with a fixed stagger: repeatable, and never a single stack.
+      const x = ((i + 0.5) / n) * ROOM_W;
+      const y = ((i * 5) % 7) * T.TILE + T.TILE;
+      this.pickups.push(spawnPickup('fruit', x, y, { points: T.FRUIT_BASE }));
+    }
+  }
+
+  /** Persist the counters. Called when a room ends, so a session that is closed
+   *  mid-room does not lose the behaviour that earned the next item. */
+  persist(): void {
+    saveCounters(this.counters);
   }
 
   /** Redness of a bubble's captive, for the renderer. */

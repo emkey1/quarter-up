@@ -17,12 +17,16 @@ import {
   buildBubbleSprites,
   buildMonsterSprites,
   buildPlayerSprites,
+  buildItemSprites,
   buildProjectileSprites,
   SPRITE_PX,
   type MonsterSprites,
   type PlayerSprites,
 } from '@/render/sprites';
 import type { ProjectileKind } from '@/data/roster';
+import { tierFor, type ItemKind } from '@/data/items';
+import { readCounters } from '@/game/counters';
+import { EXTEND_WORD, hasLetter } from '@/game/score';
 
 /** Frames per walk-cycle frame. */
 const RUN_ANIM_PERIOD = 7;
@@ -58,7 +62,12 @@ export class App implements LoopHost {
   private readonly bubbleArt: HTMLCanvasElement[];
   private readonly baronArt: HTMLCanvasElement[];
   private readonly shotArt: Record<ProjectileKind, HTMLCanvasElement>;
+  private readonly itemArt: Partial<Record<ItemKind, HTMLCanvasElement>>;
   private readonly fx = new Fx();
+
+  /** The counter readout. Toggled with F2. Without it the hidden system is untestable
+   *  by hand — you cannot tell whether jumping is counted except by jumping 35 times. */
+  showCounters = false;
 
   /** The M1 measurement readout. Toggled with F1. */
   showMeter = false;
@@ -77,6 +86,7 @@ export class App implements LoopHost {
     this.bubbleArt = buildBubbleSprites();
     this.baronArt = buildBaronSprites();
     this.shotArt = buildProjectileSprites();
+    this.itemArt = buildItemSprites();
     this.world = new World(room, roomNumber);
   }
 
@@ -102,6 +112,7 @@ export class App implements LoopHost {
 
     if (stepIndex === 0) {
       if (this.devices.keyboard.wasCodePressed('F1')) this.showMeter = !this.showMeter;
+      if (this.devices.keyboard.wasCodePressed('F2')) this.showCounters = !this.showCounters;
       if (this.devices.keyboard.wasCodePressed('KeyR')) this.setRoom(this.room, this.roomNumber);
     }
 
@@ -131,6 +142,7 @@ export class App implements LoopHost {
     // through the rim of the bubble holding it.
     this.drawMonsters(ctx, layout);
     this.drawPlayer(ctx, layout);
+    this.drawPickups(ctx, layout);
     this.drawShots(ctx, layout);
     this.drawBubbles(ctx, layout);
     this.drawBaron(ctx, layout);
@@ -143,6 +155,63 @@ export class App implements LoopHost {
     this.drawFrame(ctx, layout);
     this.drawHud(ctx, layout);
     if (this.showMeter) this.drawMeter(ctx, layout);
+    if (this.showCounters) this.drawCounters(ctx, layout);
+  }
+
+  /**
+   * The counter readout.
+   *
+   * The hidden system is the heart of the game and completely invisible by design —
+   * which also makes it impossible to develop against. This shows every counter, its
+   * threshold at the current tier, and which item it is buying, so cause and effect can
+   * be checked in seconds rather than by jumping thirty-five times and hoping.
+   */
+  private drawCounters(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const pf = layout.playfield;
+    // Debug text tracks device pixels rather than uiScale: at a narrow window uiScale
+    // grows enough that this panel swallowed the entire playfield, which makes a tool
+    // for watching the game unusable for watching the game.
+    const s = Math.max(1, layout.dpr * 0.85);
+    const rows = readCounters(this.world.counters, this.roomNumber);
+
+    const pad = Math.round(9 * s);
+    const lh = Math.round(13 * s);
+    const w = Math.round(250 * s);
+    const h = pad * 2 + lh * (rows.length + 2);
+    const x = pf.x + pad;
+    const y = pf.y + pad;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(4,6,10,.85)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.font = `${Math.round(9 * s)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+
+    ctx.fillStyle = '#8a9099';
+    ctx.fillText(`COUNTERS   tier ${tierFor(this.roomNumber)}`, x + pad, y + pad);
+    const award = this.world.awarded;
+    ctx.fillStyle = award.item ? '#ffd166' : '#5a6068';
+    ctx.fillText(
+      award.item ? `awarded ${award.item} (${award.counter})` : 'awarded nothing this room',
+      x + pad,
+      y + pad + lh,
+    );
+
+    rows.forEach((r, i) => {
+      const ly = y + pad + lh * (i + 2);
+      ctx.fillStyle = r.ready ? '#6fe3c4' : '#6d7480';
+      ctx.fillText(r.counter, x + pad, ly);
+      ctx.fillStyle = r.ready ? '#6fe3c4' : '#cfd2d6';
+      ctx.fillText(`${r.value}/${r.next}`, x + pad + Math.round(112 * s), ly);
+      ctx.fillStyle = '#5a6068';
+      ctx.fillText(r.item, x + pad + Math.round(165 * s), ly);
+    });
+    ctx.restore();
   }
 
   /** Blit a square sprite box centred on a world position, bottom-aligned to `footY`. */
@@ -194,6 +263,36 @@ export class App implements LoopHost {
         wu * pxPerWu,
         wu * pxPerWu,
       );
+    }
+  }
+
+  private drawPickups(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const { playfield, pxPerWu } = layout;
+    for (const p of this.world.pickups) {
+      const x = playfield.x + p.body.x * pxPerWu;
+      const y = playfield.y + p.body.y * pxPerWu;
+
+      // A pickup blinks out as its life ends, so a player chasing one knows it is going.
+      if (p.life < 90 && Math.floor(p.life / 6) % 2 === 0) continue;
+
+      if (p.kind === 'extend') {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `700 ${Math.round(11 * layout.uiScale)}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.lineWidth = Math.max(2, 2 * layout.uiScale);
+        ctx.strokeStyle = 'rgba(4,6,10,.9)';
+        ctx.strokeText(EXTEND_WORD[p.letter], x, y);
+        ctx.fillStyle = hasLetter(this.world.score, p.letter) ? '#6d7480' : '#ffd166';
+        ctx.fillText(EXTEND_WORD[p.letter], x, y);
+        ctx.restore();
+        continue;
+      }
+
+      const art = this.itemArt[p.kind];
+      if (!art) continue;
+      const wu = art.width / T.ART_SCALE;
+      ctx.drawImage(art, x - (wu / 2) * pxPerWu, y - (wu / 2) * pxPerWu, wu * pxPerWu, wu * pxPerWu);
     }
   }
 

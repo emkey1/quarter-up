@@ -184,6 +184,29 @@ export const T = {
    *  really about herding — see DESIGN.md §3.8. */
   CHAIN_BASE: 1000,
   STARTING_LIVES: 3,
+
+  // ---------------------------------------------------------------- items [i]
+  /** Frames a dropped pickup survives before fading. Long enough to chase one down
+   *  through the vertical wrap, short enough that a room does not silt up. */
+  PICKUP_LIFETIME: 600,
+  PICKUP_FRICTION: 0.82,
+  /** Fruit value climbs on the same curve as the chain that dropped it — the corpses
+   *  are half the reward, and a player who never chains never sees the expensive ones. */
+  FRUIT_BASE: 500,
+  FRUIT_MAX: 6000,
+  /** Sideways kick on fruit as it drops, so a chain scatters rather than stacking. */
+  FRUIT_SCATTER: 0.9,
+
+  /** How much fruit a potion rains across the room. */
+  POTION_FRUIT_COUNT: 14,
+  /** How long a clock holds the monsters still. */
+  CLOCK_FREEZE_FRAMES: 480,
+  /** How long a heart makes the player untouchable. */
+  HEART_INVULN_FRAMES: 600,
+  /** Points a ring pays per jump / per bubble popped / per step taken. */
+  RING_JUMP_POINTS: 500,
+  RING_POP_POINTS: 100,
+  RING_STEP_POINTS: 10,
   /** EXTEND letters dropped, indexed by monsters popped in one chain. Index 0 and 1
    *  are unreachable (you cannot chain fewer than one) but keep the table 1:1 with n. */
   EXTEND_LETTERS: [0, 0, 0, 1, 2, 3, 4, 5, 6] as const,

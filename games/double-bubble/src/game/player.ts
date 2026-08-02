@@ -31,12 +31,25 @@ export class Player {
   /** Advances only while moving, so the walk cycle doesn't animate on the spot. */
   animFrame = 0;
 
+  // These are annotated `number` on purpose: T is `as const`, so a field initialised
+  // from it infers the literal type and every upgrade becomes a type error.
   /** Raised by the red shoe. See DESIGN.md §3.9. */
-  speed = T.RUN_SPEED;
+  speed: number = T.RUN_SPEED;
   /** Shortened by the yellow sweet. */
-  blowCooldown = T.BUBBLE_COOLDOWN;
+  blowCooldown: number = T.BUBBLE_COOLDOWN;
   /** Lengthened by the purple sweet. */
   bubbleRange: 'normal' | 'far' = 'normal';
+  /** Set by the blue sweet: bubbles travel faster without travelling further. */
+  fastBubbles = false;
+  /** Counts down while a heart is in effect. Nothing can touch the player. */
+  invulnFrames = 0;
+  /**
+   * Rings pay points for ordinary actions for the rest of the room.
+   *
+   * Worth far more than they look: a ring turns a habit the player already has into
+   * score, which is the same lesson the counter system teaches from the other side.
+   */
+  readonly rings = { jump: false, pop: false, step: false };
 
   readonly jump: JumpMeter = { airborne: 0, apex: 0, lastApex: 0, lastAirtime: 0 };
   private launchY = 0;

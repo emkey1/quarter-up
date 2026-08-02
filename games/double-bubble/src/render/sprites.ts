@@ -1,6 +1,7 @@
 import { Px, P, ramp, palette } from './pixel';
 import { T } from '@/data/tuning';
 import { MONSTER_SPECS, type ProjectileKind } from '@/data/roster';
+import { ITEM_SPECS, type ItemKind } from '@/data/items';
 import type { MonsterKind } from '@/game/room';
 import type { PlayerPose } from '@/game/player';
 
@@ -392,6 +393,115 @@ export function projectileFrame(kind: ProjectileKind): Px {
   }
   p.outline(P.Outline);
   return p;
+}
+
+/* ------------------------------------------------------------------ items */
+
+const ITEM_PX = 16;
+
+/**
+ * Item art.
+ *
+ * Silhouette carries the meaning, colour carries the variant: all three sweets are the
+ * same shape in different colours, all three umbrellas likewise. That is deliberate —
+ * a player who learns "round twist = sweet" can then read the colour as *which* sweet
+ * without being taught twice.
+ */
+const ITEM_SHAPES: Partial<Record<ItemKind, (p: Px, c: number) => void>> = {
+  sweetYellow: (p, c) => sweet(p, c),
+  sweetBlue: (p, c) => sweet(p, c),
+  sweetPurple: (p, c) => sweet(p, c),
+  potion: (p, c) => {
+    // A flask: narrow neck, round belly, stopper.
+    p.ellipse(c, c + 2, 4.6, 4.2, P.Base);
+    p.rect(c - 2, c - 5, 4, 5, P.Light);
+    p.rect(c - 3, c - 7, 6, 2, P.Dark);
+    p.ellipse(c - 1.6, c + 1, 1.4, 1.4, P.Lightest);
+  },
+  umbrellaOrange: (p, c) => umbrella(p, c),
+  umbrellaRed: (p, c) => umbrella(p, c),
+  umbrellaPurple: (p, c) => umbrella(p, c),
+  ringPurple: (p, c) => ring(p, c),
+  ringRed: (p, c) => ring(p, c),
+  ringBlue: (p, c) => ring(p, c),
+
+  shoe: (p, c) => {
+    p.rect(c - 5, c - 2, 7, 5, P.Base);
+    p.rect(c - 5, c + 2, 10, 3, P.Dark);
+    p.ellipse(c + 3, c + 1, 3, 2.5, P.Base);
+    p.rect(c - 4, c - 3, 4, 2, P.Light);
+  },
+  clock: (p, c) => {
+    p.ellipse(c, c, 6, 6, P.Base);
+    p.ellipse(c, c, 4.4, 4.4, P.Lightest);
+    p.line(c, c, c, c - 3, P.Outline);
+    p.line(c, c, c + 2, c + 1, P.Outline);
+    p.rect(c - 1, c - 8, 2, 2, P.Dark);
+  },
+  heart: (p, c) => {
+    p.ellipse(c - 2.6, c - 1.5, 3, 3, P.Base);
+    p.ellipse(c + 2.6, c - 1.5, 3, 3, P.Base);
+    for (let i = 0; i < 7; i++) p.rect(c - 5 + i, c + 0.5 + i, 11 - i * 2, 1, P.Base);
+    p.ellipse(c - 2.5, c - 2.5, 1.2, 1.2, P.Lightest);
+  },
+  bell: (p, c) => {
+    for (let i = 0; i < 7; i++) p.rect(c - 1 - i * 0.7, c - 5 + i, 2 + i * 1.4, 1, P.Base);
+    p.rect(c - 6, c + 2, 12, 2, P.Light);
+    p.ellipse(c, c + 5, 1.6, 1.6, P.Dark);
+    p.rect(c - 1, c - 7, 2, 2, P.Dark);
+  },
+  fruit: (p, c) => {
+    p.ellipse(c, c + 1, 5, 5, P.Base);
+    p.ellipse(c - 1.6, c - 0.6, 1.6, 1.6, P.Lightest);
+    p.rect(c - 1, c - 6, 2, 3, P.Outline);
+    p.ellipse(c + 3, c - 5, 2.6, 1.4, P.Light);
+  },
+};
+
+function sweet(p: Px, c: number): void {
+  p.ellipse(c, c, 4.6, 4.6, P.Base);
+  p.ellipse(c - 1.4, c - 1.4, 1.6, 1.6, P.Lightest);
+  // Wrapper twists either side — the shape that says "sweet" at 16 pixels.
+  p.line(c - 6, c - 3, c - 5, c + 3, P.Light);
+  p.line(c + 6, c - 3, c + 5, c + 3, P.Light);
+  p.line(c - 5, c, c - 6, c, P.Light);
+  p.line(c + 5, c, c + 6, c, P.Light);
+}
+
+function umbrella(p: Px, c: number): void {
+  for (let i = 0; i < 5; i++) p.rect(c - 6 + i, c - 3 + i, 13 - i * 2, 1, P.Base);
+  p.rect(c - 6, c + 2, 13, 1, P.Dark);
+  p.rect(c, c + 2, 1, 5, P.Outline);
+  p.rect(c - 2, c + 6, 3, 1, P.Outline);
+}
+
+function ring(p: Px, c: number): void {
+  p.ellipseOutline(c, c + 1, 4.6, 4.6, P.Base);
+  p.ellipseOutline(c, c + 1, 3.4, 3.4, P.Light);
+  p.ellipse(c, c - 5, 2, 2, P.Lightest);
+}
+
+export function itemFrame(kind: ItemKind): Px {
+  const p = new Px(ITEM_PX, ITEM_PX);
+  const shape = ITEM_SHAPES[kind];
+  if (!shape) {
+    // EXTEND letters are drawn as text by the renderer; anything else missing shows as
+    // an obvious placeholder rather than as nothing at all.
+    p.rect(4, 4, 8, 8, P.Base);
+  } else {
+    shape(p, ITEM_PX / 2);
+  }
+  p.outline(P.Outline);
+  return p;
+}
+
+export function buildItemSprites(): Partial<Record<ItemKind, HTMLCanvasElement>> {
+  const out: Partial<Record<ItemKind, HTMLCanvasElement>> = {};
+  for (const kind of Object.keys(ITEM_SPECS) as ItemKind[]) {
+    if (kind === 'extend') continue; // drawn as text
+    out[kind] = itemFrame(kind).toCanvas(palette(ramp(ITEM_SPECS[kind].colour)));
+  }
+  return out;
 }
 
 export function buildProjectileSprites(): Record<ProjectileKind, HTMLCanvasElement> {
