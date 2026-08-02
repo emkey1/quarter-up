@@ -114,6 +114,16 @@ export const T = {
   BUBBLE_CHAIN_SLACK: 3,
   /** How fast a bubble slides when the player walks into it front-first. */
   BUBBLE_PUSH_SPEED: 0.9,
+  /**
+   * Extra gap between the player's edge and a newly blown bubble, in wu.
+   *
+   * Without it a bubble spawns at exactly PLAYER_HALF_W + BUBBLE_RADIUS, which is
+   * precisely the overlap threshold — so the mildest nudge from separation tips it into
+   * contact and the player bursts their own bubble on the frame after blowing it. That
+   * makes accumulating a cluster impossible, which quietly removes the entire reason the
+   * chain curve exists.
+   */
+  BUBBLE_SPAWN_CLEARANCE: 4,
 
   // ---------------------------------------------------------------- monsters [i]
   MONSTER_SPEED: 0.55,

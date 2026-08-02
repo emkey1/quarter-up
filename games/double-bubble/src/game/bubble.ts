@@ -194,7 +194,7 @@ export function overlaps(
  * Symmetric, order-independent within a pass, and free of RNG, so the drift determinism
  * the chain setups depend on survives.
  */
-export function separate(bubbles: readonly Bubble[]): void {
+export function separate(room: RoomData, bubbles: readonly Bubble[]): void {
   for (let i = 0; i < bubbles.length; i++) {
     const a = bubbles[i];
     if (a.dead) continue;
@@ -223,6 +223,46 @@ export function separate(bubbles: readonly Bubble[]): void {
       a.y -= ny;
       b.x += nx;
       b.y += ny;
+    }
+  }
+
+  // Separation moves bubbles without consulting the room, so a crowded cluster can
+  // shove one into a wall or through the floor — where it sticks, because a bubble only
+  // rises and the collision pass has no downward motion to resolve. Push them back out.
+  for (const b of bubbles) if (!b.dead) unstick(room, b);
+}
+
+/**
+ * Lift a bubble out of any geometry it has been pushed into.
+ *
+ * Resolves along whichever axis needs the least movement, rather than testing faces in
+ * a fixed order — order-based resolution picks a direction by which face it happens to
+ * check first, so a bubble pushed well inside a tile gets shoved further in instead of
+ * out.
+ */
+function unstick(room: RoomData, b: Bubble): void {
+  const x0 = tileOf(b.x - b.halfW);
+  const x1 = tileOf(b.x + b.halfW - 0.001);
+  const y0 = tileOf(b.y - b.halfH);
+  const y1 = tileOf(b.y + b.halfH - 0.001);
+
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (!isFloor(tileAt(room, tx, ty))) continue;
+
+      const left = tx * T.TILE;
+      const top = ty * T.TILE;
+      const outUp = b.y + b.halfH - top;
+      const outDown = top + T.TILE - (b.y - b.halfH);
+      const outLeft = b.x + b.halfW - left;
+      const outRight = left + T.TILE - (b.x - b.halfW);
+
+      const least = Math.min(outUp, outDown, outLeft, outRight);
+      if (least === outUp) b.y -= outUp;
+      else if (least === outDown) b.y += outDown;
+      else if (least === outLeft) b.x -= outLeft;
+      else b.x += outRight;
+      return;
     }
   }
 }

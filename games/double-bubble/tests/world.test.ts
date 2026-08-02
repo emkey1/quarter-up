@@ -55,6 +55,44 @@ describe('firing', () => {
     expect(w.bubbles[0].x).toBeGreaterThan(w.player.body.x);
   });
 
+  /**
+   * The regression that made the whole game unplayable without failing a single test.
+   *
+   * Bubbles spawned at exactly PLAYER_HALF_W + BUBBLE_RADIUS — the overlap threshold —
+   * so once a second bubble existed, separation nudged one back into the player and it
+   * burst on the frame after being blown. Standing still and firing produced 1, 2, then
+   * 0 bubbles. Every unit test passed: each mechanic was individually correct, and the
+   * interaction between spawn distance and separation was what broke it.
+   *
+   * Without a cluster there are no chains, and without chains the exponential curve —
+   * the reason the game is about herding at all — is unreachable.
+   */
+  it('accumulates a cluster when the player stands still and keeps blowing', () => {
+    const w = new World(room({ spawns: [{ kind: 'zenchan', x: 28, y: 24, dir: -1 }] }));
+    w.step({ ...emptyActions(), moveX: 1 }); // face right, away from the monster's start
+
+    for (let volley = 0; volley < 4; volley++) {
+      w.step(blow());
+      for (let i = 0; i < T.BUBBLE_COOLDOWN; i++) w.step(idle());
+    }
+
+    expect(w.bubbles.length).toBe(4);
+    expect(w.score.points).toBe(0); // none of them were burst on the way out
+  });
+
+  it('does not let a bubble still in flight interact with the player', () => {
+    const w = new World(room({}));
+    w.step(blow());
+    const b = w.bubbles[0];
+    expect(b.phase).toBe('fired');
+
+    // Park it right on top of the player: it must still survive while under impulse.
+    b.x = w.player.body.x;
+    b.y = w.player.body.y;
+    w.step(idle());
+    expect(w.bubbles.length).toBe(1);
+  });
+
   it('rate-limits, so holding the button is not a stream', () => {
     const w = new World(room({}));
     for (let i = 0; i < 10; i++) w.step(blow());

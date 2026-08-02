@@ -70,7 +70,7 @@ export class World {
     // Bubbles move first: the player's ride, push and pop decisions this frame are made
     // against where the bubbles actually are now, not where they were last frame.
     for (const b of this.bubbles) stepBubble(this.room, b);
-    separate(this.bubbles);
+    separate(this.room, this.bubbles);
 
     this.stepPlayer(a);
     this.fire(a);
@@ -110,7 +110,7 @@ export class World {
     const p = this.player;
     this.bubbles.push(
       spawnBubble(
-        p.body.x + p.facing * (p.body.halfW + T.BUBBLE_RADIUS),
+        p.body.x + p.facing * (p.body.halfW + T.BUBBLE_RADIUS + T.BUBBLE_SPAWN_CLEARANCE),
         p.body.y,
         p.facing,
         p.bubbleRange,
@@ -180,6 +180,10 @@ export class World {
       const b = this.bubbles[i];
       if (b.dead) continue;
       if (i === b0.ridingIndex) continue;
+      // A bubble still under its firing impulse is travelling away from the mouth that
+      // blew it. Letting it interact means the player bursts their own bubble on the
+      // frame after blowing it, and a cluster can never be built.
+      if (b.phase === 'fired') continue;
       if (!overlaps(b, b0.x, b0.y, b0.halfW, b0.halfH)) continue;
 
       const dx = b.x - b0.x;

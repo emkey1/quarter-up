@@ -265,6 +265,8 @@ describe('captives', () => {
 /* ------------------------------------------------------------------ chains */
 
 describe('separation', () => {
+  // Open air, well clear of the floor, so these test separation alone.
+  const r = room({});
   const free = (x: number, y: number): Bubble => {
     const b = spawnBubble(x, y, 1, 'normal');
     b.phase = 'free';
@@ -274,14 +276,14 @@ describe('separation', () => {
 
   it('pushes overlapping bubbles apart until they only touch', () => {
     const bubbles = [free(100, 100), free(104, 100)];
-    for (let i = 0; i < 40; i++) separate(bubbles);
+    for (let i = 0; i < 40; i++) separate(r, bubbles);
     const gap = Math.hypot(bubbles[0].x - bubbles[1].x, bubbles[0].y - bubbles[1].y);
     expect(gap).toBeGreaterThanOrEqual(T.BUBBLE_RADIUS * 2 - 0.01);
   });
 
   it('separates bubbles blown from exactly the same point', () => {
     const bubbles = [free(100, 100), free(100, 100)];
-    for (let i = 0; i < 40; i++) separate(bubbles);
+    for (let i = 0; i < 40; i++) separate(r, bubbles);
     const gap = Math.hypot(bubbles[0].x - bubbles[1].x, bubbles[0].y - bubbles[1].y);
     expect(gap).toBeGreaterThan(0);
     expect(Number.isFinite(gap)).toBe(true);
@@ -289,7 +291,7 @@ describe('separation', () => {
 
   it('leaves bubbles that are already clear alone', () => {
     const bubbles = [free(100, 100), free(400, 100)];
-    separate(bubbles);
+    separate(r, bubbles);
     expect(bubbles[0].x).toBe(100);
     expect(bubbles[1].x).toBe(400);
   });
@@ -297,7 +299,7 @@ describe('separation', () => {
   it('stays deterministic', () => {
     const run = (): number[] => {
       const bubbles = [free(100, 100), free(103, 101), free(107, 99), free(100, 105)];
-      for (let i = 0; i < 10; i++) separate(bubbles);
+      for (let i = 0; i < 10; i++) separate(r, bubbles);
       return bubbles.flatMap((b) => [b.x, b.y]);
     };
     expect(run()).toEqual(run());
@@ -306,9 +308,33 @@ describe('separation', () => {
   it('ignores bubbles already resolved', () => {
     const bubbles = [free(100, 100), free(100, 100)];
     bubbles[1].dead = true;
-    separate(bubbles);
+    separate(r, bubbles);
     expect(bubbles[0].x).toBe(100);
     expect(bubbles[0].y).toBe(100);
+  });
+
+  /**
+   * Separation moves bubbles without consulting the room, so a crowded cluster can shove
+   * one through the floor — where it sticks forever, because a bubble only ever rises
+   * and the collision pass has no downward motion to resolve. Seen in play: the first
+   * bubble of a volley ended up 3wu below the floor surface and sat there.
+   */
+  it('lifts a bubble back out of the floor it was pushed into', () => {
+    const floored = room({ platforms: [[25, 1, 30]] });
+    const surface = 25 * T.TILE;
+    // Two bubbles stacked just above the floor: separating them drives the lower one
+    // through the surface, which is exactly what happened in play.
+    const bubbles = [free(100, surface - 10), free(100, surface - 14)];
+    separate(floored, bubbles);
+    for (const b of bubbles) expect(b.y + b.halfH).toBeLessThanOrEqual(surface + 0.001);
+  });
+
+  it('lifts a bubble back out of a wall it was pushed into', () => {
+    const walled = room({});
+    const inner = T.TILE; // the left wall's inside face
+    const bubbles = [free(inner + 12, 100), free(inner + 16, 100)];
+    separate(walled, bubbles);
+    for (const b of bubbles) expect(b.x - b.halfW).toBeGreaterThanOrEqual(inner - 0.001);
   });
 });
 

@@ -193,24 +193,43 @@ export class App implements LoopHost {
     ctx.textBaseline = 'top';
     ctx.font = `${Math.round(11 * s)}px ui-sans-serif, system-ui, sans-serif`;
 
+    const top = pf.y - Math.round(18 * s);
+    const score = w.score.points.toLocaleString();
+    const centre = `ROOM ${String(this.roomNumber).padStart(3, '0')}   ${w.liveMonsters.length} left   ${'♥'.repeat(Math.max(0, w.score.lives))}`;
+    const pad = this.devices.gamepad.status;
+    const device = pad.connected ? pad.label : `${this.devices.lastDevice} — no pad`;
+
+    // Three labels on one line collide as soon as the playfield narrows — the device
+    // label is the least important, so it goes first, and the centre block after it.
+    //
+    // The test has to be against ANCHORED positions, not packed widths. These are
+    // left-, centre- and right-aligned, so the centre block sits at the midpoint however
+    // short the score is; summing the three widths says they fit while the centred
+    // string still runs into the right-aligned one. With a score of "0" that is a 50px
+    // overlap on a 512px playfield that the packed sum passes comfortably.
+    const gap = Math.round(12 * s);
+    const wScore = ctx.measureText(score).width;
+    const wCentre = ctx.measureText(centre).width;
+    const wDevice = ctx.measureText(device).width;
+
+    const centreLeft = pf.w / 2 - wCentre / 2;
+    const centreRight = pf.w / 2 + wCentre / 2;
+    const showCentre = wScore + gap <= centreLeft;
+    const showDevice = showCentre && centreRight + gap <= pf.w - wDevice;
+
     ctx.fillStyle = '#cfd2d6';
-    ctx.fillText(w.score.points.toLocaleString(), pf.x, pf.y - Math.round(18 * s));
+    ctx.textAlign = 'left';
+    ctx.fillText(score, pf.x, top);
 
     ctx.fillStyle = '#8a9099';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      `ROOM ${String(this.roomNumber).padStart(3, '0')}   ${w.liveMonsters.length} left   ${'♥'.repeat(Math.max(0, w.score.lives))}`,
-      pf.x + pf.w / 2,
-      pf.y - Math.round(18 * s),
-    );
-
-    ctx.textAlign = 'right';
-    const pad = this.devices.gamepad.status;
-    ctx.fillText(
-      pad.connected ? pad.label : `${this.devices.lastDevice} — no pad`,
-      pf.x + pf.w,
-      pf.y - Math.round(18 * s),
-    );
+    if (showCentre) {
+      ctx.textAlign = 'center';
+      ctx.fillText(centre, pf.x + pf.w / 2, top);
+    }
+    if (showDevice) {
+      ctx.textAlign = 'right';
+      ctx.fillText(device, pf.x + pf.w, top);
+    }
 
     ctx.textAlign = 'left';
     ctx.fillStyle = '#5a6068';
