@@ -1,17 +1,19 @@
 {
-  "name": "bracer",
+  "name": "quarter-up",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A single-player, browser-based dungeon crawler in the spirit of Gauntlet (1985).",
+  "description": "Recreations of 1980s arcade games, built for the browser.",
+  "workspaces": [
+    "games/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint src tests --ext .ts"
+    "dev": "npm run dev -w games/bracer",
+    "build": "node tools/build-arcade.mjs",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
