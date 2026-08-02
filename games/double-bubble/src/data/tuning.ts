@@ -197,6 +197,42 @@ export const T = {
   /** Sideways kick on fruit as it drops, so a chain scatters rather than stacking. */
   FRUIT_SCATTER: 0.9,
 
+  // ---------------------------------------------------------------- special bubbles [i]
+  /** Frames between special bubbles drifting into a room that offers them. */
+  SPECIAL_INTERVAL: 540,
+  /** Most a room will hold at once, so a long stall does not fill the screen. */
+  SPECIAL_MAX: 2,
+  /** Specials linger far longer than an ordinary bubble — they are an opportunity, and
+   *  one that evaporates before you can set it up is just a tease. */
+  SPECIAL_BUBBLE_LIFETIME: 1500,
+
+  WATER_DROPS: 10,
+  WATER_HALF: 3,
+  WATER_FALL_SPEED: 2.4,
+  WATER_FLOW_SPEED: 1.5,
+  WATER_LIFETIME: 260,
+
+  LIGHTNING_HALF: 4,
+  LIGHTNING_SPEED: 5.5,
+  LIGHTNING_LIFETIME: 90,
+
+  FIRE_DROPS: 3,
+  FIRE_HALF: 5,
+  FIRE_FALL_SPEED: 2.2,
+  FIRE_LIFETIME: 300,
+
+  /**
+   * What a monster killed by each element is worth.
+   *
+   * Far above a chain kill, and rising water < lightning < fire, exactly as the original
+   * had it. The point is that special bubbles are not a safety net — they are the
+   * highest-scoring way to clear a room, so using one well is a skill rather than a
+   * mercy.
+   */
+  DIAMOND_WATER: 7000,
+  DIAMOND_LIGHTNING: 8000,
+  DIAMOND_FIRE: 9000,
+
   /** How much fruit a potion rains across the room. */
   POTION_FRUIT_COUNT: 14,
   /** How long a clock holds the monsters still. */

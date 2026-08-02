@@ -17,13 +17,16 @@ import {
   buildBubbleSprites,
   buildMonsterSprites,
   buildPlayerSprites,
+  buildElementSprites,
   buildItemSprites,
   buildProjectileSprites,
+  buildSpecialBubbleSprites,
   SPRITE_PX,
   type MonsterSprites,
   type PlayerSprites,
 } from '@/render/sprites';
 import type { ProjectileKind } from '@/data/roster';
+import type { SpecialBubble } from '@/game/room';
 import { tierFor, type ItemKind } from '@/data/items';
 import { readCounters } from '@/game/counters';
 import { EXTEND_WORD, hasLetter } from '@/game/score';
@@ -63,6 +66,8 @@ export class App implements LoopHost {
   private readonly baronArt: HTMLCanvasElement[];
   private readonly shotArt: Record<ProjectileKind, HTMLCanvasElement>;
   private readonly itemArt: Partial<Record<ItemKind, HTMLCanvasElement>>;
+  private readonly specialArt: Record<SpecialBubble, HTMLCanvasElement>;
+  private readonly elementArt: ReturnType<typeof buildElementSprites>;
   private readonly fx = new Fx();
 
   /** The counter readout. Toggled with F2. Without it the hidden system is untestable
@@ -87,6 +92,8 @@ export class App implements LoopHost {
     this.baronArt = buildBaronSprites();
     this.shotArt = buildProjectileSprites();
     this.itemArt = buildItemSprites();
+    this.specialArt = buildSpecialBubbleSprites();
+    this.elementArt = buildElementSprites();
     this.world = new World(room, roomNumber);
   }
 
@@ -144,6 +151,7 @@ export class App implements LoopHost {
     this.drawPlayer(ctx, layout);
     this.drawPickups(ctx, layout);
     this.drawShots(ctx, layout);
+    this.drawElements(ctx, layout);
     this.drawBubbles(ctx, layout);
     this.drawBaron(ctx, layout);
     // Over everything in the room, but still inside the clip — a burst at the edge
@@ -310,11 +318,39 @@ export class App implements LoopHost {
     );
   }
 
+  /**
+   * The released elements.
+   *
+   * Drawn under the bubbles but over everything else: water running along a tier has to
+   * be visible through whatever is standing in it, because standing in it is fatal.
+   */
+  private drawElements(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const { playfield, pxPerWu } = layout;
+    const blit = (art: HTMLCanvasElement, x: number, y: number): void => {
+      const w = art.width / T.ART_SCALE;
+      const h = art.height / T.ART_SCALE;
+      ctx.drawImage(
+        art,
+        playfield.x + (x - w / 2) * pxPerWu,
+        playfield.y + (y - h / 2) * pxPerWu,
+        w * pxPerWu,
+        h * pxPerWu,
+      );
+    };
+
+    for (const d of this.world.drops) blit(this.elementArt.drop, d.x, d.y);
+    for (const f of this.world.flames) blit(this.elementArt.flame, f.x, f.y);
+    for (const b of this.world.bolts) blit(this.elementArt.bolt, b.x, b.y);
+  }
+
   private drawBubbles(ctx: CanvasRenderingContext2D, layout: Layout): void {
     const { playfield, pxPerWu } = layout;
     for (const b of this.world.bubbles) {
-      const step = Math.min(ANGER_STEPS - 1, Math.round(anger(b) * (ANGER_STEPS - 1)));
-      const art = this.bubbleArt[step];
+      // A special is tinted by what it carries, so the player can decide whether it is
+      // worth crossing the room for before they commit to crossing the room.
+      const art = b.special
+        ? this.specialArt[b.special]
+        : this.bubbleArt[Math.min(ANGER_STEPS - 1, Math.round(anger(b) * (ANGER_STEPS - 1)))];
       ctx.drawImage(
         art,
         playfield.x + (b.x - SPRITE_WU / 2) * pxPerWu,

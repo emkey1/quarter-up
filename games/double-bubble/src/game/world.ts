@@ -11,6 +11,7 @@ import {
   separate,
   shove,
   spawnBubble,
+  spawnSpecial,
   stepBubble,
   type Bubble,
 } from './bubble';
@@ -23,6 +24,18 @@ import {
   type Counters,
 } from './counters';
 import { fruitValue, pickupTouches, spawnPickup, stepPickup, type Pickup } from './item';
+import {
+  spawnBolt,
+  spawnFire,
+  spawnWater,
+  stepBolt,
+  stepDrop,
+  stepFlame,
+  touches,
+  type Bolt,
+  type Drop,
+  type Flame,
+} from './special';
 import { projectileHits, stepProjectile, type Projectile } from './projectile';
 import { baronHits, spawnBaron, stepBaron, type Baron } from './baron';
 import {
@@ -68,7 +81,13 @@ export class World {
   readonly monsters: Monster[] = [];
   readonly projectiles: Projectile[] = [];
   readonly pickups: Pickup[] = [];
+  readonly drops: Drop[] = [];
+  readonly bolts: Bolt[] = [];
+  readonly flames: Flame[] = [];
   readonly score: ScoreState;
+
+  /** Frames until the next special bubble drifts in, if this room offers any. */
+  private specialTimer = T.SPECIAL_INTERVAL;
 
   /** The behaviour counters. Persist across sessions — see counters.ts. */
   readonly counters: Counters;
@@ -115,9 +134,6 @@ export class World {
     this.counters = counters;
     for (const s of room.spawns) this.monsters.push(spawnMonster(s.kind, s.x, s.y, s.dir));
 
-    // Entering a room is itself a tracked behaviour, and the walk happens after it —
-    // so a player who simply keeps starting rooms eventually earns something.
-    this.counters.roomsStarted++;
     this.awarded = walkThresholds(this.counters, roomNumber);
     if (this.awarded.item) {
       const at = this.itemSpawnPoint();
@@ -190,6 +206,7 @@ export class World {
     for (const p of this.projectiles) stepProjectile(this.room, p);
     for (const p of this.pickups) stepPickup(this.room, p);
     this.collectPickups();
+    this.stepSpecials();
     this.stepBaron();
 
     this.carryCaptives();
@@ -289,6 +306,11 @@ export class World {
 
       p.dead = true;
       this.score.points += p.points;
+      // Fruit and diamonds are spoils; everything else is a special item, and taking
+      // them is itself what buys the blue cross.
+      if (p.kind !== 'fruit' && p.kind !== 'diamond' && p.kind !== 'extend') {
+        this.bump('specialItemsTaken');
+      }
       this.applyItem(p.kind, p.letter);
 
       this.events.push({
@@ -351,6 +373,23 @@ export class World {
       case 'potion':
         this.showerFruit();
         break;
+      case 'bomb':
+        // Everything on screen burns where it stands.
+        for (const m of this.liveMonsters) {
+          this.flames.push(...spawnFire(m.body.x, m.body.y));
+        }
+        break;
+      case 'crossRed':
+        for (const m of this.liveMonsters) this.elementalKill(m, T.DIAMOND_FIRE);
+        break;
+      case 'crossBlue':
+        // The room floods: water from the ceiling, right across the width.
+        for (let i = 0; i < 5; i++) {
+          this.drops.push(...spawnWater(((i + 0.5) / 5) * ROOM_W, T.TILE * 2));
+        }
+        break;
+      case 'diamond':
+        break;
       case 'fruit':
         this.bump('fruitEaten');
         break;
@@ -368,12 +407,12 @@ export class World {
   /** A travelling bubble that touches a free monster traps it. */
   private resolveCaptures(): void {
     for (const b of this.bubbles) {
-      if (b.dead || b.captive) continue;
+      // A special already carries something; it cannot also catch a monster.
+      if (b.dead || b.captive || b.special) continue;
       for (const m of this.monsters) {
         if (m.state !== 'walking') continue;
         if (!overlaps(b, m.body.x, m.body.y, m.body.halfW, m.body.halfH)) continue;
         capture(b, m, this.room.escapeFrames);
-        this.bump('monstersBubbled');
         break;
       }
     }
@@ -439,14 +478,22 @@ export class World {
 
       const dx = b.x - b0.x;
       const dy = b.y - b0.y;
+      const side: -1 | 1 = dx > 0 ? 1 : -1;
 
-      if (Math.abs(dx) > Math.abs(dy)) {
-        const side = dx > 0 ? 1 : -1;
-        if (side === p.facing) {
-          shove(b, side);
-          continue;
-        }
+      if (Math.abs(dx) > Math.abs(dy) && side === p.facing && !b.special) {
+        shove(b, side);
+        continue;
       }
+
+      // A special is its own payload: it releases rather than chaining, and the side
+      // the player touched it from is what aims a bolt.
+      if (b.special) {
+        this.release(b, side);
+        b.dead = true;
+        this.events.push({ kind: 'bubblePop', x: b.x, y: b.y });
+        continue;
+      }
+
       this.popChain(i);
       return; // the chain may have killed several; re-scan next frame
     }
@@ -633,6 +680,135 @@ export class World {
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       if (this.pickups[i].dead) this.pickups.splice(i, 1);
     }
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+      if (this.drops[i].dead) this.drops.splice(i, 1);
+    }
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      if (this.bolts[i].dead) this.bolts.splice(i, 1);
+    }
+    for (let i = this.flames.length - 1; i >= 0; i--) {
+      if (this.flames[i].dead) this.flames.splice(i, 1);
+    }
+  }
+
+  /* ---------------------------------------------------------------- specials */
+
+  /**
+   * Drift a special bubble in, and run whatever has already been released.
+   *
+   * Specials enter from the side on the room's own schedule rather than being earned —
+   * they are weather, not a reward. Finding one is luck; using it well is not.
+   */
+  private stepSpecials(): void {
+    const offered = this.room.specialBubbles;
+    if (offered.length > 0 && --this.specialTimer <= 0) {
+      this.specialTimer = T.SPECIAL_INTERVAL;
+      const alive = this.bubbles.filter((b) => b.special).length;
+      if (alive < T.SPECIAL_MAX) {
+        const kind = offered[this.frame % offered.length];
+        // Enter opposite the player, so it has to be gone to rather than walked into.
+        const fromLeft = this.player.body.x > ROOM_W / 2;
+        this.bubbles.push(
+          spawnSpecial(
+            kind,
+            fromLeft ? T.TILE * 2 : ROOM_W - T.TILE * 2,
+            T.TILE * (4 + (this.frame % 5)),
+          ),
+        );
+      }
+    }
+
+    for (const d of this.drops) stepDrop(this.room, d);
+    for (const b of this.bolts) stepBolt(this.room, b);
+    for (const f of this.flames) stepFlame(this.room, f);
+
+    this.resolveElementalKills();
+  }
+
+  /**
+   * Release a special bubble's payload.
+   *
+   * `fromSide` is which side of the bubble the player touched, and it is the entire
+   * aiming mechanic for lightning: a bolt travels away from the player, so where you
+   * stand when you pop it decides what it sweeps.
+   */
+  private release(b: Bubble, fromSide: -1 | 1): void {
+    switch (b.special) {
+      case 'water':
+        this.drops.push(...spawnWater(b.x, b.y));
+        this.bump('waterPops');
+        break;
+      case 'lightning':
+        this.bolts.push(spawnBolt(b.x, b.y, fromSide));
+        this.bump('lightningPops');
+        break;
+      case 'fire':
+        this.flames.push(...spawnFire(b.x, b.y));
+        this.bump('firePops');
+        break;
+    }
+  }
+
+  /**
+   * What the elements do to whatever they touch.
+   *
+   * Each kills for a different payout — water < lightning < fire — so what you kill a
+   * monster WITH decides what it leaves behind. That is the fact the rarest items in
+   * the counter table are gated on, and a player who never notices it never sees them.
+   */
+  private resolveElementalKills(): void {
+    const b0 = this.player.body;
+
+    for (const m of this.monsters) {
+      if (m.state !== 'walking') continue;
+      const { x, y, halfW, halfH } = m.body;
+
+      for (const d of this.drops) {
+        if (d.dead || !touches(d.x, d.y, T.WATER_HALF, x, y, halfW, halfH)) continue;
+        this.elementalKill(m, T.DIAMOND_WATER);
+        this.bump('drownedMonsters');
+        break;
+      }
+      if (m.state !== 'walking') continue;
+
+      for (const bolt of this.bolts) {
+        if (bolt.dead || !touches(bolt.x, bolt.y, T.LIGHTNING_HALF, x, y, halfW, halfH)) continue;
+        this.elementalKill(m, T.DIAMOND_LIGHTNING);
+        break;
+      }
+      if (m.state !== 'walking') continue;
+
+      for (const f of this.flames) {
+        if (f.dead || !touches(f.x, f.y, T.FIRE_HALF, x, y, halfW, halfH)) continue;
+        this.elementalKill(m, T.DIAMOND_FIRE);
+        break;
+      }
+    }
+
+    // The elements are indiscriminate. Standing in your own fire is a way to die, which
+    // is what stops a special bubble being a free room clear.
+    if (this.player.invulnFrames > 0) return;
+    for (const f of this.flames) {
+      if (!f.dead && touches(f.x, f.y, T.FIRE_HALF, b0.x, b0.y, b0.halfW, b0.halfH)) {
+        this.killPlayer();
+        return;
+      }
+    }
+    for (const bolt of this.bolts) {
+      if (!bolt.dead && touches(bolt.x, bolt.y, T.LIGHTNING_HALF, b0.x, b0.y, b0.halfW, b0.halfH)) {
+        this.killPlayer();
+        return;
+      }
+    }
+  }
+
+  private elementalKill(m: Monster, value: number): void {
+    m.state = 'dead';
+    this.score.points += value;
+    this.events.push({ kind: 'monsterPop', x: m.body.x, y: m.body.y, colour: m.spec.colour });
+    this.pickups.push(
+      spawnPickup('diamond', m.body.x, m.body.y, { points: value, vy: -1.1 }),
+    );
   }
 
   /**

@@ -26,29 +26,35 @@ export type CounterName =
   | 'jumps'
   | 'bubblesBlown'
   | 'emptyPops'
-  | 'monstersBubbled'
   | 'screenCrossings'
   | 'falls'
   | 'hurryUps'
-  | 'roomsStarted'
   | 'fruitEaten'
   | 'sweetsYellow'
   | 'sweetsBlue'
-  | 'sweetsPurple';
+  | 'sweetsPurple'
+  | 'waterPops'
+  | 'lightningPops'
+  | 'firePops'
+  | 'drownedMonsters'
+  | 'specialItemsTaken';
 
 export const COUNTER_NAMES: readonly CounterName[] = [
   'jumps',
   'bubblesBlown',
   'emptyPops',
-  'monstersBubbled',
   'screenCrossings',
   'falls',
   'hurryUps',
-  'roomsStarted',
   'fruitEaten',
   'sweetsYellow',
   'sweetsBlue',
   'sweetsPurple',
+  'waterPops',
+  'lightningPops',
+  'firePops',
+  'drownedMonsters',
+  'specialItemsTaken',
 ];
 
 export type ItemKind =
@@ -66,6 +72,10 @@ export type ItemKind =
   | 'umbrellaRed'
   | 'umbrellaPurple'
   | 'potion'
+  | 'bomb'
+  | 'crossBlue'
+  | 'crossRed'
+  | 'diamond'
   /** Dropped by chains, not by counters. */
   | 'extend'
   /** Dropped by dead monsters. */
@@ -95,6 +105,10 @@ export const ITEM_SPECS: Record<ItemKind, ItemSpec> = {
   umbrellaRed: { kind: 'umbrellaRed', label: 'Red umbrella', points: 200, colour: '#ff5a3d', note: 'SKIP 5 ROOMS' },
   umbrellaPurple: { kind: 'umbrellaPurple', label: 'Purple umbrella', points: 200, colour: '#b03dff', note: 'SKIP 7 ROOMS' },
   potion: { kind: 'potion', label: 'Potion', points: 500, colour: '#7affc8', note: 'A SHOWER OF FRUIT' },
+  bomb: { kind: 'bomb', label: 'Bomb', points: 200, colour: '#5a5f68', note: 'EVERYTHING BURNS' },
+  crossBlue: { kind: 'crossBlue', label: 'Blue cross', points: 3000, colour: '#4a9cff', note: 'THE ROOM FLOODS' },
+  crossRed: { kind: 'crossRed', label: 'Red cross', points: 3000, colour: '#ff5a4a', note: 'THE ROOM BURNS' },
+  diamond: { kind: 'diamond', label: 'Diamond', points: 7000, colour: '#9ce8ff', note: '' },
   extend: { kind: 'extend', label: 'EXTEND letter', points: 500, colour: '#ffd166', note: '' },
   fruit: { kind: 'fruit', label: 'Fruit', points: 0, colour: '#7ad85a', note: '' },
 };
@@ -131,26 +145,35 @@ export const THRESHOLDS: readonly Threshold[] = [
    * the count hits 15, buys orange, resets to zero, and never reaches 20 or 25 — red
    * and purple become permanently unreachable while looking perfectly well configured.
    * Descending order makes the biggest prize you have earned the one you get.
+   *
+   * Now on their real trigger — popping water bubbles — rather than the stand-in they
+   * used before special bubbles existed.
    */
-  { item: 'umbrellaPurple', counter: 'monstersBubbled', at: [25, 30, 35, 40] },
-  { item: 'umbrellaRed', counter: 'monstersBubbled', at: [20, 24, 28, 32] },
-  { item: 'umbrellaOrange', counter: 'monstersBubbled', at: [15, 18, 21, 24] },
+  { item: 'umbrellaPurple', counter: 'waterPops', at: [25, 30, 35, 40] },
+  { item: 'umbrellaRed', counter: 'waterPops', at: [20, 24, 28, 32] },
+  { item: 'umbrellaOrange', counter: 'waterPops', at: [15, 18, 21, 24] },
 
   { item: 'ringPurple', counter: 'sweetsYellow', at: [3, 3, 4, 4] },
   { item: 'ringRed', counter: 'sweetsPurple', at: [3, 3, 4, 4] },
   { item: 'ringBlue', counter: 'sweetsBlue', at: [3, 3, 4, 4] },
 
+  /*
+   * The deep end. You cannot reach these without first learning that special bubbles
+   * exist, that a bolt is aimed by choosing which side to pop from, and that what you
+   * kill a monster WITH decides what it leaves behind. That is the counter system's
+   * whole argument in one block: the rarest rewards are gated on understanding, not on
+   * patience.
+   */
+  { item: 'crossRed', counter: 'drownedMonsters', at: [4, 5, 6, 7] },
+  { item: 'crossBlue', counter: 'specialItemsTaken', at: [10, 11, 12, 13] },
+  { item: 'bomb', counter: 'firePops', at: [10, 13, 16, 19] },
+  /** Back on its documented trigger now that lightning bubbles exist. */
+  { item: 'clock', counter: 'lightningPops', at: [12, 14, 16, 18] },
+
   /** Source-accurate: potions are bought by falling out of the bottom of the room. */
   { item: 'potion', counter: 'falls', at: [15, 16, 17, 18] },
   { item: 'bell', counter: 'hurryUps', at: [8, 10, 12, 14] },
   { item: 'heart', counter: 'fruitEaten', at: [50, 55, 60, 65] },
-  /**
-   * PARKED TRIGGER. The clock's documented trigger is popping twelve lightning bubbles,
-   * and special bubbles do not exist until M4b. Rather than leave the item unreachable
-   * or invent a trigger and forget it was invented, it sits on rooms-started meanwhile
-   * — and this comment is the reminder to move it back.
-   */
-  { item: 'clock', counter: 'roomsStarted', at: [12, 14, 16, 18] },
 ];
 
 /**

@@ -2,9 +2,11 @@
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** M3 complete — the full eight-monster roster on its introduction schedule,
-> projectiles, the hurry-up and Baron von Blubba. Items and the counter system are M4.
-> See §11.
+> **Status:** M4 complete — the hidden counter system, items, fruit and EXTEND letters,
+> and the three special bubbles with water that flows along the geometry. Next is M5:
+> the 100 rooms, the editor, the secret rooms and the boss. See §11.
+>
+> Debug keys: **F1** jump meter, **F2** counter readout.
 >
 > Outstanding from M1: the physics constants are still `[i]` placeholders. They are
 > internally consistent and instrumented (F1 shows measured against predicted, in the

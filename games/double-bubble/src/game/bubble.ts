@@ -1,5 +1,13 @@
 import { T } from '@/data/tuning';
-import { DRIFT_DX, DRIFT_DY, driftAt, isFloor, tileAt, type RoomData } from './room';
+import {
+  DRIFT_DX,
+  DRIFT_DY,
+  driftAt,
+  isFloor,
+  tileAt,
+  type RoomData,
+  type SpecialBubble,
+} from './room';
 import type { Monster } from './monster';
 
 /**
@@ -27,6 +35,14 @@ export interface Bubble {
   fireFrames: number;
   /** Frames before an empty bubble bursts on its own. */
   life: number;
+  /**
+   * What this bubble is carrying instead of a monster.
+   *
+   * A special bubble drifts in on its own and cannot catch anything — it IS the payload.
+   * Popping it is how the player uses it, and which side they pop it from decides where
+   * a lightning bolt goes.
+   */
+  special: SpecialBubble | null;
   captive: Monster | null;
   /** Frames before the captive breaks out. Counts down only while holding one. */
   escape: number;
@@ -63,6 +79,7 @@ export function spawnBubble(x: number, y: number, dir: -1 | 1, range: 'normal' |
     dir,
     fireFrames: range === 'far' ? T.BUBBLE_FIRE_FRAMES_FAR : T.BUBBLE_FIRE_FRAMES,
     life: T.BUBBLE_LIFETIME,
+    special: null,
     captive: null,
     escape: 0,
     escapeTotal: 0,
@@ -198,6 +215,24 @@ export function stepBubble(room: RoomData, b: Bubble): void {
   } else if (b.life > 0) {
     b.life--;
   }
+}
+
+/**
+ * A special bubble, drifting in from the side of the room.
+ *
+ * Enters already free rather than fired: it was not blown by anyone, it wandered in on
+ * the room's current, which is what makes one appearing feel like an opportunity rather
+ * than something the player did.
+ */
+export function spawnSpecial(kind: SpecialBubble, x: number, y: number): Bubble {
+  const b = spawnBubble(x, y, 1, 'normal');
+  b.special = kind;
+  b.phase = 'free';
+  b.fireFrames = 0;
+  b.vx = 0;
+  // Specials wait to be used rather than timing out on their own.
+  b.life = T.SPECIAL_BUBBLE_LIFETIME;
+  return b;
 }
 
 /** Trap a monster. The caller is responsible for taking it out of the walking set. */

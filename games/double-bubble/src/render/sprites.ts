@@ -2,7 +2,7 @@ import { Px, P, ramp, palette } from './pixel';
 import { T } from '@/data/tuning';
 import { MONSTER_SPECS, type ProjectileKind } from '@/data/roster';
 import { ITEM_SPECS, type ItemKind } from '@/data/items';
-import type { MonsterKind } from '@/game/room';
+import type { MonsterKind, SpecialBubble } from '@/game/room';
 import type { PlayerPose } from '@/game/player';
 
 /**
@@ -510,4 +510,61 @@ export function buildProjectileSprites(): Record<ProjectileKind, HTMLCanvasEleme
     out[kind] = projectileFrame(kind).toCanvas(palette(ramp(PROJECTILE_COLOURS[kind])));
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ specials */
+
+/** Tints for a special bubble, so what it carries is readable before you commit. */
+const SPECIAL_TINTS: Record<SpecialBubble, string> = {
+  water: '#4a9cff',
+  lightning: '#ffe14a',
+  fire: '#ff7a3d',
+};
+
+export function buildSpecialBubbleSprites(): Record<SpecialBubble, HTMLCanvasElement> {
+  const px = bubbleFrame();
+  const out = {} as Record<SpecialBubble, HTMLCanvasElement>;
+  for (const kind of Object.keys(SPECIAL_TINTS) as SpecialBubble[]) {
+    out[kind] = px.toCanvas(palette(ramp(SPECIAL_TINTS[kind])));
+  }
+  return out;
+}
+
+/**
+ * Water, lightning and fire, drawn small and bright.
+ *
+ * Each is a handful of pixels because there are a lot of them at once — a water burst
+ * is ten droplets running along a tier, and anything detailed at that count turns the
+ * screen to soup.
+ */
+export function buildElementSprites(): {
+  drop: HTMLCanvasElement;
+  bolt: HTMLCanvasElement;
+  flame: HTMLCanvasElement;
+} {
+  const drop = new Px(12, 12);
+  drop.ellipse(6, 7, T.WATER_HALF * T.ART_SCALE * 0.5, T.WATER_HALF * T.ART_SCALE * 0.7, P.Base);
+  drop.ellipse(5, 6, 1.2, 1.2, P.Lightest);
+  drop.outline(P.Outline);
+
+  const bolt = new Px(20, 12);
+  // A jagged streak rather than a bar: it should read as a discharge in motion.
+  bolt.line(2, 6, 8, 3, P.Base);
+  bolt.line(8, 3, 12, 8, P.Base);
+  bolt.line(12, 8, 18, 5, P.Base);
+  bolt.line(2, 7, 8, 4, P.Lightest);
+  bolt.line(8, 4, 12, 9, P.Lightest);
+  bolt.line(12, 9, 18, 6, P.Lightest);
+
+  const flame = new Px(16, 16);
+  flame.ellipse(8, 11, 5, 4, P.Base);
+  flame.ellipse(8, 8, 3.4, 4.4, P.Light);
+  flame.ellipse(8, 6, 1.8, 2.8, P.Lightest);
+  flame.outline(P.Outline);
+
+  return {
+    drop: drop.toCanvas(palette(ramp('#4ab8ff'))),
+    bolt: bolt.toCanvas(palette(ramp('#ffe14a'))),
+    flame: flame.toCanvas(palette(ramp('#ff8a3d'))),
+  };
 }
