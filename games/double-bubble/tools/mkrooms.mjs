@@ -41,6 +41,9 @@ function buildTiles({ walls = true, platforms = [], solids = [] }) {
   return rows.map((r) => r.join(''));
 }
 
+/** Inclusive row range, for declaring drift bands. */
+const rows = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
 /** Drift field: rows listed in `right`/`left`/`up`/`down` flow that way, rest is still. */
 function buildDrift({ right = [], left = [], up = [], down = [] } = {}) {
   const rows = [];
@@ -90,7 +93,18 @@ const room001 = {
       [7, 12, 18],
     ],
   }),
-  drift: buildDrift({ right: [0, 1, 2, 3] }),
+  /*
+   * Bands that alternate direction, so a bubble WEAVES as it climbs instead of going
+   * straight up. A field is sparse by nature and room 1 previously had a current in
+   * four rows out of twenty-eight, which left bubbles rising in dead-straight columns
+   * over most of the room. Three bands is enough to make the path legible without
+   * making it feel like a wind tunnel; the ceiling band still gathers strays into the
+   * top-right corner, which is the first hint that rooms have currents at all.
+   */
+  drift: buildDrift({
+    right: [...rows(0, 3), ...rows(17, 21)],
+    left: rows(8, 12),
+  }),
   driftSpeed: 0.4,
   playerStart: { x: 15, y: 24 },
   spawns: [

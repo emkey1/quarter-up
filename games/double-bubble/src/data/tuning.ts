@@ -89,12 +89,23 @@ export const T = {
   /**
    * How fast a free bubble rises. [i]
    *
-   * Lowered from 0.35 on a playtest note that bubbles climbed faster than the original's
-   * — at 0.35 a bubble crossed the full 28-tile room in about ten seconds, which reads
-   * as rising rather than floating. At 0.22 the same trip takes around seventeen, which
-   * leaves time to get under one and ride it.
+   * 0.35 climbed away too fast; 0.22 read as static. The second note was really about
+   * the wobble below being absent rather than about this number — with lateral motion
+   * restored, the rise can sit nearer where it started.
    */
-  BUBBLE_RISE_SPEED: 0.22,
+  BUBBLE_RISE_SPEED: 0.3,
+
+  /**
+   * A free bubble is never perfectly still.
+   *
+   * The room's drift field is sparse by nature — over most of a room it is empty — so
+   * without an intrinsic wobble a bubble had vx of exactly zero, rose in a straight
+   * line and stopped dead. Amplitudes are comparable to the rise speed on purpose: the
+   * motion has to be visible at a glance, not a shimmer.
+   */
+  BUBBLE_WOBBLE_X: 0.26,
+  BUBBLE_WOBBLE_Y: 0.1,
+  BUBBLE_WOBBLE_PERIOD: 96,
   /** Frames a shove keeps acting, so a push coasts instead of stopping the instant
    *  contact breaks. Too short and herding a cluster is impossible; too long and
    *  bubbles feel magnetic. */

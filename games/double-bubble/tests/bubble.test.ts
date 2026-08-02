@@ -221,6 +221,62 @@ describe('drift', () => {
   });
 
   /**
+   * A free bubble must never be perfectly still.
+   *
+   * The room's drift field is sparse by nature — room 1 had a current in four rows out
+   * of twenty-eight — so with no intrinsic wobble a bubble had vx of exactly zero over
+   * most of the room, rose in a dead-straight line and stopped dead on the first thing
+   * it met. Every bubble in a column did the identical thing, which reads as a row of
+   * paused sprites rather than as anything floating.
+   */
+  it('wanders sideways even where the room has no current at all', () => {
+    const still = room({}); // no drift anywhere
+    const b = spawnBubble(120, 150, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+
+    const xs: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      stepBubble(still, b);
+      xs.push(b.x);
+    }
+    const spread = Math.max(...xs) - Math.min(...xs);
+    expect(spread).toBeGreaterThan(4); // visibly, not a shimmer
+  });
+
+  it('does not leave two neighbouring bubbles moving in lockstep', () => {
+    const still = room({});
+    const a = spawnBubble(120, 150, 1, 'normal');
+    const c = spawnBubble(129, 150, 1, 'normal');
+    for (const b of [a, c]) {
+      b.phase = 'free';
+      b.fireFrames = 0;
+    }
+    let apart = 0;
+    for (let i = 0; i < 300; i++) {
+      stepBubble(still, a);
+      stepBubble(still, c);
+      apart = Math.max(apart, Math.abs(a.x - c.x - 9));
+    }
+    expect(apart).toBeGreaterThan(1);
+  });
+
+  it('keeps wobbling once it has settled against the ceiling', () => {
+    const still = room({});
+    const b = spawnBubble(120, 40, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+    for (let i = 0; i < 400; i++) stepBubble(still, b); // climb and settle
+
+    const xs: number[] = [];
+    for (let i = 0; i < 200; i++) {
+      stepBubble(still, b);
+      xs.push(b.x);
+    }
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(2);
+  });
+
+  /**
    * Drift must be a pure function of position and the room, with no RNG anywhere —
    * DESIGN.md §12 asks for a bubble released at a fixed point to trace the same path
    * every run, and a shifting current would make chain setups unlearnable.

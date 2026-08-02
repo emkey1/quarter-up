@@ -36,6 +36,11 @@ export interface Bubble {
   /** Frames of push still being applied, so a shove coasts rather than stopping dead. */
   pushFrames: number;
   pushDir: -1 | 1;
+  /** Frames spent floating, driving the wobble. */
+  age: number;
+  /** Wobble offset, derived from the spawn position so identical starts stay identical
+   *  while neighbours visibly do not move in lockstep. */
+  wobblePhase: number;
 }
 
 let nextId = 1;
@@ -64,6 +69,10 @@ export function spawnBubble(x: number, y: number, dir: -1 | 1, range: 'normal' |
     dead: false,
     pushFrames: 0,
     pushDir: 1,
+    age: 0,
+    // Position, not an id or a counter: identical starts must trace identical paths.
+    wobblePhase:
+      (Math.round(x * 7 + y * 13) % T.BUBBLE_WOBBLE_PERIOD) + T.BUBBLE_WOBBLE_PERIOD,
   };
 }
 
@@ -156,6 +165,25 @@ export function stepBubble(room: RoomData, b: Bubble): void {
     const d = driftAt(room, tileOf(b.x), tileOf(b.y));
     b.vx = DRIFT_DX[d] * room.driftSpeed;
     b.vy = -T.BUBBLE_RISE_SPEED + DRIFT_DY[d] * room.driftSpeed;
+
+    /*
+     * Wobble: a free bubble is never perfectly still.
+     *
+     * Without this the only lateral force in the game is the room's drift field, and a
+     * field is sparse by nature — over most of a room a bubble had vx of exactly zero,
+     * rose in a dead-straight line, met a platform and stopped dead with vy zero too.
+     * Every bubble in a column did the identical thing, which reads as a row of paused
+     * sprites rather than as anything floating.
+     *
+     * The phase comes from the spawn POSITION rather than an id or a counter: two
+     * bubbles released at the same spot must trace the same path (DESIGN.md §12), or
+     * chain setups stop being learnable, but two released a few units apart should
+     * visibly not move in lockstep.
+     */
+    b.age++;
+    const t = ((b.age + b.wobblePhase) / T.BUBBLE_WOBBLE_PERIOD) * Math.PI * 2;
+    b.vx += Math.sin(t) * T.BUBBLE_WOBBLE_X;
+    b.vy += Math.cos(t * 0.7) * T.BUBBLE_WOBBLE_Y;
 
     if (b.pushFrames > 0) {
       b.pushFrames--;
