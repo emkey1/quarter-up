@@ -1,9 +1,9 @@
-# Game 2 — Design & Implementation Document
+# Double Bubble — Design & Implementation Document
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** design. No code yet. The directory name `games/bubble` is a placeholder —
-> see §0 for the name shortlist.
+> **Status:** M0 in progress — engine substrate copied and decoupled, room format and
+> renderer landed. Physics is M1. See §11 for the milestone table.
 
 ---
 
@@ -29,26 +29,17 @@
 
 ## 0. Naming
 
-Bracer takes its name obliquely: a bracer is arm armour, as is a gauntlet. The second
-game wants the same move — one word, slightly archaic, a synonym-adjacent nod rather
-than a pun on the title.
+**Working title: Double Bubble.** Package and directory `double-bubble`.
 
-**Recommendation: `Seethe`.**
+Bracer takes its name obliquely — a bracer is arm armour, as is a gauntlet. This one
+takes the opposite route and leans in: *"Double, double toil and trouble"* is Macbeth's
+witches over a bubbling cauldron, and it is very nearly the cadence of *Bubble Bobble*
+already. The title carries the source, the mechanic, and a witches'-brew reading of the
+cave all at once, and it sounds like something that would have been painted on a cabinet
+side-art in 1986.
 
-It works on both meanings at once. To seethe is literally to boil, bubble, and foam —
-the core verb of the game. Figuratively it is to be quietly furious, which is precisely
-what a trapped monster does inside a bubble before it turns red and bursts out. The
-central mechanic and the central tension share one word.
-
-| Alternative | Reasoning | Against |
-| --- | --- | --- |
-| **Cauldron** | "Double, double toil and trouble" — Macbeth's bubbling cauldron is a near-rhyme of *Bubble Bobble*, and the cave setting fits. | Two syllables heavier than Bracer; already a 1985 Palace Software game. |
-| **Toil** | Same Macbeth root, one syllable, nicely grim. | Reads as drudgery — wrong tone for a game this bright. |
-| **Frothe** | Foam, with an archaic `e` that reads as fantasy. | The `e` is affectation; no second meaning. |
-| **Brine** | Bub and Bob, sea-adjacent, liquid. | Only loosely connected — brine doesn't bubble. |
-
-Everything below uses `Seethe` / `games/seethe`. Rename the directory before M0 if you
-land somewhere else; nothing is committed to the name yet.
+It also quietly names the two-player original that §4 has to adapt around — which is a
+good joke to have sitting on the title screen of a single-player game.
 
 ---
 
@@ -354,7 +345,7 @@ Same stack as Bracer, unchanged: TypeScript, Vite, canvas, no runtime dependenci
 Vitest for the simulation layer.
 
 ```
-games/seethe/
+games/double-bubble/
   index.html
   editor.html              room editor, same rationale as Bracer's
   src/
@@ -386,7 +377,7 @@ likely to be subtly wrong and least likely to be noticed being wrong.
 
 **Copy, do not share.** `packages/` stays empty until this game is playable — the
 reasoning is in [packages/README.md](../../packages/README.md). Copy these into
-`games/seethe/src/` at M0 and let them diverge; we extract at M6 from two real examples.
+`games/double-bubble/src/` at M0 and let them diverge; we extract at M6 from two real examples.
 
 | Source | LOC | Action |
 | --- | --- | --- |

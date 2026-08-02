@@ -10,7 +10,7 @@ None of them use assets, code, or level data from the originals.
 | Game | After | State |
 | --- | --- | --- |
 | [Bracer](games/bracer) | Gauntlet (Atari Games, 1985) | M5 complete, polish next |
-| *(unnamed)* | Bubble Bobble (Taito, 1986) | design |
+| [Double Bubble](games/double-bubble) | Bubble Bobble (Taito, 1986) | M0 — skeleton |
 
 ## Layout
 
