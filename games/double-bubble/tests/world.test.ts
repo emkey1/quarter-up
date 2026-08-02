@@ -5,6 +5,7 @@ import { World } from '@/game/world';
 import { emptyActions, type ActionState } from '@/game/controls';
 import { capture, spawnBubble, resetBubbleIds } from '@/game/bubble';
 import { resetMonsterIds } from '@/game/monster';
+import { MONSTER_SPECS } from '@/data/roster';
 import room001Json from '@/data/rooms/r001.json';
 
 function room(spec: {
@@ -206,6 +207,95 @@ describe('popping', () => {
     w.popChain(0);
     expect(w.score.points).toBe(3 * T.EMPTY_BUBBLE_POP);
     expect(w.lastChain.monsters).toBe(0);
+  });
+});
+
+describe('events for the renderer', () => {
+  /** Reuses the loaded-cluster helper's shape: n monsters, each in a touching bubble. */
+  function loaded(n: number): World {
+    const spawns = Array.from({ length: n }, (_, i) => ({
+      kind: 'zenchan',
+      x: 12 + i,
+      y: 24,
+      dir: 1 as const,
+    }));
+    const w = new World(room({ spawns }));
+    const px = w.player.body.x;
+    const py = w.player.body.y;
+    w.monsters.forEach((m, i) => {
+      const b = spawnBubble(px + 24 + i * 14, py, 1, 'normal');
+      b.phase = 'free';
+      b.fireFrames = 0;
+      w.bubbles.push(b);
+      capture(b, m, 600);
+    });
+    w.events.length = 0;
+    return w;
+  }
+
+  it('announces one pop per bubble and one chain for the whole burst', () => {
+    const w = loaded(3);
+    w.popChain(0);
+
+    const pops = w.events.filter((e) => e.kind === 'monsterPop');
+    const chains = w.events.filter((e) => e.kind === 'chain');
+    expect(pops.length).toBe(3);
+    expect(chains.length).toBe(1);
+    expect(chains[0]).toMatchObject({ monsters: 3, points: 4_000 });
+  });
+
+  /** A six-chain is one event and should read at the middle of what was burst, not at
+   *  whichever bubble the player happened to touch. */
+  it('places the chain readout at the centre of the cluster', () => {
+    const w = loaded(3);
+    const xs = w.bubbles.map((b) => b.x);
+    const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+    w.popChain(0);
+    const chain = w.events.find((e) => e.kind === 'chain')!;
+    expect(chain.kind === 'chain' && Math.abs(chain.x - mid)).toBeLessThan(2);
+  });
+
+  it('carries the monster colour, so a loaded pop can look different from an empty one', () => {
+    const w = loaded(1);
+    w.popChain(0);
+    const pop = w.events.find((e) => e.kind === 'monsterPop')!;
+    expect(pop.kind === 'monsterPop' && pop.colour).toBe(MONSTER_SPECS.zenchan.colour);
+  });
+
+  it('distinguishes an escape from a kill', () => {
+    const w = new World(room({ escapeFrames: 3 }));
+    const m = w.monsters[0];
+    const b = spawnBubble(m.body.x, m.body.y, 1, 'normal');
+    w.bubbles.push(b);
+    capture(b, m, 3);
+    w.events.length = 0;
+
+    for (let i = 0; i < 6; i++) w.step(idle());
+
+    expect(w.events.some((e) => e.kind === 'escape')).toBe(true);
+    expect(w.events.some((e) => e.kind === 'monsterPop')).toBe(false);
+    expect(w.events.some((e) => e.kind === 'chain')).toBe(false);
+  });
+
+  it('announces a bubble that simply times out', () => {
+    const w = new World(room({}));
+    w.step(blow());
+    const b = w.bubbles[0];
+    b.life = 1;
+    w.events.length = 0;
+    for (let i = 0; i < 3; i++) w.step(idle());
+    expect(w.events.some((e) => e.kind === 'bubblePop')).toBe(true);
+  });
+
+  /** Events are drained by the renderer, not the sim. If nothing drains them during a
+   *  long room they must not grow without bound in a way that hides a leak. */
+  it('leaves the list for the renderer to drain rather than clearing it itself', () => {
+    const w = loaded(2);
+    w.popChain(0);
+    const before = w.events.length;
+    expect(before).toBeGreaterThan(0);
+    w.step(idle());
+    expect(w.events.length).toBeGreaterThanOrEqual(before);
   });
 });
 

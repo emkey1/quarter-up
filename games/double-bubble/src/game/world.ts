@@ -22,6 +22,23 @@ import { chainScore, extendLetters, initialScore, type ScoreState } from './scor
 export type RoomPhase = 'playing' | 'cleared' | 'dead';
 
 /**
+ * Things worth showing the player.
+ *
+ * The simulation announces what happened and knows nothing about how it looks; the
+ * renderer drains the list and decides. That keeps effects out of the deterministic
+ * step — a replay must not depend on how many sparks were drawn — and means the sim
+ * never grows a reference to a particle system.
+ *
+ * Appended to across every step of a frame and drained once per drawn frame, because
+ * the loop may step several times between draws and a burst must not be missed.
+ */
+export type WorldEvent =
+  | { kind: 'bubblePop'; x: number; y: number }
+  | { kind: 'monsterPop'; x: number; y: number; colour: string }
+  | { kind: 'escape'; x: number; y: number }
+  | { kind: 'chain'; x: number; y: number; monsters: number; points: number };
+
+/**
  * One room in play: the player, its bubbles, its monsters, and the clock.
  *
  * Deliberately a plain object graph stepped in a fixed order rather than an entity
@@ -52,6 +69,9 @@ export class World {
 
   /** Last chain resolved, for the HUD and for tests. */
   lastChain = { monsters: 0, points: 0, letters: 0 };
+
+  /** Drained by the renderer once per drawn frame. See WorldEvent. */
+  readonly events: WorldEvent[] = [];
 
   constructor(
     readonly room: RoomData,
@@ -191,12 +211,16 @@ export class World {
       m.angry = true;
       b.captive = null;
       b.dead = true;
+      this.events.push({ kind: 'escape', x: b.x, y: b.y });
     }
   }
 
   private resolveExpiry(): void {
     for (const b of this.bubbles) {
-      if (!b.dead && !b.captive && b.life <= 0) b.dead = true;
+      if (!b.dead && !b.captive && b.life <= 0) {
+        b.dead = true;
+        this.events.push({ kind: 'bubblePop', x: b.x, y: b.y });
+      }
     }
   }
 
@@ -255,15 +279,28 @@ export class World {
 
     let monsters = 0;
     let empties = 0;
+    let sumX = 0;
+    let sumY = 0;
+    let counted = 0;
     for (const i of chain) {
       const b = this.bubbles[i];
       if (b.dead) continue;
       b.dead = true;
+      sumX += b.x;
+      sumY += b.y;
+      counted++;
       if (b.captive) {
+        this.events.push({
+          kind: 'monsterPop',
+          x: b.x,
+          y: b.y,
+          colour: b.captive.spec.colour,
+        });
         b.captive.state = 'dead';
         b.captive = null;
         monsters++;
       } else {
+        this.events.push({ kind: 'bubblePop', x: b.x, y: b.y });
         empties++;
       }
     }
@@ -273,6 +310,19 @@ export class World {
     this.score.points += points;
     this.lastChain = { monsters, points, letters };
     // EXTEND letters are counted here but do not yet drop as pickups — items are M4.
+
+    if (counted > 0) {
+      // The score reads at the middle of what was burst, not at whichever bubble the
+      // player happened to touch — a six-chain is one event and should say so in one
+      // place.
+      this.events.push({
+        kind: 'chain',
+        x: sumX / counted,
+        y: sumY / counted,
+        monsters,
+        points,
+      });
+    }
   }
 
   /** A trapped monster rides inside its bubble. */

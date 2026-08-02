@@ -10,6 +10,7 @@ import { T } from '@/data/tuning';
 import { buildTileSet, type TileSet } from '@/render/tiles';
 import { themeForRoom, type Theme } from '@/render/theme';
 import { drawRoom } from '@/render/room';
+import { Fx } from '@/render/fx';
 import {
   ANGER_STEPS,
   buildBaronSprites,
@@ -57,6 +58,7 @@ export class App implements LoopHost {
   private readonly bubbleArt: HTMLCanvasElement[];
   private readonly baronArt: HTMLCanvasElement[];
   private readonly shotArt: Record<ProjectileKind, HTMLCanvasElement>;
+  private readonly fx = new Fx();
 
   /** The M1 measurement readout. Toggled with F1. */
   showMeter = false;
@@ -88,6 +90,7 @@ export class App implements LoopHost {
       this.tiles = buildTileSet(theme);
     }
     this.world = new World(room, roomNumber);
+    this.fx.clear();
   }
 
   poll(): void {
@@ -103,6 +106,10 @@ export class App implements LoopHost {
     }
 
     this.world.step(a);
+    // Drained every step rather than every frame, so a burst is never missed when the
+    // loop catches up on a backlog and steps twice between draws.
+    this.fx.consume(this.world.events);
+    this.fx.step();
   }
 
   draw(): void {
@@ -127,6 +134,9 @@ export class App implements LoopHost {
     this.drawShots(ctx, layout);
     this.drawBubbles(ctx, layout);
     this.drawBaron(ctx, layout);
+    // Over everything in the room, but still inside the clip — a burst at the edge
+    // must not spray across the HUD.
+    this.fx.draw(ctx, layout);
 
     ctx.restore();
 
