@@ -22,10 +22,14 @@ export interface Body {
   onGround: boolean;
   /** True on the step the body wrapped through the bottom of the room. */
   wrapped: boolean;
+  /** Index into the `ridables` array the body is standing on, or -1 for solid ground.
+   *  This is how a rider gets carried: the caller adds the ridable's motion after the
+   *  step, rather than the body having to know what a bubble is. */
+  ridingIndex: number;
 }
 
 export function makeBody(x: number, y: number, halfW: number, halfH: number): Body {
-  return { x, y, vx: 0, vy: 0, halfW, halfH, onGround: false, wrapped: false };
+  return { x, y, vx: 0, vy: 0, halfW, halfH, onGround: false, wrapped: false, ridingIndex: -1 };
 }
 
 /** Tile column/row a world coordinate falls in. */
@@ -77,20 +81,36 @@ export function resolveX(room: RoomData, b: Body): void {
 }
 
 /**
+ * Anything that can be stood on but isn't part of the tile grid — which in this game
+ * means bubbles. They obey the same one-way rule as platforms: you land on top, you
+ * pass up through from below.
+ */
+export interface Ridable {
+  x: number;
+  y: number;
+  halfW: number;
+  halfH: number;
+}
+
+/**
  * Vertical move, and the one-way rule.
  *
  * A Platform stops a body only when the body's underside *crossed* the platform's top
  * edge during this step. A body already below it — mid-jump, or having dropped through —
  * passes straight up. That single condition is the whole one-way behaviour, and it is
  * what makes falling off the bottom of the room a traversal tool rather than a death.
+ *
+ * `ridables` get the identical treatment rather than a special case, which is what makes
+ * standing on a drifting bubble feel like standing on the floor.
  */
-export function resolveY(room: RoomData, b: Body): void {
+export function resolveY(room: RoomData, b: Body, ridables: readonly Ridable[] = []): void {
   const prevBottom = b.y + b.halfH;
   const ny = b.y + b.vy;
   const tx0 = tileOf(b.x - b.halfW);
   const tx1 = tileOf(b.x + b.halfW - EPS);
 
   b.onGround = false;
+  b.ridingIndex = -1;
 
   if (b.vy > 0) {
     const bottom = ny + b.halfH;
@@ -104,6 +124,29 @@ export function resolveY(room: RoomData, b: Body): void {
       b.y = surface - b.halfH;
       b.vy = 0;
       b.onGround = true;
+      return;
+    }
+
+    // Then bubbles. Highest surface wins, so landing between two overlapping bubbles
+    // puts you on the upper one rather than on whichever happened to be created first.
+    let best = -1;
+    let bestSurface = Infinity;
+    for (let i = 0; i < ridables.length; i++) {
+      const r = ridables[i];
+      if (b.x + b.halfW <= r.x - r.halfW || b.x - b.halfW >= r.x + r.halfW) continue;
+      const surface = r.y - r.halfH;
+      if (prevBottom > surface) continue; // already below it when the step began
+      if (bottom < surface) continue;
+      if (surface < bestSurface) {
+        bestSurface = surface;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      b.y = bestSurface - b.halfH;
+      b.vy = 0;
+      b.onGround = true;
+      b.ridingIndex = best;
       return;
     }
   } else if (b.vy < 0) {
@@ -142,10 +185,10 @@ export function wrapVertical(b: Body): void {
 }
 
 /** One full step for a body under gravity. */
-export function stepBody(room: RoomData, b: Body): void {
+export function stepBody(room: RoomData, b: Body, ridables: readonly Ridable[] = []): void {
   applyGravity(b);
   resolveX(room, b);
-  resolveY(room, b);
+  resolveY(room, b, ridables);
   wrapVertical(b);
 }
 

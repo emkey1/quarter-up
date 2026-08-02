@@ -83,8 +83,14 @@ export const T = {
    *  after which the bubble rises and joins the room's drift current. */
   BUBBLE_FIRE_SPEED: 3.0,
   BUBBLE_FIRE_FRAMES: 22,
-  BUBBLE_FIRE_SPEED_FAR: 4.2, // purple sweet
+  /** Purple sweet: bubbles travel *further*, not faster — more frames of push, same
+   *  speed, so the arc a player has learned to aim still holds. */
+  BUBBLE_FIRE_FRAMES_FAR: 32,
   BUBBLE_RISE_SPEED: 0.35,
+  /** Frames a shove keeps acting, so a push coasts instead of stopping the instant
+   *  contact breaks. Too short and herding a cluster is impossible; too long and
+   *  bubbles feel magnetic. */
+  BUBBLE_PUSH_FRAMES: 10,
   /** Frames between shots. The yellow sweet drops this to _RAPID. */
   BUBBLE_COOLDOWN: 18,
   BUBBLE_COOLDOWN_RAPID: 7,
@@ -97,6 +103,25 @@ export const T = {
   /** Fraction of ESCAPE_FRAMES remaining when the bubble starts reddening. The warning
    *  must be generous: an escape should always feel like something you were told about. */
   ESCAPE_WARN_AT: 0.35,
+  /**
+   * Gap between two bubble rims that still chains, in wu.
+   *
+   * Slack rather than exact contact, and deliberately generous. The exponential scoring
+   * curve means the difference between a 3-chain and a 4-chain is 4,000 points, so a
+   * cluster that *looks* touching and doesn't chain reads as the game cheating. See
+   * DESIGN.md §3.8.
+   */
+  BUBBLE_CHAIN_SLACK: 3,
+  /** How fast a bubble slides when the player walks into it front-first. */
+  BUBBLE_PUSH_SPEED: 0.9,
+
+  // ---------------------------------------------------------------- monsters [i]
+  MONSTER_SPEED: 0.55,
+  MONSTER_SPEED_ANGRY: 0.95,
+  /** Per-frame chance of jumping for a higher tier while the player is above. Low on
+   *  purpose — a walker that beelines the instant you climb is a meaner game. */
+  MONSTER_JUMP_CHANCE: 0.012,
+  MONSTER_JUMP_CHANCE_ANGRY: 0.03,
 
   // ---------------------------------------------------------------- room clock [i]
   /** Frames before HURRY UP flashes. */
@@ -114,6 +139,7 @@ export const T = {
   /** Chain pops are exponential: 2^(n-1) * BASE. This single curve is why the game is
    *  really about herding — see DESIGN.md §3.8. */
   CHAIN_BASE: 1000,
+  STARTING_LIVES: 3,
   /** EXTEND letters dropped, indexed by monsters popped in one chain. Index 0 and 1
    *  are unreachable (you cannot chain fewer than one) but keep the table 1:1 with n. */
   EXTEND_LETTERS: [0, 0, 0, 1, 2, 3, 4, 5, 6] as const,

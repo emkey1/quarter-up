@@ -1,7 +1,7 @@
 import { T } from '@/data/tuning';
 import type { ActionState } from './controls';
 import type { RoomData } from './room';
-import { makeBody, stepBody, type Body } from './physics';
+import { makeBody, stepBody, type Body, type Ridable } from './physics';
 
 export type PlayerPose = 'idle' | 'run' | 'rise' | 'fall';
 
@@ -33,6 +33,10 @@ export class Player {
 
   /** Raised by the red shoe. See DESIGN.md §3.9. */
   speed = T.RUN_SPEED;
+  /** Shortened by the yellow sweet. */
+  blowCooldown = T.BUBBLE_COOLDOWN;
+  /** Lengthened by the purple sweet. */
+  bubbleRange: 'normal' | 'far' = 'normal';
 
   readonly jump: JumpMeter = { airborne: 0, apex: 0, lastApex: 0, lastAirtime: 0 };
   private launchY = 0;
@@ -47,7 +51,22 @@ export class Player {
     );
   }
 
-  step(room: RoomData, a: ActionState): void {
+  /** Put the player back at the room's start, keeping upgrades but clearing motion. */
+  respawn(tileX: number, tileY: number): void {
+    const b = this.body;
+    b.x = tileX * T.TILE + T.TILE / 2;
+    b.y = (tileY + 1) * T.TILE - T.PLAYER_HALF_H;
+    b.vx = 0;
+    b.vy = 0;
+    b.onGround = false;
+    b.ridingIndex = -1;
+    this.facing = 1;
+    this.pose = 'idle';
+    this.jump.airborne = 0;
+    this.jump.apex = 0;
+  }
+
+  step(room: RoomData, a: ActionState, ridables: readonly Ridable[] = []): void {
     const b = this.body;
 
     // Instant acceleration, no friction. This is an arcade platformer of 1986, not a
@@ -65,7 +84,7 @@ export class Player {
     }
 
     const wasOnGround = b.onGround;
-    stepBody(room, b);
+    stepBody(room, b, ridables);
 
     this.measure(wasOnGround);
     this.updatePose(a);

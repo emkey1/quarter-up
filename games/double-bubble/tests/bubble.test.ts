@@ -1,0 +1,355 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { T } from '@/data/tuning';
+import { validateRoom, type RoomData } from '@/game/room';
+import {
+  anger,
+  capture,
+  chainFrom,
+  resetBubbleIds,
+  separate,
+  spawnBubble,
+  stepBubble,
+  type Bubble,
+} from '@/game/bubble';
+import { resetMonsterIds, spawnMonster } from '@/game/monster';
+import { chainScore, extendLetters } from '@/game/score';
+
+function room(spec: {
+  platforms?: [number, number, number][];
+  drift?: { right?: number[]; left?: number[]; up?: number[]; down?: number[] };
+}): RoomData {
+  const rows: string[][] = [];
+  for (let y = 0; y < T.GRID_H; y++) {
+    const r = new Array<string>(T.GRID_W).fill('.');
+    r[0] = '#';
+    r[T.GRID_W - 1] = '#';
+    rows.push(r);
+  }
+  for (const [y, x0, x1] of spec.platforms ?? []) for (let x = x0; x <= x1; x++) rows[y][x] = '=';
+
+  const driftRows: string[] = [];
+  for (let y = 0; y < T.GRID_H; y++) {
+    const d = spec.drift ?? {};
+    let ch = '.';
+    if (d.right?.includes(y)) ch = 'r';
+    else if (d.left?.includes(y)) ch = 'l';
+    else if (d.up?.includes(y)) ch = 'u';
+    else if (d.down?.includes(y)) ch = 'd';
+    driftRows.push(ch.repeat(T.GRID_W));
+  }
+
+  const r = validateRoom({
+    id: 'fixture',
+    tiles: rows.map((x) => x.join('')),
+    drift: driftRows,
+    driftSpeed: 0.4,
+    playerStart: { x: 5, y: 5 },
+    spawns: [{ kind: 'zenchan', x: 5, y: 5, dir: 1 }],
+  });
+  if (!r.ok) throw new Error(r.errors.join('\n'));
+  return r.data;
+}
+
+beforeEach(() => {
+  resetBubbleIds();
+  resetMonsterIds();
+});
+
+/* ------------------------------------------------------------------ scoring */
+
+describe('chain scoring', () => {
+  /**
+   * The single most important number in the game. This curve is why it is about herding
+   * rather than shooting, and getting it wrong by resolving pops serially turns a
+   * six-chain from 32,000 into 6,000.
+   */
+  it('doubles for every extra monster in the chain', () => {
+    expect(chainScore(1)).toBe(1_000);
+    expect(chainScore(2)).toBe(2_000);
+    expect(chainScore(3)).toBe(4_000);
+    expect(chainScore(4)).toBe(8_000);
+    expect(chainScore(5)).toBe(16_000);
+    expect(chainScore(6)).toBe(32_000);
+    expect(chainScore(7)).toBe(64_000);
+  });
+
+  /**
+   * Two at once is the break-even point — 2,000 either way — and the curve only starts
+   * paying from three. That is a real property of the design, not an accident: it means
+   * a casual double is worth nothing extra, and the reward begins exactly where setting
+   * a cluster up starts requiring actual work.
+   */
+  it('breaks even at two and beats singles from three up', () => {
+    expect(chainScore(2)).toBe(2 * chainScore(1));
+    for (let n = 3; n <= 7; n++) {
+      expect(chainScore(n)).toBeGreaterThan(n * chainScore(1));
+    }
+    expect(chainScore(7)).toBe(64 * chainScore(1)); // ...and by a lot
+  });
+
+  it('scores nothing for an empty chain', () => {
+    expect(chainScore(0)).toBe(0);
+    expect(chainScore(-1)).toBe(0);
+  });
+});
+
+describe('EXTEND letters', () => {
+  /** A separate, steeper curve: two at once is worth points but no letters at all. */
+  it('follows the documented drop table', () => {
+    expect(extendLetters(1)).toBe(0);
+    expect(extendLetters(2)).toBe(0);
+    expect(extendLetters(3)).toBe(1);
+    expect(extendLetters(4)).toBe(2);
+    expect(extendLetters(5)).toBe(3);
+    expect(extendLetters(6)).toBe(4);
+    expect(extendLetters(7)).toBe(5);
+    expect(extendLetters(8)).toBe(6);
+  });
+
+  it('caps at the whole word however big the chain', () => {
+    expect(extendLetters(20)).toBe(6);
+  });
+});
+
+/* ------------------------------------------------------------------ lifecycle */
+
+describe('bubble lifecycle', () => {
+  it('travels horizontally, decelerates, then rises', () => {
+    const r = room({});
+    const b = spawnBubble(100, 100, 1, 'normal');
+
+    stepBubble(r, b);
+    const firstStep = b.vx;
+    expect(firstStep).toBeGreaterThan(0);
+    expect(b.phase).toBe('fired');
+
+    for (let i = 0; i < 5; i++) stepBubble(r, b);
+    expect(b.vx).toBeLessThan(firstStep); // decelerating
+
+    const xBefore = b.x;
+    for (let i = 0; i < T.BUBBLE_FIRE_FRAMES; i++) stepBubble(r, b);
+    expect(b.phase).toBe('free');
+    expect(b.x).toBeGreaterThan(xBefore);
+
+    const yBefore = b.y;
+    stepBubble(r, b);
+    expect(b.y).toBeLessThan(yBefore); // rising
+  });
+
+  it('fires the other way when facing left', () => {
+    const r = room({});
+    const b = spawnBubble(100, 100, -1, 'normal');
+    stepBubble(r, b);
+    expect(b.vx).toBeLessThan(0);
+  });
+
+  it('travels further with the purple sweet without travelling faster', () => {
+    const r = room({});
+    const near = spawnBubble(100, 100, 1, 'normal');
+    const far = spawnBubble(100, 100, 1, 'far');
+
+    stepBubble(r, near);
+    stepBubble(r, far);
+    // Same speed on the first frame; the difference is how long the push lasts.
+    expect(far.fireFrames).toBeGreaterThan(near.fireFrames);
+
+    for (let i = 0; i < T.BUBBLE_FIRE_FRAMES_FAR + 2; i++) {
+      stepBubble(r, near);
+      stepBubble(r, far);
+    }
+    expect(far.x).toBeGreaterThan(near.x);
+  });
+
+  it('bursts on its own once its life runs out', () => {
+    const r = room({});
+    const b = spawnBubble(100, 100, 1, 'normal');
+    b.life = 3;
+    for (let i = 0; i < 3; i++) stepBubble(r, b);
+    expect(b.life).toBe(0);
+  });
+
+  /** Unlike a body, a bubble has no one-way behaviour — it collects under a platform. */
+  it('rests against the underside of a platform rather than passing through', () => {
+    const r = room({ platforms: [[10, 2, 20]] });
+    const b = spawnBubble(5 * T.TILE + 4, 14 * T.TILE, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+    for (let i = 0; i < 400; i++) stepBubble(r, b);
+    expect(b.y - b.halfH).toBeCloseTo(11 * T.TILE, 4);
+  });
+});
+
+describe('drift', () => {
+  it('carries a free bubble along the room current', () => {
+    const r = room({ drift: { right: [4, 5, 6] } });
+    const b = spawnBubble(100, 5 * T.TILE + 4, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+    const x0 = b.x;
+    stepBubble(r, b);
+    expect(b.x).toBeGreaterThan(x0);
+  });
+
+  /**
+   * Drift must be a pure function of position and the room, with no RNG anywhere —
+   * DESIGN.md §12 asks for a bubble released at a fixed point to trace the same path
+   * every run, and a shifting current would make chain setups unlearnable.
+   */
+  it('is deterministic: identical starts trace identical paths', () => {
+    const r = room({ drift: { right: [2, 3, 4], up: [8, 9] } });
+    const path = (): number[] => {
+      const b = spawnBubble(120, 200, 1, 'normal');
+      const out: number[] = [];
+      for (let i = 0; i < 300; i++) {
+        stepBubble(r, b);
+        out.push(b.x, b.y);
+      }
+      return out;
+    };
+    expect(path()).toEqual(path());
+  });
+});
+
+/* ------------------------------------------------------------------ captives */
+
+describe('captives', () => {
+  it('holds a monster and counts down', () => {
+    const r = room({});
+    const b = spawnBubble(100, 100, 1, 'normal');
+    const m = spawnMonster('zenchan', 5, 5, 1);
+    capture(b, m, 100);
+
+    expect(m.state).toBe('bubbled');
+    expect(b.escape).toBe(100);
+    stepBubble(r, b);
+    expect(b.escape).toBe(99);
+  });
+
+  it('stops counting its own life down while holding one', () => {
+    const r = room({});
+    const b = spawnBubble(100, 100, 1, 'normal');
+    const m = spawnMonster('zenchan', 5, 5, 1);
+    const life = b.life;
+    capture(b, m, 100);
+    for (let i = 0; i < 20; i++) stepBubble(r, b);
+    expect(b.life).toBe(life);
+  });
+
+  /** The reddening is the entire warning, so it has to start well before the end. */
+  it('reddens gradually, reaching full only at the very end', () => {
+    const b = spawnBubble(100, 100, 1, 'normal');
+    const m = spawnMonster('zenchan', 5, 5, 1);
+    capture(b, m, 100);
+
+    expect(anger(b)).toBe(0);
+
+    // Exactly at the threshold it is still calm; the warning band is the last
+    // ESCAPE_WARN_AT of the clock.
+    b.escape = Math.round(100 * T.ESCAPE_WARN_AT);
+    expect(anger(b)).toBe(0);
+
+    b.escape = 10; // well inside the band
+    const mid = anger(b);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+
+    b.escape = 0;
+    expect(anger(b)).toBe(1);
+  });
+
+  it('reports no anger for an empty bubble', () => {
+    expect(anger(spawnBubble(100, 100, 1, 'normal'))).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ chains */
+
+describe('separation', () => {
+  const free = (x: number, y: number): Bubble => {
+    const b = spawnBubble(x, y, 1, 'normal');
+    b.phase = 'free';
+    b.fireFrames = 0;
+    return b;
+  };
+
+  it('pushes overlapping bubbles apart until they only touch', () => {
+    const bubbles = [free(100, 100), free(104, 100)];
+    for (let i = 0; i < 40; i++) separate(bubbles);
+    const gap = Math.hypot(bubbles[0].x - bubbles[1].x, bubbles[0].y - bubbles[1].y);
+    expect(gap).toBeGreaterThanOrEqual(T.BUBBLE_RADIUS * 2 - 0.01);
+  });
+
+  it('separates bubbles blown from exactly the same point', () => {
+    const bubbles = [free(100, 100), free(100, 100)];
+    for (let i = 0; i < 40; i++) separate(bubbles);
+    const gap = Math.hypot(bubbles[0].x - bubbles[1].x, bubbles[0].y - bubbles[1].y);
+    expect(gap).toBeGreaterThan(0);
+    expect(Number.isFinite(gap)).toBe(true);
+  });
+
+  it('leaves bubbles that are already clear alone', () => {
+    const bubbles = [free(100, 100), free(400, 100)];
+    separate(bubbles);
+    expect(bubbles[0].x).toBe(100);
+    expect(bubbles[1].x).toBe(400);
+  });
+
+  it('stays deterministic', () => {
+    const run = (): number[] => {
+      const bubbles = [free(100, 100), free(103, 101), free(107, 99), free(100, 105)];
+      for (let i = 0; i < 10; i++) separate(bubbles);
+      return bubbles.flatMap((b) => [b.x, b.y]);
+    };
+    expect(run()).toEqual(run());
+  });
+
+  it('ignores bubbles already resolved', () => {
+    const bubbles = [free(100, 100), free(100, 100)];
+    bubbles[1].dead = true;
+    separate(bubbles);
+    expect(bubbles[0].x).toBe(100);
+    expect(bubbles[0].y).toBe(100);
+  });
+});
+
+describe('chainFrom', () => {
+  const at = (x: number, y: number): Bubble => {
+    const b = spawnBubble(x, y, 1, 'normal');
+    b.phase = 'free';
+    return b;
+  };
+
+  it('finds a run of touching bubbles', () => {
+    const reach = T.BUBBLE_RADIUS * 2 + T.BUBBLE_CHAIN_SLACK;
+    const bubbles = [at(100, 100), at(100 + reach - 1, 100), at(100 + 2 * (reach - 1), 100)];
+    expect(chainFrom(bubbles, 0).sort()).toEqual([0, 1, 2]);
+  });
+
+  it('stops at a gap', () => {
+    const reach = T.BUBBLE_RADIUS * 2 + T.BUBBLE_CHAIN_SLACK;
+    const bubbles = [at(100, 100), at(100 + reach - 1, 100), at(400, 100)];
+    expect(chainFrom(bubbles, 0).sort()).toEqual([0, 1]);
+  });
+
+  it('chains diagonally, not just in rows', () => {
+    const bubbles = [at(100, 100), at(112, 112)];
+    expect(chainFrom(bubbles, 0).sort()).toEqual([0, 1]);
+  });
+
+  it('reaches a cluster from any member', () => {
+    const bubbles = [at(100, 100), at(115, 100), at(130, 100), at(145, 100)];
+    for (let i = 0; i < bubbles.length; i++) {
+      expect(chainFrom(bubbles, i).sort()).toEqual([0, 1, 2, 3]);
+    }
+  });
+
+  it('returns just the one when nothing is near', () => {
+    expect(chainFrom([at(100, 100), at(400, 400)], 0)).toEqual([0]);
+  });
+
+  it('ignores bubbles already resolved this frame', () => {
+    const bubbles = [at(100, 100), at(112, 100)];
+    bubbles[1].dead = true;
+    expect(chainFrom(bubbles, 0)).toEqual([0]);
+  });
+});

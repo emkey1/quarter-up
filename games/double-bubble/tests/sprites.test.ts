@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPlayerFrames, SPRITE_PX } from '@/render/sprites';
+import { buildMonsterFrames, buildPlayerFrames, SPRITE_PX } from '@/render/sprites';
 import { Px, TRANSPARENT } from '@/render/pixel';
 import { T } from '@/data/tuning';
 
@@ -20,6 +20,59 @@ function bounds(px: Px): { w: number; h: number; x0: number; y1: number } {
   }
   return { w: x1 - x0 + 1, h: y1 - y0 + 1, x0, y1 };
 }
+
+/**
+ * The nastiest bug class in the whole renderer, because it fails silently and in only
+ * one direction. A fractional coordinate makes `data[y * w + x]` a fractional index,
+ * which a Uint8Array discards without complaint — so a shape drawn at a fractional
+ * centre does not land half a pixel off, it disappears. `ellipse` floors internally and
+ * survives; `rect` and `line` write straight through `set` and do not. It cost a
+ * Zen-Chan its entire body and left two eyes hanging in mid-air.
+ */
+describe('Px coordinate rounding', () => {
+  it('paints at fractional coordinates instead of dropping the write', () => {
+    const p = new Px(8, 8);
+    p.set(3.4, 4.6, 5);
+    expect(p.at(3, 5)).toBe(5);
+  });
+
+  it('fills a rect placed at a fractional origin', () => {
+    const p = new Px(16, 16);
+    p.rect(2, 4.92, 6, 6, 3);
+    let painted = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (p.at(x, y) !== 0) painted++;
+    expect(painted).toBe(36);
+  });
+
+  it('draws a line from a fractional start', () => {
+    const p = new Px(16, 16);
+    p.line(1.5, 2.5, 9.5, 2.5, 4);
+    let painted = 0;
+    for (let x = 0; x < 16; x++) if (p.at(x, 3) !== 0) painted++;
+    expect(painted).toBeGreaterThan(5);
+  });
+
+  it('still rejects genuinely out-of-bounds writes', () => {
+    const p = new Px(4, 4);
+    p.set(-1, 2, 7);
+    p.set(2, 99, 7);
+    for (let i = 0; i < p.data.length; i++) expect(p.data[i]).toBe(0);
+  });
+});
+
+describe('monster art', () => {
+  it('draws a body, not just the eyes', () => {
+    for (const px of buildMonsterFrames()) {
+      let painted = 0;
+      for (let y = 0; y < px.h; y++) {
+        for (let x = 0; x < px.w; x++) if (px.at(x, y) !== 0) painted++;
+      }
+      // The body alone is 24x24; anything near the size of the eyes alone means the
+      // fractional-coordinate bug is back.
+      expect(painted).toBeGreaterThan(400);
+    }
+  });
+});
 
 describe('player art', () => {
   const frames = buildPlayerFrames();

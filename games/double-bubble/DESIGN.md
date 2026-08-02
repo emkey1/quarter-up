@@ -2,8 +2,13 @@
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** M0 in progress — engine substrate copied and decoupled, room format and
-> renderer landed. Physics is M1. See §11 for the milestone table.
+> **Status:** M2 complete — bubbles work: lifecycle, drift, packing, riding, pushing and
+> chain pops, against Zen-Chan. A room is clearable and a three-chain pays 4,000.
+> The rest of the roster, the hurry-up and the Baron are M3. See §11.
+>
+> Outstanding from M1: the physics constants are still `[i]` placeholders. They are
+> internally consistent and instrumented (F1 shows measured against predicted, in the
+> units a frame-stepped clip yields) but they have not been measured against footage.
 
 ---
 

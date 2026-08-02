@@ -99,13 +99,27 @@ export class Px {
   }
 
   at(x: number, y: number): number {
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return TRANSPARENT;
-    return this.data[y * this.w + x];
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (ix < 0 || iy < 0 || ix >= this.w || iy >= this.h) return TRANSPARENT;
+    return this.data[iy * this.w + ix];
   }
 
+  /**
+   * Paint one pixel.
+   *
+   * Coordinates are ROUNDED rather than assumed integral. A fractional y indexes
+   * `data[y * w + x]` at a fractional offset, which a Uint8Array silently discards —
+   * so a shape drawn at a fractional centre does not misalign by half a pixel, it
+   * vanishes entirely, with no error anywhere. That cost a Zen-Chan its whole body and
+   * left two eyes floating in the room, because `cy = 32 * 0.56` is 17.92 and `rect`
+   * writes through this method while `ellipse` happens to floor first.
+   */
   set(x: number, y: number, c: number): void {
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
-    this.data[y * this.w + x] = c;
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (ix < 0 || iy < 0 || ix >= this.w || iy >= this.h) return;
+    this.data[iy * this.w + ix] = c;
   }
 
   /** Only paint where nothing has been painted yet — for layering behind. */
