@@ -49,11 +49,24 @@ export const T = {
    * floaty fixed arc is that you can predict where you will land on a drifting bubble
    * before you commit. See DESIGN.md §3.2.
    *
-   * Solved for a 32wu (4-tile) apex reached in 20 frames:
-   *   v0 = 2h/t = 3.2      g = v0/t = 0.16      h = v0^2/2g = 32  ✓
+   * Solved for a 4-tile (32wu) apex reached in K=20 frames — but NOT with the textbook
+   * h = v0^2/(2g). That is the continuous solution, and this is a fixed-step integrator
+   * that applies gravity *before* the position update, so the first frame of a jump
+   * moves (v0 - g) rather than v0. Summing the real series gives
+   *
+   *     apex = g*K*(K-1)/2        with K = v0/g
+   *
+   * which for a given v0 and g lands about 5% short of v0^2/(2g) — enough to look
+   * correct on paper and still fail a frame-by-frame comparison against footage.
+   * Inverting it for apex 32wu over K=20:
+   *
+   *     g  = 2*32 / (20*19) = 0.1684…      v0 = g*K = 3.368…
+   *
+   * predictJump() and solveJump() in game/physics.ts do this both ways; use solveJump
+   * to convert measured footage numbers into constants during the M1 fidelity pass.
    */
-  JUMP_VELOCITY: 3.2,
-  GRAVITY: 0.16,
+  JUMP_VELOCITY: 3.368,
+  GRAVITY: 0.1684,
   /** Terminal velocity. Without a cap, a fall through the vertical wrap accelerates
    *  forever and the player tunnels through platforms on re-entry. */
   FALL_SPEED_MAX: 4.0,

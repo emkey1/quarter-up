@@ -58,10 +58,20 @@ function buildDrift({ right = [], left = [], up = [], down = [] } = {}) {
 /**
  * Room 1 — teaches nothing but the basics, which is the whole job.
  *
- * Four tiers of short platforms with generous gaps, and a floor that stops short of the
- * walls so the drop-through and the vertical wrap are discoverable in the first ten
- * seconds without anyone being told about them. Two Zen-Chans, the slowest monster,
- * placed on the same tier so a first chain pop is possible but not accidental.
+ * TIER SPACING IS THREE ROWS, and that is a hard constraint rather than a taste.
+ * The jump apex is four tiles exactly, so a platform four rows up sits precisely at the
+ * limit: the feet arrive level with the lip and whether you catch it comes down to
+ * float noise. That reads as broken input, not as "you need a bubble for this one".
+ * Three rows clears comfortably. Anything meant to be out of reach should be five or
+ * more, so it is unmistakably a bubble-riding problem — never four.
+ *
+ * The tiers alternate sides in a staircase, with a two-column horizontal step between
+ * them. A jump covers roughly 4.75 tiles of ground at run speed, so two is a walk.
+ *
+ * The floor stops short of the walls so the drop-through and the vertical wrap are
+ * discoverable in the first ten seconds without anyone being told about them. Two
+ * Zen-Chans, the slowest monster, share a tier so a first chain pop is possible but
+ * not accidental.
  *
  * The ceiling band drifts right: bubbles that get away collect in the top-right corner
  * instead of scattering, which is the first hint that rooms have currents.
@@ -70,25 +80,22 @@ const room001 = {
   id: 'r001',
   tiles: buildTiles({
     platforms: [
-      [6, 4, 11],
-      [6, 20, 27],
-      [11, 2, 8],
-      [11, 13, 18],
-      [11, 23, 29],
-      [16, 4, 11],
-      [16, 20, 27],
-      [21, 2, 8],
-      [21, 13, 18],
-      [21, 23, 29],
-      [25, 3, 28],
+      [25, 3, 28], // floor
+      [22, 6, 13],
+      [19, 15, 22],
+      [16, 6, 13],
+      [13, 15, 22],
+      [10, 3, 9],
+      [10, 20, 27],
+      [7, 12, 18],
     ],
   }),
   drift: buildDrift({ right: [0, 1, 2, 3] }),
   driftSpeed: 0.4,
   playerStart: { x: 15, y: 24 },
   spawns: [
-    { kind: 'zenchan', x: 6, y: 10, dir: 1 },
-    { kind: 'zenchan', x: 25, y: 10, dir: -1 },
+    { kind: 'zenchan', x: 5, y: 9, dir: 1 },
+    { kind: 'zenchan', x: 24, y: 9, dir: -1 },
   ],
   escapeFrames: 480,
   timer: 1800,
