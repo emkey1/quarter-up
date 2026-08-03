@@ -74,7 +74,7 @@
       "t": "exit",
       "x": 38,
       "y": 9,
-      "skipTo": 20
+      "skipTo": 21
     },
     {
       "t": "exit",
@@ -125,7 +125,7 @@
       "t": "sign",
       "x": 38,
       "y": 14,
-      "text": "LEVEL 20"
+      "text": "LEVEL 21"
     },
     {
       "t": "sign",

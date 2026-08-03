@@ -191,7 +191,46 @@ describe('intro level-select', () => {
     expect(last.name).toBe('Six Doors');
     expect(skips.length).toBe(6);
     expect(skips.map((s) => s.skipTo).sort((a, b) => (a as number) - (b as number)))
-      .toEqual([8, 14, 20, 26, 32, 38]);
+      .toEqual([8, 14, 21, 26, 32, 38]);
+  });
+
+  it('never opens a door into a treasure room', () => {
+    // Evenly spaced every six levels, the third door landed on depth 20 — which is
+    // exactly where the first treasure room sits. The best opening move was therefore to
+    // take door three and farm a room full of unguarded gold before the run had started,
+    // which made the choice between six doors a non-choice and gave away for free the
+    // reward you are meant to reach by surviving twelve levels.
+    //
+    // Asserted as a property rather than by re-pinning the numbers, because the door
+    // spacing and the treasure cadence are independent and either could move again.
+    const last = INTRO[INTRO.length - 1];
+    for (const s of last.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number')) {
+      const depth = s.skipTo as number;
+      expect(
+        CAMPAIGN[depth - 1].type,
+        `door to ${depth} opens straight into a treasure room`,
+      ).not.toBe('treasure');
+    }
+  });
+
+  it('resolves the depth-20 collision forwards, so the vault is missed rather than given', () => {
+    // Which way to dodge is the whole question, and only for the door that actually
+    // collided. Backwards to 19 would hand the vault over after a single level, which is
+    // barely better than landing on it. Forwards to 21 means skipping ahead skips the
+    // reward too, which is what skipping ahead ought to cost.
+    //
+    // Deliberately NOT a blanket "no door sits one level below a vault": door five goes
+    // to 32 and the second vault is at 33, and that is ordinary progression — you have to
+    // clear a full dungeon level at depth 32 to get there, which at that depth is earned
+    // rather than free.
+    const last = INTRO[INTRO.length - 1];
+    const depths = (
+      last.objects.filter((o) => o.t === 'exit' && typeof o.skipTo === 'number') as { skipTo: number }[]
+    ).map((s) => s.skipTo);
+
+    expect(CAMPAIGN.flatMap((l, i) => (l.type === 'treasure' ? [i + 1] : []))).toEqual([20, 33, 46]);
+    expect(depths, 'the third door should step past the first vault').toContain(21);
+    expect(depths, 'the third door must not stop just short of it either').not.toContain(19);
   });
 
   it('labels every door with where it goes', () => {

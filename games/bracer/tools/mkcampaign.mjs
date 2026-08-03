@@ -126,6 +126,26 @@ const hidden = [];
 /** Floor signs for the level-select, written into the level so the game can paint them. */
 const DOOR_SIGNS = [];
 
+/** Intro levels occupy campaign depths 1..INTRO_COUNT. */
+const INTRO_COUNT = 7;
+/** A treasure room follows every TREASURE_EVERY'th dungeon level. */
+const TREASURE_EVERY = 12;
+
+/**
+ * Is this 1-based campaign depth a treasure room?
+ *
+ * The k'th vault follows dungeon level k*TREASURE_EVERY, and the k-1 vaults before it
+ * have each pushed everything down by one — so it sits at
+ * INTRO_COUNT + k*TREASURE_EVERY + k. With the current numbers that is 20, 33, 46.
+ *
+ * Worth stating once here rather than counting on fingers at each call site: the offset
+ * is easy to get wrong by one in either direction, and being wrong is silent.
+ */
+const isTreasureDepth = (depth) => {
+  const after = depth - INTRO_COUNT;
+  return after > 0 && after % (TREASURE_EVERY + 1) === 0;
+};
+
 /* ================================================================== intro levels */
 /**
  * The seven intro levels.
@@ -248,10 +268,22 @@ intro(7, (g) => {
    * Each door's destination is written on the floor in front of it (see DOOR_SIGNS): an
    * unlabelled door asks you to gamble on a number you cannot see, which is not a choice,
    * it is a shrug.
+   *
+   * The spacing is every six levels, EXCEPT that no door may open into a treasure room.
+   * Evenly spaced, the third door landed on depth 20 — which is exactly where the first
+   * treasure room sits, so the best opening move was to take door three and farm a room
+   * full of free gold with no monsters in it before the run had properly started. That
+   * made the choice between six doors a non-choice, and handed out a reward that is
+   * supposed to be the thing you reach by surviving twelve levels.
+   *
+   * Skipping ahead should skip the reward too, so a colliding door steps PAST the vault
+   * rather than short of it. Derived from the cadence rather than hardcoded around the
+   * one collision, because the next person to change either number should not have to
+   * rediscover this.
    */
   fill(g, 2, 2, 29, 29, '.');
   DOOR_SIGNS.length = 0;
-  const depths = [8, 14, 20, 26, 32, 38];
+  const depths = [8, 14, 20, 26, 32, 38].map((d) => (isTreasureDepth(d) ? d + 1 : d));
   const cols = [7, 16, 25];
   depths.forEach((depth, i) => {
     const x = cols[i % 3];
@@ -527,7 +559,7 @@ for (let d = 1; d <= 40; d++) {
   );
 
   // A treasure room every twelve levels: pure greed, on a clock.
-  if (d % 12 === 0) {
+  if (d % TREASURE_EVERY === 0) {
     // Written straight in grid space, not design space: the field is a checkerboard, and
     // a checkerboard is grain. Mapping it cell by cell would space the treasure out to
     // fit the bigger room and leave the count unchanged — a bigger room with the same
