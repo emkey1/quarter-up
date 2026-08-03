@@ -1,4 +1,4 @@
-import type { Layout, Rect } from '@/engine/display';
+import type { Layout, Rect } from '@cabinet/display';
 
 /**
  * Screen-level feedback: shake, flash, vignette, impact punch.

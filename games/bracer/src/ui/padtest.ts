@@ -1,8 +1,9 @@
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { Input } from '@/engine/input';
 import type { ActionName } from '@/engine/actions';
-import { padUsable, buttonPressed, buttonValue, type PadSource } from '@/engine/gamepad';
+import { padUsable, buttonPressed, buttonValue, type PadSource } from '@cabinet/gamepad';
 import { shapeOf } from '@/engine/padlog';
+import { T } from '@/data/tuning';
 import { saveSettings } from '@/engine/storage';
 
 const BINDABLE: { action: ActionName; label: string }[] = [
@@ -261,7 +262,7 @@ export class PadTest {
     }
 
     /* ------------------------------------------------- history (survives reloads) */
-    const sightings = Object.values(gp.log.sightings);
+    const sightings = Object.values(input.padLog.sightings);
     if (sightings.length) {
       head('ever seen  (persisted across reloads)');
       for (const sg of sightings) {
@@ -274,8 +275,8 @@ export class PadTest {
           sg.inputSeen ? OK : BAD,
         );
       }
-      if (gp.log.events.length) {
-        for (const e of gp.log.events.slice(0, 5)) {
+      if (input.padLog.events.length) {
+        for (const e of input.padLog.events.slice(0, 5)) {
           mono(`${new Date(e.t).toLocaleTimeString()}  ${e.text.slice(0, 64)}`, 9, DIM, x);
           y += 12 * s;
         }
@@ -312,7 +313,7 @@ export class PadTest {
       liveButtons.forEach((b, i) => {
         const cx = bx0 + (i % 12) * cell;
         const cy = y - 9 * s + Math.floor(i / 12) * cell;
-        const on = buttonPressed(b);
+        const on = buttonPressed(b, T.PAD_TRIGGER_THRESHOLD);
         ctx.fillStyle = on ? OK : 'rgba(255,255,255,.07)';
         ctx.fillRect(cx, cy, cell - 3 * s, cell - 3 * s);
         ctx.fillStyle = on ? '#06210b' : 'rgba(255,255,255,.3)';

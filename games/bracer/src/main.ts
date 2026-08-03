@@ -1,6 +1,7 @@
-import { Display } from '@/engine/display';
+import { Display } from '@cabinet/display';
 import { Input } from '@/engine/input';
-import { Loop } from '@/engine/loop';
+import { Loop } from '@cabinet/loop';
+import { T } from '@/data/tuning';
 import { loadSettings } from '@/engine/storage';
 import { validateLevel, type LevelData } from '@/game/level';
 import { App } from '@/ui/app';
@@ -50,7 +51,16 @@ function boot(): void {
   const stage = document.getElementById('stage');
   if (!stage) throw new Error('#stage missing');
 
-  const display = new Display(stage);
+  const display = new Display(stage, {
+    viewW: T.VIEW_W,
+    viewH: T.VIEW_H,
+    artScale: T.ART_SCALE,
+    scaleMin: T.SCREEN_SCALE_MIN,
+    scaleMax: T.SCREEN_SCALE_MAX,
+    // The status panel — health, score, keys, potions — has no compact fallback, so a
+    // narrow window keeps a cramped flank rather than losing the readout entirely.
+    keepRightPanel: true,
+  });
   const input = new Input();
   input.attach();
 
@@ -65,7 +75,7 @@ function boot(): void {
   window.addEventListener('gamepadconnected', () => input.poll(), { once: false });
 
   const app = new App(display, input, playtestLevel());
-  const loop = new Loop(app);
+  const loop = new Loop(app, { stepHz: T.STEP_HZ });
   app.loop = loop;
   loop.start();
 
@@ -80,11 +90,11 @@ function boot(): void {
       app,
       loop,
       padReport: () => {
-        const txt = input.gamepad.log.report();
+        const txt = input.padLog.report();
         console.log(txt);
         return txt;
       },
-      padReset: () => input.gamepad.log.clear(),
+      padReset: () => input.padLog.clear(),
     },
   });
 }

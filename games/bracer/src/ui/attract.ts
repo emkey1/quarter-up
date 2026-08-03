@@ -1,4 +1,4 @@
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { ActionState } from '@/engine/actions';
 import { UI, centred, logo, sans, mono, blink } from '@/render/ui';
 import type { Pointer } from '@/engine/pointer';

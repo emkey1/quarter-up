@@ -1,5 +1,5 @@
-import type { LoopHost } from '@/engine/loop';
-import type { Display, Layout } from '@/engine/display';
+import type { LoopHost } from '@cabinet/loop';
+import type { Display, Layout } from '@cabinet/display';
 import type { Devices } from '@/engine/devices';
 import { emptyActions, sampleActions, type Action, type ActionState } from '@/game/controls';
 import type { RoomData } from '@/game/room';

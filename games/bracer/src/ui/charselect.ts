@@ -1,5 +1,5 @@
 import { CLASSES, CLASS_ORDER, CLASS_VERDICT, classBars, type ClassId } from '@/data/classes';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { ActionState } from '@/engine/actions';
 import { UI, centred, logo, sans, statBar, blink } from '@/render/ui';
 import { sprites } from '@/render/sprites';

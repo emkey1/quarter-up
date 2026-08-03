@@ -1,5 +1,5 @@
 import { T } from '@/data/tuning';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { WorldEvent } from '@/game/world';
 
 /**

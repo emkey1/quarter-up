@@ -1,4 +1,4 @@
-import type { Layout, Rect } from '@/engine/display';
+import type { Layout, Rect } from '@cabinet/display';
 
 /** Shared chrome for the menu screens. Kept deliberately plain: this is a game about
  *  a dungeon, and the UI's job is to get out of the way quickly. */

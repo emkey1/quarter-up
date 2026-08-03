@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@cabinet': fileURLToPath(new URL('../../packages/cabinet/src', import.meta.url)),
+    },
   },
   test: {
     environment: 'node',

@@ -1,6 +1,6 @@
-import type { PadConfig } from './config';
-import { Keyboard, type Bindings } from './keyboard';
-import { GamepadInput, type DpadActions, type PadProfile } from './gamepad';
+import type { PadConfig } from '@cabinet/config';
+import { Keyboard, type Bindings } from '@cabinet/keyboard';
+import { GamepadInput, type DpadActions, type PadProfile } from '@cabinet/gamepad';
 
 export type DeviceKind = 'keyboard' | 'gamepad';
 

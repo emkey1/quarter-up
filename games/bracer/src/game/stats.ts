@@ -1,5 +1,5 @@
 import type { CharacterClass, ClassStats, Roll, ByFamily, UpgradeId } from '@/data/classes';
-import type { Rng } from '@/engine/rng';
+import type { Rng } from '@cabinet/rng';
 
 /** Which stats each upgrade potion promotes from `base` to `extra`. */
 const UPGRADE_FIELDS: Record<UpgradeId, (keyof ClassStats)[]> = {

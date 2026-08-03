@@ -1,4 +1,4 @@
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { Input } from '@/engine/input';
 import {
   DEFAULT_RULES,

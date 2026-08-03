@@ -3,7 +3,7 @@ import type { ClassId, UpgradeId } from '@/data/classes';
 import { difficultyOf, type Difficulty } from '@/data/difficulty';
 import type { ActionState } from '@/engine/actions';
 import type { FireModel } from '@/engine/input';
-import { Rng } from '@/engine/rng';
+import { Rng } from '@cabinet/rng';
 import { SpatialGrid } from '@/engine/spatial';
 import { chase, findSpawnTile, type Blocker } from './ai';
 import { Camera } from './camera';

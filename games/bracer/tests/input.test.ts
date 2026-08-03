@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { T } from '@/data/tuning';
-import { quantiseStick, analogStick } from '@/engine/gamepad';
+import { quantiseStick as quantise, analogStick as analog } from '@cabinet/gamepad';
+
+/**
+ * The cabinet's stick maths takes its thresholds as arguments now that it is shared with
+ * the other games. These wrappers pin them back to Bracer's, so every assertion below
+ * still measures the values this game actually runs with.
+ */
+const quantiseStick = (x: number, y: number, prev: number | null) =>
+  quantise(x, y, prev, T.PAD_DEADZONE, T.PAD_HYSTERESIS);
+const analogStick = (x: number, y: number) => analog(x, y, T.PAD_DEADZONE);
 import { fireRoots } from '@/engine/input';
 
 describe('quantiseStick', () => {

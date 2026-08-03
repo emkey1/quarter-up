@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { T, ROOM_W } from '@/data/tuning';
 import { MONSTER_SPECS, unlockedBy } from '@/data/roster';
-import { Rng } from '@/engine/rng';
+import { Rng } from '@cabinet/rng';
 import { validateRoom, MONSTER_KINDS, type MonsterKind, type RoomData } from '@/game/room';
 import { resetMonsterIds, spawnMonster, stepMonster } from '@/game/monster';
 import { resetProjectileIds, stepProjectile, projectileHits } from '@/game/projectile';

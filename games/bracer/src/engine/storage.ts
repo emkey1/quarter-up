@@ -1,5 +1,16 @@
-import type { PadProfile } from './gamepad';
-import type { KeyBindings } from './keyboard';
+/**
+ * What Bracer persists between sessions.
+ *
+ * The guarded localStorage access underneath is shared (`@cabinet/storage`); this file
+ * is only the shape of the blob and the key it lives under. Everything is optional
+ * because any of it may be missing from an older save, and a settings read is never
+ * important enough to take the game down with it.
+ */
+
+import { readJson, writeJson } from '@cabinet/storage';
+import type { PadProfile } from '@cabinet/gamepad';
+import type { ActionName } from './actions';
+import type { KeyBindings } from './controls';
 import type { FireModel } from './input';
 import type { Rules } from '@/data/rules';
 
@@ -7,7 +18,7 @@ const KEY = 'bracer.settings.v1';
 
 export interface Settings {
   keyBindings?: Partial<KeyBindings>;
-  padProfiles?: Record<string, PadProfile>;
+  padProfiles?: Record<string, PadProfile<ActionName>>;
   fireModel?: FireModel;
   analogMovement?: boolean;
   rumble?: boolean;
@@ -18,18 +29,9 @@ export interface Settings {
 }
 
 export function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Settings) : {};
-  } catch {
-    return {}; // private browsing, quota, corrupt JSON — never block the game on this
-  }
+  return readJson<Settings>(KEY, {});
 }
 
 export function saveSettings(patch: Settings): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...loadSettings(), ...patch }));
-  } catch {
-    /* ignore */
-  }
+  writeJson(KEY, { ...loadSettings(), ...patch });
 }

@@ -1,7 +1,9 @@
-import type { ActionState } from './actions';
-import { emptyActions } from './actions';
-import { Keyboard } from './keyboard';
-import { GamepadInput } from './gamepad';
+import type { ActionState, ActionName } from './actions';
+import { emptyActions, ACTION_NAMES } from './actions';
+import { DEFAULT_KEY_BINDINGS, STANDARD_PROFILE, DPAD } from './controls';
+import { PadLog } from './padlog';
+import { Keyboard } from '@cabinet/keyboard';
+import { GamepadInput } from '@cabinet/gamepad';
 import { T } from '@/data/tuning';
 
 export type DeviceKind = 'keyboard' | 'gamepad';
@@ -14,8 +16,20 @@ export type DeviceKind = 'keyboard' | 'gamepad';
  * press can never fire twice when the loop catches up on a backlog.
  */
 export class Input {
-  readonly keyboard = new Keyboard();
-  readonly gamepad = new GamepadInput();
+  readonly keyboard = new Keyboard<ActionName>(ACTION_NAMES, DEFAULT_KEY_BINDINGS);
+  readonly gamepad = new GamepadInput<ActionName>(
+    {
+      deadzone: T.PAD_DEADZONE,
+      hysteresis: T.PAD_HYSTERESIS,
+      triggerThreshold: T.PAD_TRIGGER_THRESHOLD,
+    },
+    STANDARD_PROFILE,
+    DPAD,
+  );
+
+  /** Persistent record of every pad ever seen — the diagnostic behind the pad-test
+   *  screen. Attached to the device as an observer rather than living inside it. */
+  readonly padLog = new PadLog();
 
   /** Which device the player last touched — drives the HUD prompt glyphs and the
    *  per-device fire-model default. */
@@ -26,6 +40,7 @@ export class Input {
   attach(): void {
     this.keyboard.attach();
     this.gamepad.attach();
+    this.gamepad.observer = this.padLog;
   }
 
   detach(): void {

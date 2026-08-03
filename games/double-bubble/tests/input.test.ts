@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { quantiseStick, buttonValue, padUsable, padAxes, padButtons } from '@/engine/gamepad';
+import { quantiseStick, buttonValue, padUsable, padAxes, padButtons } from '@cabinet/gamepad';
 import { T } from '@/data/tuning';
 
 const DZ = T.PAD_DEADZONE;

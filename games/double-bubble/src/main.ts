@@ -1,11 +1,11 @@
-import { Display } from '@/engine/display';
-import { Loop } from '@/engine/loop';
-import { readJson } from '@/engine/storage';
+import { Display } from '@cabinet/display';
+import { Loop } from '@cabinet/loop';
+import { readJson } from '@cabinet/storage';
 import { createDevices, type Action } from '@/game/controls';
 import { App } from '@/ui/app';
 import { T } from '@/data/tuning';
-import type { Bindings } from '@/engine/keyboard';
-import type { PadProfile } from '@/engine/gamepad';
+import type { Bindings } from '@cabinet/keyboard';
+import type { PadProfile } from '@cabinet/gamepad';
 
 // Every room is loaded and validated here, at module load. A bundled room that fails
 // validation is a build-time mistake, and finding out forty rooms into a run is the
@@ -31,6 +31,9 @@ function boot(): void {
     artScale: T.ART_SCALE,
     scaleMin: T.SCREEN_SCALE_MIN,
     scaleMax: T.SCREEN_SCALE_MAX,
+    // A room is one screen and the HUD sits over the playfield, so a too-narrow window
+    // simply loses both flanks rather than keeping a cramped one.
+    keepRightPanel: false,
   });
 
   const devices = createDevices();

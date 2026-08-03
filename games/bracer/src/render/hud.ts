@@ -1,6 +1,6 @@
 import { T } from '@/data/tuning';
 import { CLASSES, UPGRADES } from '@/data/classes';
-import type { Layout, Rect } from '@/engine/display';
+import type { Layout, Rect } from '@cabinet/display';
 import type { Input } from '@/engine/input';
 import { FIRE_MODELS, type FireModel } from '@/engine/input';
 import type { World } from '@/game/world';

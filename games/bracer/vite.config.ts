@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@cabinet': fileURLToPath(new URL('../../packages/cabinet/src', import.meta.url)),
     },
   },
   server: { port: 5173, open: false },

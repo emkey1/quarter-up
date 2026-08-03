@@ -1,4 +1,4 @@
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { ActionState } from '@/engine/actions';
 import { UI, centred, sans } from '@/render/ui';
 import { DEFAULT_DIFFICULTY, difficultyOf, type DifficultyId } from '@/data/difficulty';

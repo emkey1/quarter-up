@@ -1,5 +1,5 @@
 import { T, ROOM_W } from '@/data/tuning';
-import { Rng } from '@/engine/rng';
+import { Rng } from '@cabinet/rng';
 import type { ActionState } from './controls';
 import type { RoomData } from './room';
 import { Player } from './player';

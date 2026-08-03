@@ -1,5 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { GamepadInput } from '@/engine/gamepad';
+import { GamepadInput } from '@cabinet/gamepad';
+import { T } from '@/data/tuning';
+import type { ActionName } from '@/engine/actions';
+import { STANDARD_PROFILE, DPAD } from '@/engine/controls';
+
+/** A pad device configured exactly as the game configures it. */
+const newPad = () =>
+  new GamepadInput<ActionName>(
+    {
+      deadzone: T.PAD_DEADZONE,
+      hysteresis: T.PAD_HYSTERESIS,
+      triggerThreshold: T.PAD_TRIGGER_THRESHOLD,
+    },
+    STANDARD_PROFILE,
+    DPAD,
+  );
 
 /** Minimal fake Gamepad, shaped like the real thing. */
 function makePad(over: Partial<Gamepad> & { id?: string } = {}): Gamepad {
@@ -44,11 +59,11 @@ afterEach(() => {
 });
 
 describe('non-standard pad rescue', () => {
-  let gp: GamepadInput;
+  let gp: GamepadInput<ActionName>;
 
   beforeEach(() => {
     install(makePad());
-    gp = new GamepadInput();
+    gp = newPad();
   });
 
   it('reports a non-standard pad as such rather than silently failing', () => {
@@ -141,7 +156,7 @@ describe('non-standard pad rescue', () => {
     // for both on a number, so every button reads as never-pressed: the pad enumerates
     // perfectly and no input ever arrives.
     install(makePad({ buttons: [0, 0, 0, 0, 0, 0, 0, 0] as unknown as readonly GamepadButton[] }));
-    const g = new GamepadInput();
+    const g = newPad();
     g.poll();
     expect(g.status.connected).toBe(true);
 
@@ -159,7 +174,7 @@ describe('non-standard pad rescue', () => {
         buttons: Array.from({ length: 8 }, () => ({ pressed: false })) as unknown as readonly GamepadButton[],
       }),
     );
-    const g = new GamepadInput();
+    const g = newPad();
     (pad.buttons as unknown as { pressed: boolean }[])[0] = { pressed: true };
     g.poll();
     expect(g.isHeld('fire')).toBe(true);
@@ -171,7 +186,7 @@ describe('non-standard pad rescue', () => {
     const p = makePad();
     delete (p as unknown as Record<string, unknown>).connected;
     install(p);
-    const g = new GamepadInput();
+    const g = newPad();
     press(0);
     g.poll();
     expect(g.status.connected).toBe(true);
@@ -181,7 +196,7 @@ describe('non-standard pad rescue', () => {
   it('finds a controller sitting in slot 3 with slots 0-2 empty', () => {
     // The Gamepad API exposes four slots and a controller may land in any of them.
     setNavigator({ getGamepads: () => [null, null, null, pad] });
-    const g = new GamepadInput();
+    const g = newPad();
     press(0);
     g.poll();
     expect(g.status.connected, 'a pad in slot 3 must still be found').toBe(true);
@@ -196,7 +211,7 @@ describe('non-standard pad rescue', () => {
     // live readout and the binding flow both go blind while the pad still enumerates.
     install(makePad({ index: 0 } as Partial<Gamepad>));
     setNavigator({ getGamepads: () => [null, null, pad] }); // reports 0, actually slot 2
-    const g = new GamepadInput();
+    const g = newPad();
     press(0);
     g.poll();
     expect(g.status.connected).toBe(true);
@@ -212,7 +227,7 @@ describe('non-standard pad rescue', () => {
     const quiet = makePad({ id: 'Quiet Pad' });
     const busy = makePad({ id: 'Busy Pad' });
     setNavigator({ getGamepads: () => [quiet, busy] });
-    const g = new GamepadInput();
+    const g = newPad();
     g.poll();
     expect(g.status.id).toBe('Quiet Pad'); // first usable wins by default
 
@@ -228,7 +243,7 @@ describe('non-standard pad rescue', () => {
   it('finds a pad that never became active', () => {
     // The failure mode being fixed: binding must not require the pad to already be
     // the "active" one, because a pad that does nothing never becomes active.
-    const fresh = new GamepadInput();
+    const fresh = newPad();
     press(3);
     fresh.beginDetect();
     expect(fresh.detect()?.source).toEqual({ kind: 'button', index: 3 });

@@ -1,6 +1,6 @@
 import { Devices } from '@/engine/devices';
-import type { Bindings } from '@/engine/keyboard';
-import type { DpadActions, PadProfile } from '@/engine/gamepad';
+import type { Bindings } from '@cabinet/keyboard';
+import type { DpadActions, PadProfile } from '@cabinet/gamepad';
 import { T } from '@/data/tuning';
 
 /**
@@ -63,6 +63,8 @@ export const STANDARD_PROFILE: PadProfile<Action> = {
   match: 'standard',
   label: 'Standard gamepad',
   moveStick: { x: 0, y: 1 },
+  // Nothing to aim: you face where you walk, and bubbles go that way.
+  aimStick: null,
   sources: {
     up: [{ kind: 'button', index: 12 }],
     down: [{ kind: 'button', index: 13 }],

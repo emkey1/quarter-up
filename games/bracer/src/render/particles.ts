@@ -1,4 +1,4 @@
-import type { Rect } from '@/engine/display';
+import type { Rect } from '@cabinet/display';
 
 /**
  * Pooled particles. Render-only: never stepped by the simulation, never read by it.

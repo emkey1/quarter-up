@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Rng, hash32 } from '@/engine/rng';
+import { Rng, hash32 } from '../src/rng';
 
 /**
  * Determinism is load-bearing: the drift-path test in §12 asserts that a bubble released

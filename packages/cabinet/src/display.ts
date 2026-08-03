@@ -34,9 +34,14 @@ const MIN_FLANK_PX = 168; // device px below which a flank is not worth having
 /**
  * Owns the canvas and resolves world units to device pixels.
  *
- * The room (viewW x viewH world units) is fixed and fills the playfield exactly —
- * this game has no camera, because a room is one screen. Only how many device pixels
- * each world unit occupies varies.
+ * The gameplay viewport (viewW x viewH world units) is fixed; only how many device
+ * pixels each world unit occupies varies. Whether the world is larger than the viewport
+ * is the game's business — Double Bubble's room is exactly one screen and it has no
+ * camera at all, Bracer scrolls a 768-unit level behind the same fixed window. Neither
+ * changes the arithmetic here.
+ *
+ * Integer scales only. A fractional scale on pixel art means unevenly-sized pixels,
+ * which is worse than a smaller playfield.
  */
 export class Display {
   readonly canvas: HTMLCanvasElement;
@@ -124,9 +129,10 @@ export class Display {
       canvasH,
       playfield: { x: pfX, y: pfY, w: pfW, h: pfH },
       leftPanel: hasFlanks ? { x: 0, y: pfY, w: flank, h: pfH } : null,
-      rightPanel: hasFlanks
-        ? { x: pfX + pfW, y: pfY, w: canvasW - (pfX + pfW), h: pfH }
-        : null,
+      rightPanel:
+        hasFlanks || this.cfg.keepRightPanel
+          ? { x: pfX + pfW, y: pfY, w: Math.max(0, canvasW - (pfX + pfW)), h: pfH }
+          : null,
     };
 
     this.onResize?.(this.layout);

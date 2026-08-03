@@ -3,7 +3,7 @@
 A browser-based, single-player dungeon crawler that closely mimics the mechanics, feel, and
 presentation of Atari Games' **Gauntlet** (arcade, 1985).
 
-**Status:** design v2 — **M0–M5 implemented** (§12), including the setup screen (§6.6), the 50-level campaign (§11) and the level editor (§11.1). Polish (M6) next.
+**Status:** design v2 — **M0–M5 implemented** (§12), including the setup screen (§6.6), the 50-level campaign (§11) and the level editor (§11.1). **M6 in progress**: the shared-engine extraction is done and this game now runs on [`@quarter-up/cabinet`](../../packages/cabinet); save/resume, the colour-blind palette, the widescreen toggle and the performance pass are outstanding.
 **Target:** modern desktop browsers, keyboard **or gamepad**, 60 Hz fixed-step simulation,
 HTML5 Canvas, art at 2× the original's resolution.
 
@@ -1426,7 +1426,26 @@ credit, and brutal on level 30+.
 
 Continues and score-per-credit, local high-score table, save/resume, difficulty presets, pause,
 performance pass, colour-blind-safe class palette option, widescreen toggle with its deviation
-warning, README + controls card (keyboard and pad).
+warning, README + controls card (keyboard and pad) — **and the `packages/cabinet` extraction**,
+which is shared with Double Bubble's M6 and described in [packages/README.md](../../packages/README.md).
+
+State, checked against the code rather than against this list:
+
+| Item | |
+| --- | --- |
+| Continues and score-per-credit | done |
+| Local high-score table | done |
+| Difficulty presets | done — the five-rung ladder, §6.6 |
+| Pause | done |
+| About / controls card | done |
+| `packages/cabinet` extraction | done |
+| Save/resume across a reload | **outstanding** |
+| Colour-blind-safe class palette | **outstanding** |
+| Widescreen toggle | **outstanding** |
+| Performance pass | **outstanding** — never measured |
+
+Several of these landed during play-testing rounds without being labelled M6. The four
+outstanding ones are the milestone.
 
 *Accept:* no dropped frames on a 5-year-old laptop at `S=2`; a run survives a page reload; all §4
 adaptations and §5.2 fire models implemented and documented in-game under About.

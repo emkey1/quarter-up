@@ -1,6 +1,6 @@
 import { T } from '@/data/tuning';
 import { MONSTER_SPECS, type MonsterSpec } from '@/data/roster';
-import type { Rng } from '@/engine/rng';
+import type { Rng } from '@cabinet/rng';
 import { isBlocking, isFloor, tileAt, type MonsterKind, type RoomData } from './room';
 import { makeBody, stepBody, wrapVertical, type Body, type Ridable } from './physics';
 import { spawnProjectile, type Projectile } from './projectile';

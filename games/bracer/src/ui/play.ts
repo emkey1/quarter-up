@@ -1,9 +1,9 @@
 import { T } from '@/data/tuning';
 import { CLASS_ORDER, type ClassId } from '@/data/classes';
-import type { Display } from '@/engine/display';
+import type { Display } from '@cabinet/display';
 import type { Input } from '@/engine/input';
 import { defaultFireModel, type FireModel } from '@/engine/input';
-import type { Loop } from '@/engine/loop';
+import type { Loop } from '@cabinet/loop';
 import type { Run } from '@/game/flow';
 import { PROVING } from '@/data/campaign';
 import type { Screen } from './screen';
@@ -130,7 +130,7 @@ export class PlayScreen implements Screen {
    */
   draw(
     ctx: CanvasRenderingContext2D,
-    layout: import('@/engine/display').Layout,
+    layout: import('@cabinet/display').Layout,
     chrome = true,
   ): void {
     this.animFrame++;
@@ -409,7 +409,7 @@ export class PlayScreen implements Screen {
    * locked 232x240 gameplay viewport exists to bound generator pressure and potion
    * range, and neither matters in a menu.
    */
-  drawBackdrop(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
+  drawBackdrop(ctx: CanvasRenderingContext2D, layout: import('@cabinet/display').Layout): void {
     // Zoomed in relative to play: at 1:1 a full-canvas view needs almost the whole
     // 512wu level, so any camera offset would expose the map edge. Doubling the scale
     // needs half the level and looks better besides.
@@ -429,7 +429,7 @@ export class PlayScreen implements Screen {
    *  availability varies wildly, and plenty of people play muted (DESIGN.md §6.5). */
   private drawCaptions(
     ctx: CanvasRenderingContext2D,
-    layout: import('@/engine/display').Layout,
+    layout: import('@cabinet/display').Layout,
     pf: { x: number; y: number; w: number; h: number },
   ): void {
     const caps = this.speech.activeCaptions();
@@ -458,7 +458,7 @@ export class PlayScreen implements Screen {
    *  in-game whenever it is not Arcade. Derived, never stored. */
   private drawTierBadge(
     ctx: CanvasRenderingContext2D,
-    layout: import('@/engine/display').Layout,
+    layout: import('@cabinet/display').Layout,
   ): void {
     const tier = tierOf(this.setup.rules);
     if (tier === 'arcade') return;
@@ -479,7 +479,7 @@ export class PlayScreen implements Screen {
 
   /** Always-visible hint, because the debug flank disappears on narrow windows and a
    *  silently-absent controller is otherwise indistinguishable from a broken one. */
-  private drawPadHint(ctx: CanvasRenderingContext2D, layout: import('@/engine/display').Layout): void {
+  private drawPadHint(ctx: CanvasRenderingContext2D, layout: import('@cabinet/display').Layout): void {
     const gp = this.input.gamepad;
     const s = layout.uiScale;
     const pf = layout.playfield;

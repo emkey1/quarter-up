@@ -2,9 +2,12 @@
 
 *An homage to Taito's **Bubble Bobble** (arcade, 1986).*
 
-> **Status:** M5 all but the editor. The campaign runs end to end: a hundred generated
-> rooms, the secret doors and cryptograms, Super Mode, and the boss at room 100. The
-> room editor is the last piece. See §11.
+> **Status:** M5 all but the editor, plus the M6 extraction. The campaign runs end to end:
+> a hundred generated rooms, the secret doors and cryptograms, Super Mode, and the boss at
+> room 100. The room editor is the last M5 piece. See §11.
+>
+> The engine copied in at M0 has been diffed against Bracer's and the shared half is now
+> [`@quarter-up/cabinet`](../../packages/cabinet); what stayed local is in §7.
 >
 > Debug keys: **F1** jump meter, **F2** counter readout.
 >
@@ -387,9 +390,15 @@ likely to be subtly wrong and least likely to be noticed being wrong.
 
 ## 7. What ports from Bracer
 
-**Copy, do not share.** `packages/` stays empty until this game is playable — the
-reasoning is in [packages/README.md](../../packages/README.md). Copy these into
-`games/double-bubble/src/` at M0 and let them diverge; we extract at M6 from two real examples.
+**Copy, do not share** — the rule for M0 through M5. `packages/` stayed empty until this
+game was playable, for the reasoning in [packages/README.md](../../packages/README.md):
+copy into `games/double-bubble/src/` at M0, let the two diverge under real use, extract at
+M6 from two real examples rather than from a guess about one.
+
+**Done as of M6.** The copies were diffed and the shared half is now
+[`@quarter-up/cabinet`](../../packages/cabinet) — loop, display, keyboard, gamepad, RNG,
+storage, and the audio synthesis machinery. `devices.ts` and this game's voice table
+stayed local. The table below is the M0 plan, kept as a record of what was copied.
 
 | Source | LOC | Action |
 | --- | --- | --- |
@@ -533,7 +542,7 @@ expect the hand-tuning fraction to be higher.
 | **M3** | Monster roster. All eight types, anger states, the hurry-up and Baron von Blubba. | Every monster behaves per §3.5 and the Baron is genuinely frightening. |
 | **M4** | Items and the counter system (§3.9). Special bubbles, water flow, EXTEND, fruit conversion. Debug counter overlay. | Counters persist across reloads; each item is reachable by its documented behaviour. |
 | **M5** | Content. 100 rooms, room editor with drift painting, secret rooms and cryptograms, warps, boss, Super Mode. | Playable start to finish; true ending reachable per §4. |
-| **M6** | Polish — **and the `packages/cabinet` extraction.** Diff this game's copied engine against Bracer's, extract what stayed identical. | Both games run on the shared package; neither regressed. |
+| **M6** | Polish — **and the `packages/cabinet` extraction.** Diff this game's copied engine against Bracer's, extract what stayed identical. | Extraction **done**: both games run on the shared package, 585 tests green, neither regressed. Polish outstanding. |
 
 M6 is where the monorepo decision pays off. Don't skip it, and don't do it earlier.
 

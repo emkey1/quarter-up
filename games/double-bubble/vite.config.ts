@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@cabinet': fileURLToPath(new URL('../../packages/cabinet/src', import.meta.url)),
     },
   },
   // Bracer holds 5173; a second game needs its own port so both can run at once.

@@ -3,7 +3,7 @@ import { CharSelectScreen } from '@/ui/charselect';
 import { Pointer } from '@/engine/pointer';
 import { CLASS_ORDER, type ClassId } from '@/data/classes';
 import { emptyActions } from '@/engine/actions';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 
 /** A layout shaped like a real 1600x900 window at dpr 1. */
 function layout(): Layout {

@@ -59,6 +59,23 @@ export function quantiseStick(
   return { dx: OCT_DX[oct], dy: OCT_DY[oct], octant: oct };
 }
 
+/**
+ * Radial deadzone with rescaling — the analog alternative to quantising.
+ *
+ * Returns a direction of continuously varying magnitude rather than one of eight fixed
+ * ones, so it is a deviation from any cabinet with a digital stick. Games expose it as
+ * an opt-in and document it as such; nothing selects it by default.
+ *
+ * Rescales past the deadzone so the first millimetre of travel past the threshold gives
+ * a small push rather than an immediate jump to full speed.
+ */
+export function analogStick(x: number, y: number, deadzone: number): StickResult {
+  const mag = Math.hypot(x, y);
+  if (mag < deadzone) return { dx: 0, dy: 0, octant: null };
+  const scaled = Math.min(1, (mag - deadzone) / (1 - deadzone));
+  return { dx: (x / mag) * scaled, dy: (y / mag) * scaled, octant: null };
+}
+
 /* ------------------------------------------------------------------ profiles */
 
 export type PadSource =
@@ -71,6 +88,8 @@ export interface PadProfile<A extends string> {
   match: string;
   label: string;
   moveStick: { x: number; y: number } | null;
+  /** Second stick, read into aimX/aimY. Null for games with nothing to aim. */
+  aimStick: { x: number; y: number } | null;
   sources: Partial<Record<A, PadSource[]>>;
 }
 
@@ -84,6 +103,11 @@ export interface DpadActions<A extends string> {
 }
 
 /* ------------------------------------------------------------------ device */
+
+/** Anything that wants to watch the raw pad array each poll. See `GamepadInput.observer`. */
+export interface PadObserver {
+  observe(pads: readonly (Gamepad | null)[]): void;
+}
 
 export interface PadStatus {
   connected: boolean;
@@ -113,9 +137,31 @@ export class GamepadInput<A extends string> {
   private held = new Map<A, boolean>();
   private prevHeld = new Map<A, boolean>();
   private moveOct: number | null = null;
+  private aimOct: number | null = null;
 
   moveX = 0;
   moveY = 0;
+  /** Second-stick direction. Stays at zero unless the profile names an aimStick. */
+  aimX = 0;
+  aimY = 0;
+
+  /**
+   * Read the move stick as a continuous direction rather than quantising it to eight.
+   *
+   * A deviation from a digital-stick cabinet, so it is off unless a game offers it and
+   * the player turns it on.
+   */
+  analogMovement = false;
+
+  /**
+   * Optional diagnostic hook, handed the raw pad array on every poll.
+   *
+   * Bracer keeps a persistent log of every pad it has ever seen, because tracking down a
+   * controller the browser never surfaced needed evidence across page reloads. That is a
+   * debugging tool for one game, not part of an input device, so it attaches here rather
+   * than living inside.
+   */
+  observer: PadObserver | null = null;
 
   rumbleEnabled = false;
 
@@ -215,15 +261,16 @@ export class GamepadInput<A extends string> {
     } catch (e) {
       if (!this.pollError) {
         this.pollError = String((e as Error)?.message ?? e);
-        console.error('[double-bubble] gamepad poll failed; input from pads disabled:', e);
+        console.error('[cabinet] gamepad poll failed; input from pads disabled:', e);
       }
-      this.moveX = this.moveY = 0;
+      this.moveX = this.moveY = this.aimX = this.aimY = 0;
       this.held = new Map();
     }
   }
 
   private pollInner(): void {
     const pads = this.pads();
+    this.observer?.observe(pads);
 
     // Pick the pad the player is actually touching; fall back to the first usable one.
     // Every slot is scanned, so a controller in slot 3 with slots 0-2 empty is found.
@@ -251,8 +298,8 @@ export class GamepadInput<A extends string> {
     if (!pad) {
       if (this.status.connected) this.statusChangedAt = performance.now();
       this.status = { connected: false, id: '', label: '', standard: false, index: -1, slot: -1 };
-      this.moveX = this.moveY = 0;
-      this.moveOct = null;
+      this.moveX = this.moveY = this.aimX = this.aimY = 0;
+      this.moveOct = this.aimOct = null;
       return;
     }
 
@@ -286,12 +333,24 @@ export class GamepadInput<A extends string> {
     } else if (this.profile.moveStick) {
       const ax = padAxes(pad)[this.profile.moveStick.x] ?? 0;
       const ay = padAxes(pad)[this.profile.moveStick.y] ?? 0;
-      const r = quantiseStick(ax, ay, this.moveOct, this.cfg.deadzone, this.cfg.hysteresis);
+      const r = this.analogMovement
+        ? analogStick(ax, ay, this.cfg.deadzone)
+        : quantiseStick(ax, ay, this.moveOct, this.cfg.deadzone, this.cfg.hysteresis);
       this.moveX = r.dx;
       this.moveY = r.dy;
       this.moveOct = r.octant;
     } else {
       this.moveX = this.moveY = 0;
+    }
+
+    // Aim is always quantised: it selects a firing direction, not a speed.
+    if (this.profile.aimStick) {
+      const ax = padAxes(pad)[this.profile.aimStick.x] ?? 0;
+      const ay = padAxes(pad)[this.profile.aimStick.y] ?? 0;
+      const r = quantiseStick(ax, ay, this.aimOct, this.cfg.deadzone, this.cfg.hysteresis);
+      this.aimX = r.dx;
+      this.aimY = r.dy;
+      this.aimOct = r.octant;
     }
   }
 
@@ -376,6 +435,7 @@ export class GamepadInput<A extends string> {
       match: padId,
       label: `Custom — ${padId.slice(0, 28)}`,
       moveStick: this.standardProfile.moveStick,
+      aimStick: this.standardProfile.aimStick,
       sources: structuredClone(this.standardProfile.sources),
     };
     profile.sources[action] = [source];
@@ -462,6 +522,11 @@ export class GamepadInput<A extends string> {
  * the pad enumerates perfectly and no input ever arrives, which is indistinguishable
  * from a dead controller.
  */
+/** Is this button down? Analog triggers report a fraction, so a threshold is needed. */
+export function buttonPressed(b: unknown, threshold: number): boolean {
+  return buttonValue(b) >= threshold;
+}
+
 export function buttonValue(b: unknown): number {
   if (typeof b === 'number') return b;
   if (b && typeof b === 'object') {

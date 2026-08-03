@@ -1,5 +1,5 @@
 import { CLASSES, type ClassId } from '@/data/classes';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { ActionState } from '@/engine/actions';
 import { tierOf, type Rules } from '@/data/rules';
 import { DEFAULT_DIFFICULTY, difficultyOf } from '@/data/difficulty';

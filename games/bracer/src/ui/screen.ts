@@ -1,5 +1,5 @@
 import type { ActionState } from '@/engine/actions';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 
 export type ScreenId = 'attract' | 'charselect' | 'levelintro' | 'play' | 'gameover';
 

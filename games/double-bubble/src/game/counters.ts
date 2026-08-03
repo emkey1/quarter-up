@@ -5,7 +5,7 @@ import {
   type CounterName,
   type ItemKind,
 } from '@/data/items';
-import { readJson, writeJson } from '@/engine/storage';
+import { readJson, writeJson } from '@cabinet/storage';
 
 /**
  * The hidden counter array.

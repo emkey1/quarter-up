@@ -1,0 +1,13 @@
+{
+  "name": "@quarter-up/cabinet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The shared cabinet: frame loop, input, display scaling, RNG, storage, audio synthesis.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests --ext .ts"
+  }
+}

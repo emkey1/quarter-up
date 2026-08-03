@@ -13,15 +13,15 @@ None of them use assets, code, or level data from the originals.
 | [Double Bubble](games/double-bubble) | Bubble Bobble (Taito, 1986) | M5 all but the room editor — 100 rooms, boss, true ending |
 
 Each game's own `DESIGN.md` carries the authoritative status; this table is a summary and
-will lag it. Two things outstanding worth knowing about here:
+will lag it. Two things worth knowing about here:
 
 - **Double Bubble's physics constants are still `[i]` placeholders** — internally
   consistent and instrumented (`F1` shows measured against predicted) but never checked
   against frame-stepped footage. Everything built on top inherits any error in them.
-- **M6 is the shared-package extraction**, not just polish. `packages/` stays empty until
-  then on purpose: the engine was copied into Double Bubble at M0 so the two could
-  diverge under real use, and what stayed identical gets lifted out once there is
-  evidence rather than a guess. See [packages/README.md](packages/README.md).
+- **The shared package now exists.** The engine was copied into Double Bubble at M0 so
+  the two could diverge under real use; at M6 the copies were diffed and what stayed the
+  same became [`packages/cabinet`](packages/cabinet). What the diff found, and what
+  deliberately stayed local to each game, is in [packages/README.md](packages/README.md).
 
 ## Layout
 
@@ -30,7 +30,7 @@ quarter-up/
   index.html          cabinet-select page for the assembled site
   tools/              repo-level tooling (the arcade build)
   games/<game>/       one game: self-contained, own Vite config, own DESIGN.md
-  packages/           shared code — deliberately empty for now, see packages/README.md
+  packages/cabinet/   shared engine: loop, display, input, RNG, storage, audio synthesis
 ```
 
 Games are npm workspaces. Each one is independently runnable and shippable; the arcade
@@ -70,5 +70,7 @@ Keeping them together means a fix to gamepad handling is one commit rather than 
 and two version bumps, and it keeps the split reversible: `git subtree split` lifts a game
 out with its history intact, whereas merging separate repos later does not go as well.
 
-The shared package is deliberately deferred until two games exist to extract it from.
-See [packages/README.md](packages/README.md).
+That substrate now lives in [`packages/cabinet`](packages/cabinet), extracted at M6 by
+diffing two copies that had been evolving separately since M0 — rather than guessed at
+from the first game alone. See [packages/README.md](packages/README.md) for what the diff
+found and what stayed local.

@@ -1,8 +1,8 @@
 import { T } from '@/data/tuning';
 import type { Camera } from '@/game/camera';
 import { Terrain, Tile, TileFlag } from '@/game/terrain';
-import type { Layout } from '@/engine/display';
-import { hash32 } from '@/engine/rng';
+import type { Layout } from '@cabinet/display';
+import { hash32 } from '@cabinet/rng';
 import { blobIndex, neighbourMask } from './autotile';
 import { AtlasRow, FLOOR_VARIANTS, TileAtlas, tileCell, WALL_VARIANTS } from './tileatlas';
 import type { Theme } from './theme';

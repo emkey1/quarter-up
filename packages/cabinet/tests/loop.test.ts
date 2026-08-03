@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Loop, type LoopHost } from '@/engine/loop';
+import { Loop, type LoopHost } from '../src/loop';
 
 /**
  * The loop's contract with input.

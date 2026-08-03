@@ -3,7 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@cabinet/*": ["../../packages/cabinet/src/*"]
     }
   },
   "include": ["src", "tests", "tools", "vite.config.ts"]

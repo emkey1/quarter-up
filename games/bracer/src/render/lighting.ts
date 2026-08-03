@@ -1,4 +1,4 @@
-import type { Rect } from '@/engine/display';
+import type { Rect } from '@cabinet/display';
 
 export interface Light {
   x: number; // screen px

@@ -1,5 +1,5 @@
 import { T } from '@/data/tuning';
-import { hash32 } from '@/engine/rng';
+import { hash32 } from '@cabinet/rng';
 import type { Item } from './items';
 
 /**

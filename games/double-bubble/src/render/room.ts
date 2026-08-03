@@ -1,7 +1,7 @@
 import { T } from '@/data/tuning';
 import { Tile, tileAt, type RoomData } from '@/game/room';
 import { Edge, TILE_PX, type TileSet } from './tiles';
-import type { Layout } from '@/engine/display';
+import type { Layout } from '@cabinet/display';
 import type { Theme } from './theme';
 
 /**
