@@ -134,3 +134,90 @@ export function findSpawnTile(
   }
   return null;
 }
+
+/* ------------------------------------------------------------------ navigation */
+
+/**
+ * A breadth-first distance field over walkable cells, used to actually get somewhere.
+ *
+ * Deliberately NOT used by ordinary monsters. Their greedy pursuit above is the
+ * authentic behaviour — Gauntlet's monsters hug walls and pile up at chokepoints, and
+ * that is most of what makes a corridor defensible. Pathfinding would erase it.
+ *
+ * The Thief is the exception, and the reason this exists. He is not ambient: he is
+ * announced by a tone the design calls a warning, there is exactly one of him, and he
+ * spawns in a far corner rather than out of a generator beside you. Greedy pursuit meant
+ * he walked into the first wall between him and the player and pressed against it until
+ * his patience ran out — across the whole campaign he arrived 0 times out of 4, so the
+ * warning tone announced an enemy that never came. "Beelines to the player" (§4) is a
+ * statement about intent, not about ignoring geometry.
+ *
+ * Costs one BFS over GRID*GRID cells per recompute, and only while a thief is alive.
+ */
+export class FlowField {
+  /** Steps to the goal, or -1 for unreachable/solid. Indexed like Terrain. */
+  private readonly dist: Int32Array;
+  private readonly queue: Int32Array;
+
+  constructor(private readonly size: number) {
+    this.dist = new Int32Array(size * size);
+    this.queue = new Int32Array(size * size);
+  }
+
+  /** Rebuild the field with the goal at this cell. */
+  recompute(terrain: Terrain, goalCx: number, goalCy: number): void {
+    this.dist.fill(-1);
+    if (!terrain.inBounds(goalCx, goalCy) || terrain.solidAtCell(goalCx, goalCy)) return;
+
+    const n = this.size;
+    let head = 0;
+    let tail = 0;
+    const start = goalCy * n + goalCx;
+    this.dist[start] = 0;
+    this.queue[tail++] = start;
+
+    // Four-way, not eight: a diagonal that clips a wall corner is not a step the mover
+    // can actually take, and following one puts the thief right back against a wall.
+    while (head < tail) {
+      const cur = this.queue[head++];
+      const cx = cur % n;
+      const cy = (cur / n) | 0;
+      const d = this.dist[cur] + 1;
+      for (let i = 0; i < 4; i++) {
+        const nx = cx + (i === 0 ? 1 : i === 1 ? -1 : 0);
+        const ny = cy + (i === 2 ? 1 : i === 3 ? -1 : 0);
+        if (nx < 0 || ny < 0 || nx >= n || ny >= n) continue;
+        const ni = ny * n + nx;
+        if (this.dist[ni] !== -1) continue;
+        if (terrain.solidAtCell(nx, ny)) continue;
+        this.dist[ni] = d;
+        this.queue[tail++] = ni;
+      }
+    }
+  }
+
+  /** Steps from this cell to the goal, or -1 if it cannot be reached. */
+  distanceAt(cx: number, cy: number): number {
+    if (cx < 0 || cy < 0 || cx >= this.size || cy >= this.size) return -1;
+    return this.dist[cy * this.size + cx];
+  }
+
+  /**
+   * The neighbouring cell one step closer to the goal, or null if there is no route.
+   *
+   * Returns a CELL rather than a direction so the caller can aim at its centre. Aiming
+   * at the goal itself is what fails: the mover shaves the corner, catches the wall and
+   * stops. Aiming at the next cell centre keeps it in the corridor.
+   */
+  next(cx: number, cy: number): { cx: number; cy: number } | null {
+    const here = this.distanceAt(cx, cy);
+    if (here <= 0) return null;
+    for (let i = 0; i < 4; i++) {
+      const nx = cx + (i === 0 ? 1 : i === 1 ? -1 : 0);
+      const ny = cy + (i === 2 ? 1 : i === 3 ? -1 : 0);
+      const d = this.distanceAt(nx, ny);
+      if (d >= 0 && d < here) return { cx: nx, cy: ny };
+    }
+    return null;
+  }
+}

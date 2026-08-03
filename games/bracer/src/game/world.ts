@@ -5,7 +5,7 @@ import type { ActionState } from '@/engine/actions';
 import type { FireModel } from '@/engine/input';
 import { Rng } from '@cabinet/rng';
 import { SpatialGrid } from '@/engine/spatial';
-import { chase, findSpawnTile, type Blocker } from './ai';
+import { chase, findSpawnTile, FlowField, type Blocker } from './ai';
 import { Camera } from './camera';
 import { boxHitsSolid } from './collision';
 import { damageGenerator, damageMonster, damagePlayer } from './combat';
@@ -68,6 +68,11 @@ export class World {
   items: Item[] = [];
   deaths: Death[] = [];
   thieves: Thief[] = [];
+  /** Route field for the Thief, rebuilt only when his goal cell changes. See
+   *  stepThieves — no other enemy uses it, on purpose. */
+  private readonly thiefFlow = new FlowField(T.GRID);
+  private thiefFlowCx = -1;
+  private thiefFlowCy = -1;
 
   /** Feature toggles. Part of the simulation, so replays honour them (DESIGN.md §6.6). */
   rules: Rules = { ...DEFAULT_RULES };
@@ -805,6 +810,33 @@ export class World {
           tx = t.x - (p.x - t.x);
           ty = t.y - (p.y - t.y);
         }
+      }
+
+      /*
+       * Steer along a route rather than straight at the target.
+       *
+       * Reported from play as the thief being announced on level 22 and never turning up.
+       * He spawns in a far corner, and sign(dx)/sign(dy) walks him into the first wall in
+       * the way and holds him there until his patience expires — 43 of his 45 seconds
+       * were spent motionless against a wall he never went round. Across the campaign he
+       * arrived 0 times out of 4, so the warning tone was announcing nothing.
+       *
+       * The field is rebuilt from wherever he is heading, which is the player while
+       * hunting and the exit once he has your property. Aiming at the NEXT CELL rather
+       * than at the destination is the part that matters: aiming at the destination is
+       * what made him shave a corner and catch the wall in the first place.
+       */
+      const goalCx = Math.floor(tx / T.TILE);
+      const goalCy = Math.floor(ty / T.TILE);
+      if (goalCx !== this.thiefFlowCx || goalCy !== this.thiefFlowCy) {
+        this.thiefFlow.recompute(this.terrain, goalCx, goalCy);
+        this.thiefFlowCx = goalCx;
+        this.thiefFlowCy = goalCy;
+      }
+      const step = this.thiefFlow.next(Math.floor(t.x / T.TILE), Math.floor(t.y / T.TILE));
+      if (step) {
+        tx = step.cx * T.TILE + T.TILE / 2;
+        ty = step.cy * T.TILE + T.TILE / 2;
       }
       const sx = Math.sign(tx - t.x) * T.THIEF_SPEED;
       const sy = Math.sign(ty - t.y) * T.THIEF_SPEED;

@@ -265,6 +265,46 @@ describe('the Thief', () => {
     expect(chooseTheft({ upgrades: [], potions: 0, keys: 0, score: 0 }).kind).toBe('nothing');
   });
 
+  it('actually reaches the player, in every real level he appears in', () => {
+    // Reported from play: the thief is announced on level 22 and never turns up.
+    //
+    // He did not turn up on any of them. He spawns in a far corner, and his pursuit was
+    // sign(dx)/sign(dy) with nothing behind it, so he walked into the first wall between
+    // him and the player and pressed against it until his patience ran out — 43 of his 45
+    // seconds motionless, then a silent death. Across the campaign he arrived 0 times out
+    // of 4, while the tone the design calls a warning announced him every time.
+    //
+    // Every existing thief test used `arena()`, an open room with no wall between the two
+    // of them, where greedy pursuit works perfectly. That is why this survived to M6. So
+    // this one runs the SHIPPED levels, and the player stands still: if the thief cannot
+    // reach a stationary target across a real dungeon, he cannot reach a moving one.
+    const withThief = CAMPAIGN.map((lvl, i) => ({ lvl, depth: i + 1 })).filter(({ lvl }) =>
+      lvl.objects.some((o) => o.t === 'thief'),
+    );
+    expect(withThief.length, 'no level has a thief any more — this test is measuring nothing').toBeGreaterThan(0);
+
+    for (const { lvl, depth } of withThief) {
+      const w = new World(lvl, 'elf', 999);
+      w.godMode = true; // the point is arrival, not what he does on contact
+      const t = w.thieves[0];
+      expect(t, `${lvl.id}: thief did not spawn`).toBeTruthy();
+
+      let reachedAt = -1;
+      for (let f = 0; f < T.THIEF_PATIENCE_F; f++) {
+        w.step(emptyActions());
+        if (!t.alive) break;
+        if (Math.hypot(w.player.x - t.x, w.player.y - t.y) < w.player.half + t.half) {
+          reachedAt = f;
+          break;
+        }
+      }
+
+      expect(reachedAt, `${lvl.id} (depth ${depth}): thief never reached the player`).toBeGreaterThanOrEqual(0);
+      // And with room to spare, so a slightly longer route is not an instant regression.
+      expect(reachedAt, `${lvl.id}: thief only just made it`).toBeLessThan(T.THIEF_PATIENCE_F / 2);
+    }
+  });
+
   it('ACCEPTANCE: steals an upgrade, and killing him returns it only as a plain potion', () => {
     const w = new World(arena([{ t: 'thief', x: 19, y: 16 }]), 'elf', 1);
     w.godMode = true;
