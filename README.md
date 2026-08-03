@@ -9,8 +9,19 @@ None of them use assets, code, or level data from the originals.
 
 | Game | After | State |
 | --- | --- | --- |
-| [Bracer](games/bracer) | Gauntlet (Atari Games, 1985) | M5 complete, polish next |
-| [Double Bubble](games/double-bubble) | Bubble Bobble (Taito, 1986) | M0 — skeleton |
+| [Bracer](games/bracer) | Gauntlet (Atari Games, 1985) | M5 complete — 50 levels, level editor. Polish (M6) next |
+| [Double Bubble](games/double-bubble) | Bubble Bobble (Taito, 1986) | M5 all but the room editor — 100 rooms, boss, true ending |
+
+Each game's own `DESIGN.md` carries the authoritative status; this table is a summary and
+will lag it. Two things outstanding worth knowing about here:
+
+- **Double Bubble's physics constants are still `[i]` placeholders** — internally
+  consistent and instrumented (`F1` shows measured against predicted) but never checked
+  against frame-stepped footage. Everything built on top inherits any error in them.
+- **M6 is the shared-package extraction**, not just polish. `packages/` stays empty until
+  then on purpose: the engine was copied into Double Bubble at M0 so the two could
+  diverge under real use, and what stayed identical gets lifted out once there is
+  evidence rather than a guess. See [packages/README.md](packages/README.md).
 
 ## Layout
 
