@@ -148,3 +148,32 @@ export function diggerSprite(dir: number): Px {
 
   return p;
 }
+
+
+/**
+ * A boulder. Three appearances: at rest, teetering, and coming apart.
+ *
+ * The teetering frame is offset rather than redrawn — the wobble is what warns you, so
+ * it has to be visible at a glance without being a different object.
+ */
+export function rockSprite(variant: 'rest' | 'teeter' | 'shatter'): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const s = bandSlots(3); // bedrock tones, so a rock reads as harder than any earth
+  const shift = variant === 'teeter' ? 2 : 0;
+
+  if (variant === 'shatter') {
+    // Broken into pieces, spreading outward.
+    for (const [x, y, r] of [[8, 20, 4], [17, 21, 3], [22, 17, 3], [11, 13, 3], [20, 10, 2]] as const) {
+      p.ellipse(x, y, r, r, s.base);
+      p.ellipse(x, y - 1, r - 1, r - 1, s.light);
+    }
+    p.outline(s.outline);
+    return p;
+  }
+
+  p.ellipse(TILE_PX / 2 + shift, TILE_PX / 2, 12, 11, s.base);
+  p.ellipse(TILE_PX / 2 + shift - 3, TILE_PX / 2 - 3, 6, 5, s.light);
+  p.ellipse(TILE_PX / 2 + shift + 4, TILE_PX / 2 + 4, 4, 3, s.dark);
+  p.outline(s.outline);
+  return p;
+}

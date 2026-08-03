@@ -2,6 +2,7 @@ import type { Layout } from '@cabinet/display';
 import { T, bandOf } from '@/data/tuning';
 import { Cell, Field } from '@/game/field';
 import { Digger } from '@/game/digger';
+import { RockState, type Rock } from '@/game/rock';
 import { blobIndex, neighbourMask } from './autotile';
 import { AtlasRow, MISC, TileAtlas } from './atlas';
 
@@ -37,7 +38,7 @@ export class FieldView {
     f.clearDirty();
   }
 
-  draw(ctx: CanvasRenderingContext2D, f: Field, digger: Digger, layout: Layout): void {
+  draw(ctx: CanvasRenderingContext2D, f: Field, digger: Digger, rocks: readonly Rock[], layout: Layout): void {
     this.refreshMasks(f);
 
     const pf = layout.playfield;
@@ -73,6 +74,26 @@ export class FieldView {
         const [sx, sy, sw, sh] = this.atlas.src(row, col);
         ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, dst, dst);
       }
+    }
+
+    // Rocks under the digger: a boulder should never hide the thing about to be killed
+    // by it, and during the teeter the player's exact position is what they are judging.
+    for (const r of rocks) {
+      if (r.state === RockState.Gone) continue;
+      const col =
+        r.state === RockState.Shattering
+          ? MISC.rockShatter
+          : r.state === RockState.Teetering
+            ? MISC.rockTeeter
+            : MISC.rock;
+      const [rx, ry, rw, rh] = this.atlas.src(AtlasRow.Misc, col);
+      ctx.drawImage(
+        this.atlas.canvas,
+        rx, ry, rw, rh,
+        Math.round(pf.x + (r.x - T.CELL / 2) * px),
+        Math.round(pf.y + (r.y - T.CELL / 2) * px),
+        dst, dst,
+      );
     }
 
     // The digger, drawn on top and positioned by its centre rather than its cell, so

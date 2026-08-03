@@ -79,9 +79,9 @@ describe('the field renderer', () => {
     const d = new Digger(7, 5);
     const { ctx, blits } = recordingCtx();
 
-    view.draw(ctx, f, d, layout);
+    view.draw(ctx, f, d, [], layout);
 
-    expect(blits.length).toBe(T.GRID_W * T.GRID_H + 1);
+    expect(blits.length, 'every cell, plus the digger').toBe(T.GRID_W * T.GRID_H + 1);
   });
 
   it('puts the digger at its world position, not its cell', () => {
@@ -93,7 +93,7 @@ describe('the field renderer', () => {
     for (let i = 0; i < 10; i++) d.step(f, { dir: Dir.Down }); // mid-cell
 
     const { ctx, blits } = recordingCtx();
-    view.draw(ctx, f, d, layout);
+    view.draw(ctx, f, d, [], layout);
 
     const digger = blits[blits.length - 1];
     expect(digger.dy).toBe(Math.round(d.y - T.CELL / 2));
@@ -110,12 +110,12 @@ describe('the field renderer', () => {
     const spy = vi.spyOn(f, 'clearDirty');
 
     const { ctx } = recordingCtx();
-    view.draw(ctx, f, d, layout);
-    view.draw(ctx, f, d, layout);
+    view.draw(ctx, f, d, [], layout);
+    view.draw(ctx, f, d, [], layout);
     expect(spy, 'nothing changed; masks should not be rebuilt').toHaveBeenCalledTimes(1);
 
     f.dig(3, 9);
-    view.draw(ctx, f, d, layout);
+    view.draw(ctx, f, d, [], layout);
     expect(spy).toHaveBeenCalledTimes(2);
   });
 });

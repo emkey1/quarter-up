@@ -101,6 +101,35 @@ describe('what the constants mean, in countable units', () => {
     });
   });
 
+  describe('rocks', () => {
+    it('warns for half a second before it falls', () => {
+      // The fairness window, and the number to check first if the mechanic feels unfair
+      // in either direction. Countable off a recording: watch a rock wobble.
+      expect(SECONDS(T.ROCK_TEETER_F)).toBeCloseTo(0.5, 2);
+    });
+
+    it('falls twice as fast as the digger can run', () => {
+      // Once it is coming down, running sideways has to be the answer. If a rock were
+      // slower than the digger, you could outrun it downward and the threat would only
+      // ever be a nuisance.
+      expect(T.ROCK_FALL_SPEED / T.MOVE_SPEED).toBeCloseTo(2, 6);
+    });
+
+    it('crosses a cell in a seventh of a second', () => {
+      expect(SECONDS(T.CELL / T.ROCK_FALL_SPEED)).toBeCloseTo(0.133, 3);
+    });
+
+    it('gives the digger about three cells of escape during the teeter', () => {
+      // What the warning is actually WORTH, which is the thing a player experiences.
+      // Under two cells and the teeter is decorative; far over three and luring
+      // something under a rock stops working.
+      const escape = (T.ROCK_TEETER_F * T.MOVE_SPEED) / T.CELL;
+      expect(escape).toBeCloseTo(1.875, 3);
+      expect(escape, 'not enough room to react').toBeGreaterThan(1);
+      expect(escape, 'so much warning that nothing could ever be lured under one').toBeLessThan(4);
+    });
+  });
+
   describe('the free constants, tracked', () => {
     it('has only two continuous values so far, and both are named here', () => {
       // DESIGN.md §12 claims the continuous list is short — dig speed, run speed, and

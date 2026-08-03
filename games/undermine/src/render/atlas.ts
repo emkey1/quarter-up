@@ -1,5 +1,5 @@
 import { BLOB_COUNT } from './autotile';
-import { PALETTE, TILE_PX, earthTile, tunnelTile, skyTile, diggerSprite } from './tilegen';
+import { PALETTE, TILE_PX, earthTile, tunnelTile, skyTile, diggerSprite, rockSprite } from './tilegen';
 import { BLOB_INDEX } from './autotile';
 import { T } from '@/data/tuning';
 
@@ -22,7 +22,16 @@ export const AtlasRow = {
   Misc: T.BANDS + 1,
 } as const;
 
-export const MISC = { sky: 0, diggerUp: 1, diggerRight: 2, diggerDown: 3, diggerLeft: 4 } as const;
+export const MISC = {
+  sky: 0,
+  diggerUp: 1,
+  diggerRight: 2,
+  diggerDown: 3,
+  diggerLeft: 4,
+  rock: 5,
+  rockTeeter: 6,
+  rockShatter: 7,
+} as const;
 
 export class TileAtlas {
   readonly canvas: HTMLCanvasElement;
@@ -49,7 +58,16 @@ export class TileAtlas {
       tunnelTile(band).blitTo(ctx, band * TILE_PX, AtlasRow.Tunnel * TILE_PX, PALETTE);
     }
 
-    const misc = [skyTile(), diggerSprite(0), diggerSprite(1), diggerSprite(2), diggerSprite(3)];
+    const misc = [
+      skyTile(),
+      diggerSprite(0),
+      diggerSprite(1),
+      diggerSprite(2),
+      diggerSprite(3),
+      rockSprite('rest'),
+      rockSprite('teeter'),
+      rockSprite('shatter'),
+    ];
     misc.forEach((px, i) => px.blitTo(ctx, i * TILE_PX, AtlasRow.Misc * TILE_PX, PALETTE));
   }
 

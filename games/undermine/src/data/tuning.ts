@@ -85,6 +85,26 @@ export const T = {
    */
   DIG_SPEED: 0.5,
 
+  // ---------------------------------------------------------------- rocks
+  /**
+   * [i] Frames a rock teeters before it falls.
+   *
+   * Fairness, and the reason this is not just a trap. Dig out the cell under a rock and
+   * you are standing in exactly the place it is about to land, so without a warning the
+   * only way to learn the mechanic is to die to it. Half a second is enough to react to
+   * and short enough that luring something under one still works.
+   */
+  ROCK_TEETER_F: 30,
+
+  /** [i] How fast a rock falls, wu per frame. Twice the digger's best pace: once it is
+   *  coming down, outrunning it sideways has to be the answer rather than outrunning it
+   *  downward. */
+  ROCK_FALL_SPEED: 2,
+
+  /** [i] Frames the debris lingers after a rock lands, before it stops existing. Long
+   *  enough to read as an event rather than a disappearance. */
+  ROCK_SHATTER_F: 24,
+
   /**
    * [con] How close to a cell's centre line the digger must be before it may turn onto
    * the other axis, in wu.

@@ -76,7 +76,7 @@ export class App implements LoopHost {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, layout.canvasW, layout.canvasH);
 
-    this.view.draw(ctx, this.world.field, this.world.digger, layout);
+    this.view.draw(ctx, this.world.field, this.world.digger, this.world.rocks, layout);
 
     if (this.paused) {
       const pf = layout.playfield;
