@@ -185,7 +185,7 @@ Monsters block each other — deliberate traffic jams at chokepoints are a core 
 | Thing | Rules |
 | --- | --- |
 | **Wall** | Solid. Two *diagonally adjacent* wall blocks leave a seam that small/medium shots can thread but monsters cannot — the basis of "attack from behind cover." |
-| **Breakable wall** | Softer texture, destroyed by shots. |
+| **Breakable wall** | Softer texture, destroyed by shots — several of them. Absorbs `BREAKABLE_HP` (3) and each shot does the shooter's shot strength, so the same wall is two shots for a Warrior and three for a Wizard, the way generators already differ by class. Chunks visibly come out of it as it weakens. Placed by `breaches()` only where it opens a genuine shortcut, and never as the sole route to anywhere. |
 | **Door** | Any shape; all touching door tiles open with **one key**. Auto-unlock after **18 s** with no combat/pickup activity (**36 s** if you're holding keys). Used deliberately for flood control. |
 | **Key** | +100 pts. Shares **12 inventory slots** with potions. Monsters can't pass through a key on the floor, but shots can. |
 | **Potion** | Screen-wide smart bomb, strength = the user's magic stats. Only way to kill Death. Orange potions are indestructible; blue ones can be shot (triggering a weaker blast) or destroyed by enemy fire. |

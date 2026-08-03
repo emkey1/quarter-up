@@ -107,6 +107,39 @@ export class TilemapRenderer {
         const [row, col] = tileCell(tile, blob < 0 ? 0 : blob, doorOpen, variant, wallVariant);
         const [sx, sy, sw, sh] = this.atlas.src(row, col);
         ctx.drawImage(this.atlas.canvas, sx, sy, sw, sh, dx, dy, dstPx, dstPx);
+
+        /*
+         * A breakable wall that has been shot must LOOK shot.
+         *
+         * It takes several hits, and without feedback the first two read as the shot
+         * having done nothing — which teaches the player that breakables are scenery and
+         * to stop trying. Chunks are knocked out of it as it weakens, so the wall visibly
+         * runs out before it goes.
+         *
+         * Punched out in art-pixel units rather than device pixels, and at positions
+         * hashed from the cell, so the damage stays on the pixel grid at every screen
+         * scale and a given wall always crumbles the same way.
+         */
+        if (tile === Tile.Breakable) {
+          const wear = t.breakableWear(cx, cy);
+          if (wear > 0) {
+            const artPx = dstPx / this.atlas.tilePx;
+            const chunks = Math.round(wear * 10);
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            for (let k = 0; k < chunks; k++) {
+              const h = hash32(cx * 31 + k, cy * 17 + k, 'wear');
+              const ox = 4 + (h % 24);
+              const oy = 4 + ((h >> 8) % 24);
+              const size = 2 + ((h >> 16) % 3);
+              ctx.fillRect(
+                Math.round(dx + ox * artPx),
+                Math.round(dy + oy * artPx),
+                Math.max(1, Math.round(size * artPx)),
+                Math.max(1, Math.round(size * artPx)),
+              );
+            }
+          }
+        }
       }
     }
 

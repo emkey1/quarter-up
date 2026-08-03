@@ -95,6 +95,9 @@ export const T = {
   MELEE_DMG: [5, 8, 10] as const,
   FIREBALL_DMG: 10,
   ROCK_DMG: 3,
+  /** Shots a breakable wall absorbs, before the shooter's shot strength is applied.
+   *  Three at a Warrior's 2 power is two shots; a 1-power Wizard needs three. [i] */
+  BREAKABLE_HP: 3,
   THIEF_DMG: 10,
   DEATH_TOTAL_DRAIN: 200,
   DEATH_DRAIN_PER_FRAME: 4, // [i]

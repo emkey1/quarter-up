@@ -739,3 +739,118 @@ export function finish(g, meta) {
     objects: g.objects,
   };
 }
+
+/**
+ * BREACHES — walls soft enough to shoot down.
+ *
+ * The original had them and this did not: the tile, the damage path and the analyser
+ * support were all built at M2, and then no recipe ever emitted one, so in fifty levels
+ * there was not a single shootable wall. This is the missing half.
+ *
+ * Placement is the whole point. Scattered at random a breakable is just a wall that
+ * takes longer, and the player learns to ignore them. What makes one interesting is that
+ * getting rid of it changes the SHAPE of the level — so this only softens a wall that
+ * currently separates two places a long walk apart.
+ *
+ * The method: flood the floor from the start to get a path distance for every cell, then
+ * look for thin partitions — a wall with floor directly opposite itself on two sides.
+ * The detour saved by breaching one is |dist(a) - dist(b)|, and anything above `minGain`
+ * is a genuine shortcut rather than a hole into the next corridor. Highest gain first,
+ * spaced apart so they do not cluster into one crumbling wall.
+ *
+ * Reachability is unaffected either way — the analyser already counts a breakable as
+ * passable, since every class can shoot one down — so this can never strand anyone. It
+ * only ever adds a route.
+ *
+ * @param {object} o
+ * @param {number[]} o.start        Player start, the origin for path distance.
+ * @param {number} [o.count]        How many to place.
+ * @param {number} [o.minGain]      Detour saved, in cells, for a wall to be worth softening.
+ * @param {number} [o.spacing]      Minimum gap between two breaches.
+ * @returns {Array<[number, number]>} Where they went, for the build report.
+ */
+export function breaches(g, o) {
+  const { start, count = 3, minGain = 18, spacing = 6 } = o;
+
+  const solid = (x, y) => {
+    const c = get(g, x, y);
+    return c === 'X' || c === ' ';
+  };
+
+  // Path distance over walkable ground. Doors count as passable for the same reason the
+  // analyser counts them: they open on the stalemate timer, so they are a delay, not a wall.
+  const dist = new Map();
+  const q = [start];
+  dist.set(start.join(','), 0);
+  for (let head = 0; head < q.length; head++) {
+    const [x, y] = q[head];
+    const d = dist.get(`${x},${y}`) + 1;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const k = `${nx},${ny}`;
+      if (!inb(nx, ny) || dist.has(k) || solid(nx, ny)) continue;
+      dist.set(k, d);
+      q.push([nx, ny]);
+    }
+  }
+
+  const at = (x, y) => dist.get(`${x},${y}`);
+  const candidates = [];
+
+  // Never the outer border: a hole in it opens onto the void.
+  for (let y = 2; y < N - 2; y++) {
+    for (let x = 2; x < N - 2; x++) {
+      if (g.tiles[y][x] !== 'X') continue;
+      if (g.objects.some((ob) => Math.abs(ob.x - x) <= 1 && Math.abs(ob.y - y) <= 1)) continue;
+
+      for (const [ax, ay, bx, by] of [
+        [x - 1, y, x + 1, y],
+        [x, y - 1, x, y + 1],
+      ]) {
+        const da = at(ax, ay);
+        const db = at(bx, by);
+        if (da === undefined || db === undefined) continue;
+        const gain = Math.abs(da - db);
+        if (gain >= minGain) candidates.push({ x, y, gain });
+      }
+    }
+  }
+
+  candidates.sort((a, b) => b.gain - a.gain);
+  const placed = [];
+  for (const c of candidates) {
+    if (placed.length >= count) break;
+    if (placed.some((p) => Math.abs(p[0] - c.x) + Math.abs(p[1] - c.y) < spacing)) continue;
+    set(g, c.x, c.y, 'x');
+    placed.push([c.x, c.y]);
+  }
+  return placed;
+}
+
+/**
+ * `breaches`, but lower the bar until the level has at least one.
+ *
+ * A few layouts are open enough that no wall in them separates two points by `minGain`
+ * steps, and at the strict threshold those levels shipped without a single shootable
+ * wall. Rather than force one in — which would put a hole into the adjacent corridor and
+ * teach the player that breakables are meaningless — this retries at a lower bar and
+ * accepts a smaller shortcut, stopping at `floor` where it stops being a shortcut at all.
+ *
+ * Returns whatever it managed, which may still be nothing. That is a legitimate answer
+ * for a level with no partitions worth breaching, and the build report names them.
+ */
+export function breachesRelaxed(g, o) {
+  const { minGain = 18, floor = 9 } = o;
+  for (const bar of [minGain, Math.round(minGain * 0.7), floor]) {
+    if (bar < floor) break;
+    const placed = breaches(g, { ...o, minGain: bar });
+    if (placed.length) return placed;
+  }
+  return [];
+}

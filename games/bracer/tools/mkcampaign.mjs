@@ -123,6 +123,8 @@ const NAMES = [
 const levels = [];
 /** Where each hidden upgrade potion ended up, so the report can prove it is hidden. */
 const hidden = [];
+/** Shootable walls placed per level, for the build report. */
+const breachCount = new Map();
 /** Floor signs for the level-select, written into the level so the game can paint them. */
 const DOOR_SIGNS = [];
 
@@ -529,6 +531,28 @@ for (let d = 1; d <= 40; d++) {
     }
   }
 
+  /*
+   * Shootable walls, once the player has a reason to want a shortcut.
+   *
+   * Not from level one: the first few levels are teaching you that walls are walls, and
+   * a soft one before you have met a hard one is just confusing. From d04 on there is
+   * always at least one, and the deeper levels get more, because that is where the
+   * detours are long enough for a shortcut to be worth the shots.
+   *
+   * K.breaches only softens a wall that separates two places a long walk apart, so each
+   * one is a real change to the level's shape rather than a hole into the next corridor.
+   */
+  if (d >= 4) {
+    const placed = K.breachesRelaxed(g, {
+      start,
+      count: 2 + Math.floor(d / 10),
+      minGain: 18,
+      floor: 9,
+      spacing: 6,
+    });
+    breachCount.set(`d${String(d).padStart(2, '0')}`, placed.length);
+  }
+
   // Upgrade potions appear on a schedule, so the run has landmarks.
   //
   // Placed at the cell FURTHEST from the start by step count, not two tiles above it as
@@ -629,6 +653,15 @@ if (hidden.length) {
   console.log(
     `hidden upgrades: ${hidden.map((h) => `${h.id}=${h.steps}`).join(' ')}  ` +
       `(nearest is ${worst.id} at ${worst.steps} steps from the start)`,
+  );
+}
+if (breachCount.size) {
+  const vals = [...breachCount.values()];
+  const none = [...breachCount].filter(([, n]) => n === 0).map(([id]) => id);
+  console.log(
+    `shootable walls: ${vals.reduce((a, b) => a + b, 0)} across ${breachCount.size} levels ` +
+      `(min ${Math.min(...vals)}, max ${Math.max(...vals)})` +
+      (none.length ? `  — none placed in: ${none.join(' ')}` : ''),
   );
 }
 if (failures) {

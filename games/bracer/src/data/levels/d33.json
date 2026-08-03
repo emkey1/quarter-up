@@ -17,11 +17,11 @@
     "X.....X..X.XX..X.XX..X.XX..XXXXX..X...X........X",
     "X.....X....X.....X.....X...X......X...X........X",
     "X....XX.X.....X.X...X..X...X......X............X",
-    "X.X...X..X..X..XX.X..X.X..XXXXXXXXXXXX.XXXXXX..X",
+    "X.X...X..X..X..XX.X..X.X..XXxXXXXXXxXX.XXXXXX..X",
     "X.....X..XXXXXXX.X.....XX.............XX.......X",
     "X....XX.X..X..X..X..X..X..X....X............X..X",
     "X.....X..X..X..X.XX..X.X..X.................X..X",
-    "X....XX..........X.....XXXX.................X..X",
+    "X....XX..........X.....XxXX.................X..X",
     "X....X..X.....X..X..X..X.XXX......XX.....X..XX.X",
     "X........X..X..X.XX..X...XXX................X..X",
     "X.....X..XXXX...XXXXXXX..XXXXXX..X....X.....X..X",
@@ -44,7 +44,7 @@
     "X.....XX.X..X..X..X..X...XX.................X..X",
     "X......X.......X.....X....X.................X..X",
     "X....X.XX..X..XX.X..XX....X.................X..X",
-    "X.....XXXXXXXXX..XXXXXXX..XXXXXXXXXXX.XXXXXX...X",
+    "X.....XXXxXXXXX..XXXXXXX..XXXXXXXXXXX.XXXXXX...X",
     "X......X.........................X.......X.....X",
     "X.XXXX.X...X..X..X..X............X...X...X.....X",
     "X.....XX.......X..X..X....X......X...X...X.....X",
@@ -286,8 +286,8 @@
     },
     {
       "t": "upgrade",
-      "x": 38,
-      "y": 5,
+      "x": 46,
+      "y": 1,
       "kind": "armor"
     }
   ]

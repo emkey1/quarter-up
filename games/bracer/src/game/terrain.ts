@@ -34,6 +34,9 @@ export const TILE_GLYPHS: Readonly<Record<string, Tile>> = {
 export class Terrain {
   readonly tiles: Uint8Array;
   readonly flags: Uint8Array;
+  /** Remaining health of each breakable wall. 0 means "untouched", not "destroyed" —
+   *  a cell is only ever read here while its tile is still Breakable. */
+  private readonly damage: Uint8Array;
   /** Bumped whenever a tile changes, so the renderer knows to re-cache. */
   version = 0;
   /** Blocks changed since the renderer last synced. */
@@ -42,6 +45,7 @@ export class Terrain {
   constructor() {
     this.tiles = new Uint8Array(T.GRID * T.GRID);
     this.flags = new Uint8Array(T.GRID * T.GRID);
+    this.damage = new Uint8Array(T.GRID * T.GRID);
   }
 
   idx(cx: number, cy: number): number {
@@ -175,10 +179,41 @@ export class Terrain {
     return opened;
   }
 
-  destroyBreakable(cx: number, cy: number): boolean {
-    if (this.at(cx, cy) !== Tile.Breakable) return false;
-    this.set(cx, cy, Tile.Floor);
-    return true;
+  /**
+   * Damage a breakable wall. Returns 'miss', 'hit' or 'destroyed'.
+   *
+   * A breakable takes several shots rather than one. That is how the original read — a
+   * soft wall flashes under fire and comes down after a few hits — and it is what makes
+   * one a decision rather than a free door: standing still to chip a wall is time your
+   * health drain and everything on the level are charging you for.
+   *
+   * Damage is the shooter's shot strength, so the wall is a different obstacle depending
+   * on who is holding the gun, exactly as generators already are. A Warrior punches
+   * through; a Wizard takes longer and would rather go round.
+   *
+   * Health lives in `damage` rather than in the tile, because the tile byte is a Tile and
+   * the flags byte is a bitfield; neither has room for a counter, and widening either to
+   * carry one would put wall health in front of every tile lookup in the game.
+   */
+  hitBreakable(cx: number, cy: number, power: number): 'miss' | 'hit' | 'destroyed' {
+    if (this.at(cx, cy) !== Tile.Breakable) return 'miss';
+    const i = this.idx(cx, cy);
+    const left = (this.damage[i] || T.BREAKABLE_HP) - Math.max(1, power);
+    if (left <= 0) {
+      this.damage[i] = 0;
+      this.set(cx, cy, Tile.Floor);
+      return 'destroyed';
+    }
+    this.damage[i] = left;
+    this.markDirty(i);
+    return 'hit';
+  }
+
+  /** How battered this wall looks, 0 (untouched) to 1 (about to go). Renderer only. */
+  breakableWear(cx: number, cy: number): number {
+    if (this.at(cx, cy) !== Tile.Breakable) return 0;
+    const left = this.damage[this.idx(cx, cy)] || T.BREAKABLE_HP;
+    return 1 - left / T.BREAKABLE_HP;
   }
 
   /** The 180-second stand-still trick: every wall in the level becomes an exit. */

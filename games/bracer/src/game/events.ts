@@ -15,6 +15,7 @@ export type GameEvent =
   | { t: 'monsterKilled'; kind: MonsterKind; level: number; x: number; y: number; by: KillSource }
   | { t: 'generatorHurt'; x: number; y: number; level: number }
   | { t: 'generatorDestroyed'; x: number; y: number; kind: MonsterKind }
+  | { t: 'breakableDestroyed'; x: number; y: number }
   | { t: 'spawned'; x: number; y: number }
   | { t: 'playerHurt'; amount: number; x: number; y: number }
   | { t: 'playerDied' }

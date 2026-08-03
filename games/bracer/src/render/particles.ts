@@ -155,6 +155,8 @@ export const FX_COLOURS = {
   generator: ['#ffb060', '#ff6020', '#ffe0a0', '#804020'],
   spark: ['#fffbe0', '#ffd060'],
   dust: ['#a89878', '#6a5c48'],
+  /** A breakable wall coming down: masonry, not sparks. */
+  rubble: ['#8a7a4a', '#6a5c48', '#b8a878', '#4a4030'],
   blood: ['#ff4040', '#c02020'],
   magic: ['#d8b0ff', '#ffffff', '#9060e0'],
   pickup: ['#ffe9a0', '#ffffff'],

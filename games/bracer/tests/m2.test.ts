@@ -7,7 +7,7 @@ import { emptyActions, type ActionState } from '@/engine/actions';
 import { Tile } from '@/game/terrain';
 import { makeItem } from '@/game/items';
 import { foodKeepRatio, cullFood } from '@/game/rank';
-import type { LevelData, LevelObject } from '@/game/level';
+import { validateLevel, type LevelData, type LevelObject } from '@/game/level';
 
 function arena(objects: LevelObject[] = [], tweak?: (rows: string[][]) => void): LevelData {
   const rows: string[][] = [];
@@ -503,6 +503,82 @@ describe('M2 acceptance: a full run is playable', () => {
       const exits = w.terrain.cellsOf(Tile.Exit);
       expect(exits.length, `${lvl.id} has no exit`).toBeGreaterThan(0);
       expect(w.terrain.solidAt(w.player.x, w.player.y), `${lvl.id} starts in a wall`).toBe(false);
+    }
+  });
+});
+
+describe('breakable walls', () => {
+  /** A room split by a solid wall with one soft cell in it. */
+  function split(soft: boolean): LevelData {
+    const rows: string[][] = [];
+    for (let y = 0; y < T.GRID; y++) {
+      const row: string[] = [];
+      for (let x = 0; x < T.GRID; x++) {
+        const edge = y === 0 || y === T.GRID - 1 || x === 0 || x === T.GRID - 1;
+        row.push(edge ? 'X' : x === 20 ? 'X' : '.');
+      }
+      rows.push(row);
+    }
+    if (soft) rows[16][20] = 'x';
+    return {
+      id: 'split', name: 'Split', theme: 'stone', type: 'normal',
+      start: [16, 16], tiles: rows.map((r) => r.join('')), objects: [],
+    };
+  }
+
+  it('takes several shots, not one', () => {
+    // Reported from play as a thing the original had: walls you shoot down. One shot
+    // would make them a free door; the cost is the time you stand still paying for it.
+    const w = new World(split(true), 'wizard', 1);
+    w.godMode = true;
+    w.player.x = 19 * T.TILE + T.TILE / 2;
+    w.player.y = 16 * T.TILE + T.TILE / 2;
+    w.player.facing = 0; // east, into the soft cell
+
+    const a = emptyActions();
+    a.fire = true;
+    let shots = 0;
+    for (let f = 0; f < 600; f++) {
+      w.step(a);
+      shots += w.events.drain().filter((e) => e.t === 'shotFired').length;
+      if (w.terrain.at(20, 16) === Tile.Floor) break;
+    }
+    expect(w.terrain.at(20, 16), 'the wall should be gone by now').toBe(Tile.Floor);
+    expect(shots, 'one shot is a free door, not a decision').toBeGreaterThan(1);
+  });
+
+  it('wears visibly before it goes, so the first hits do not read as nothing', () => {
+    const w = new World(split(true), 'wizard', 1);
+    expect(w.terrain.breakableWear(20, 16)).toBe(0);
+    expect(w.terrain.hitBreakable(20, 16, 1)).toBe('hit');
+    const wear = w.terrain.breakableWear(20, 16);
+    expect(wear, 'a damaged wall must look damaged').toBeGreaterThan(0);
+    expect(wear, 'but not finished').toBeLessThan(1);
+  });
+
+  it('comes down faster for a stronger shot', () => {
+    // The same wall is a different obstacle depending on who is shooting it, exactly as
+    // generators already are.
+    const weak = new World(split(true), 'wizard', 1).terrain;
+    let weakHits = 0;
+    while (weak.hitBreakable(20, 16, 1) !== 'miss') weakHits++;
+
+    const strong = new World(split(true), 'wizard', 1).terrain;
+    let strongHits = 0;
+    while (strong.hitBreakable(20, 16, 3) !== 'miss') strongHits++;
+
+    expect(strongHits).toBeLessThan(weakHits);
+  });
+
+  it('is not the only way through anything in the campaign', () => {
+    // A breakable never blocks: every class can shoot one down, so the analyser counts
+    // them as passable. The risk is the opposite one — a level whose ONLY route runs
+    // through a soft wall would strand a player who does not realise they can shoot it.
+    // Treating them as solid must still leave the exit reachable everywhere.
+    for (const lvl of CAMPAIGN) {
+      const solidified: LevelData = { ...lvl, tiles: lvl.tiles.map((r) => r.replace(/x/g, 'X')) };
+      const r = validateLevel(solidified);
+      expect(r.ok, `${lvl.id}: unreachable once its breakable walls are treated as solid`).toBe(true);
     }
   });
 });

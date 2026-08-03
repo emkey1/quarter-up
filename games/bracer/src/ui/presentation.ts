@@ -77,6 +77,19 @@ export class Presentation {
         });
         break;
 
+      // A wall coming down is a bigger event than a shot stopping on one, and it needs
+      // to sound like it — the player has just spent several shots and a few seconds of
+      // standing still on this, and wants to be told it worked.
+      case 'breakableDestroyed':
+        A.play('generatorDie');
+        this.particles.spawn(e.x, e.y, 14, {
+          speed: 1.6,
+          life: 26,
+          size: 2,
+          colours: [...FX_COLOURS.rubble],
+        });
+        break;
+
       case 'melee':
         A.play('melee', 60);
         break;

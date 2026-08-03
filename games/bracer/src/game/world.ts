@@ -392,10 +392,13 @@ export class World {
 
       if (pr.alive && res.hitWall) {
         pr.alive = false;
-        // A shot that stops on a breakable wall takes it down with it.
+        // A shot that stops on a breakable wall chips it. Several hits bring it down,
+        // and how many depends on who is shooting — see Terrain.hitBreakable.
         const cx = Math.floor((pr.x + Math.sign(pr.vx) * (T.TILE / 2)) / T.TILE);
         const cy = Math.floor((pr.y + Math.sign(pr.vy) * (T.TILE / 2)) / T.TILE);
-        if (this.terrain.destroyBreakable(cx, cy)) this.engage();
+        const hit = this.terrain.hitBreakable(cx, cy, pr.damage);
+        if (hit !== 'miss') this.engage();
+        if (hit === 'destroyed') this.events.emit({ t: 'breakableDestroyed', x: res.x, y: res.y });
         this.events.emit({ t: 'shotHitWall', x: res.x, y: res.y });
       }
 
