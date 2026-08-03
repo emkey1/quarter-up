@@ -1,0 +1,150 @@
+import { Px, P, ramp, palette } from './pixel';
+import { NB, reduceMask } from './autotile';
+
+/** Art is authored at twice the field cell, as in the other two cabinets. */
+export const TILE_PX = 32;
+
+/**
+ * The four earth bands, shallow to deep.
+ *
+ * Colour is the only thing that distinguishes them, and it is load-bearing rather than
+ * decorative: the score for bursting something reads its band, so a player has to be
+ * able to tell at a glance how deep they are. Warm and light at the top, cold and dark
+ * at the bottom — the further down, the less it looks like anywhere you should be.
+ */
+export const BAND_RAMPS = [
+  ramp('#b87a3c', { spread: 0.26 }), // topsoil
+  ramp('#9a5a34', { spread: 0.26 }), // clay
+  ramp('#6a4a52', { spread: 0.24 }), // shale
+  ramp('#3e3a4e', { spread: 0.22 }), // bedrock
+] as const;
+
+const SKY = ramp('#1a2038', { spread: 0.3 });
+
+export const PALETTE = palette(BAND_RAMPS[0], BAND_RAMPS[1], BAND_RAMPS[2], BAND_RAMPS[3], SKY);
+
+/** Palette slots for band n, since `palette()` lays ramps out six entries at a time. */
+export function bandSlots(band: number): { outline: number; darkest: number; dark: number; base: number; light: number } {
+  const o = 1 + band * 6;
+  return { outline: o, darkest: o + 1, dark: o + 2, base: o + 3, light: o + 4 };
+}
+
+export const SKY_SLOTS = bandSlots(4);
+
+/** Cheap deterministic noise. Grain must be a property of WHERE a cell is, never of
+ *  when it was drawn, or the earth shimmers as the field changes. */
+function hash(x: number, y: number, salt: number): number {
+  let h = (x * 374761393 + y * 668265263 + salt * 1442695040888963407) | 0;
+  h = (h ^ (h >>> 13)) * 1274126177;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+/**
+ * One earth tile, with its exposed faces lit according to the blob mask.
+ *
+ * The mask says which neighbours are also earth; every side that is NOT earth is a cut
+ * face, and gets a lighter lip so the tunnel beside it reads as carved rather than as
+ * a colour change. That lip is most of what makes a grid of squares look like a tunnel
+ * network, and it is why this is worth generating per-mask instead of drawing one
+ * square per band.
+ */
+export function earthTile(band: number, mask: number): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const s = bandSlots(band);
+  const m = reduceMask(mask);
+
+  p.rect(0, 0, TILE_PX, TILE_PX, s.base);
+
+  // Grain, so a wall of earth is not a flat colour field.
+  for (let y = 0; y < TILE_PX; y += 2) {
+    for (let x = 0; x < TILE_PX; x += 2) {
+      const t = hash(x, y, band * 7 + 1);
+      if (t > 0.82) p.rect(x, y, 2, 2, s.light);
+      else if (t < 0.16) p.rect(x, y, 2, 2, s.dark);
+    }
+  }
+
+  // Cut faces. A lit lip on the open side, shading away from it.
+  const LIP = 3;
+  if (!(m & NB.N)) {
+    p.rect(0, 0, TILE_PX, 1, s.outline);
+    p.rect(0, 1, TILE_PX, LIP, s.light);
+  }
+  if (!(m & NB.S)) {
+    p.rect(0, TILE_PX - 1, TILE_PX, 1, s.outline);
+    p.rect(0, TILE_PX - 1 - LIP, TILE_PX, LIP, s.darkest);
+  }
+  if (!(m & NB.W)) {
+    p.rect(0, 0, 1, TILE_PX, s.outline);
+    p.rect(1, 0, LIP, TILE_PX, s.dark);
+  }
+  if (!(m & NB.E)) {
+    p.rect(TILE_PX - 1, 0, 1, TILE_PX, s.outline);
+    p.rect(TILE_PX - 1 - LIP, 0, LIP, TILE_PX, s.dark);
+  }
+
+  // Inside corners: where two cut faces meet, round the join off so the corner does not
+  // read as a square notch punched out of the earth.
+  const corner = (cx: number, cy: number, a: number, b: number) => {
+    if (m & a || m & b) return;
+    for (let j = 0; j < LIP + 1; j++) {
+      for (let i = 0; i < LIP + 1 - j; i++) {
+        p.set(cx === 0 ? i : TILE_PX - 1 - i, cy === 0 ? j : TILE_PX - 1 - j, s.outline);
+      }
+    }
+  };
+  corner(0, 0, NB.N, NB.W);
+  corner(1, 0, NB.N, NB.E);
+  corner(0, 1, NB.S, NB.W);
+  corner(1, 1, NB.S, NB.E);
+
+  return p;
+}
+
+/** Open tunnel: what is left once earth is removed. Dark, with a hint of the band it
+ *  was cut from so the depth is still readable in an emptied-out level. */
+export function tunnelTile(band: number): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const s = bandSlots(Math.max(0, band));
+  p.rect(0, 0, TILE_PX, TILE_PX, s.outline);
+  for (let y = 0; y < TILE_PX; y += 4) {
+    for (let x = 0; x < TILE_PX; x += 4) {
+      if (hash(x, y, band * 13 + 5) > 0.88) p.rect(x, y, 2, 2, s.darkest);
+    }
+  }
+  return p;
+}
+
+/** The strip above the earth line. */
+export function skyTile(): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  p.rect(0, 0, TILE_PX, TILE_PX, SKY_SLOTS.base);
+  for (let y = 0; y < TILE_PX; y += 2) {
+    for (let x = 0; x < TILE_PX; x += 2) {
+      if (hash(x, y, 99) > 0.94) p.rect(x, y, 1, 1, SKY_SLOTS.light);
+    }
+  }
+  return p;
+}
+
+/** A first, honest digger sprite: M0 needs something on screen that faces four ways.
+ *  Real art is M4. */
+export function diggerSprite(dir: number): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const body = P.Base;
+  const trim = P.Light;
+  const dark = P.Dark;
+
+  p.ellipse(TILE_PX / 2, TILE_PX / 2 + 2, 9, 10, body);
+  p.rect(8, 6, 16, 7, trim); // helmet
+  p.rect(8, 12, 16, 2, dark);
+
+  // A visor on the facing side, so which way it is pointing is unambiguous.
+  const eye = P.Outline;
+  if (dir === 0) p.rect(12, 4, 8, 3, eye);
+  else if (dir === 1) p.rect(22, 9, 4, 4, eye);
+  else if (dir === 2) p.rect(12, 22, 8, 3, eye);
+  else p.rect(6, 9, 4, 4, eye);
+
+  return p;
+}

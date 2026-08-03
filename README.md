@@ -11,7 +11,7 @@ None of them use assets, code, or level data from the originals.
 | --- | --- | --- |
 | [Bracer](games/bracer) | Gauntlet (Atari Games, 1985) | M5 complete — 50 levels, level editor. Polish (M6) next |
 | [Double Bubble](games/double-bubble) | Bubble Bobble (Taito, 1986) | M5 all but the room editor — 100 rooms, boss, true ending |
-| [Undermine](games/undermine) | Dig Dug (Namco, 1982) | **Design only** — nothing implemented yet, see its DESIGN.md |
+| [Undermine](games/undermine) | Dig Dug (Namco, 1982) | M0 — field, autotiling, digging. First game built on the shared cabinet |
 
 Each game's own `DESIGN.md` carries the authoritative status; this table is a summary and
 will lag it. Two things worth knowing about here:

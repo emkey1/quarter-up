@@ -1,7 +1,9 @@
 # Undermine — design
 
-> **Status:** design v1, nothing implemented. This document is the plan; §11 is the
-> milestone list and §13 is what we do not yet know.
+> **Status:** **M0 implemented.** The field renders with autotiling, the digger cuts it,
+> and the whole thing runs on `@quarter-up/cabinet` with no local engine copy — there is
+> no `src/engine/` directory at all. 31 tests. §11 is the milestone list and §13 is what
+> we do not yet know.
 >
 > Chosen as the third cabinet for a specific reason: it is playable well on a keyboard.
 > Four directions and one button, no twitch aiming, no gamepad required — which matters,
@@ -363,7 +365,7 @@ did and which needs no invention.
 
 | | Scope | Accept |
 | --- | --- | --- |
-| **M0** | Skeleton. Workspace on `@quarter-up/cabinet`, canvas, a field of earth rendering with autotiling, a digger that carves it. | Dev server runs, digging works, tests pass. |
+| **M0** | Skeleton. Workspace on `@quarter-up/cabinet`, canvas, a field of earth rendering with autotiling, a digger that carves it. | **Done.** Builds, 31 tests, lane-locked digging at two speeds. |
 | **M1** | Movement and terrain. Four-way grid movement, the dig-speed difference, rocks falling and killing. | A rock can be dropped on the player. Speed difference is measurable in a test. |
 | **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | Neither camping nor open ground is safe. |
 | **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | Pump-and-stall is viable without being dominant. |

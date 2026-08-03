@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@cabinet/*": ["../../packages/cabinet/src/*"]
+    }
+  },
+  "include": ["src", "tests", "tools", "vite.config.ts"]
+}
