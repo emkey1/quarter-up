@@ -5,13 +5,34 @@
  * RULE: nothing below "world space" may be expressed in screen pixels.
  *
  * Values tagged [i] are *inferred* reconstructions, not sourced facts. No usable
- * disassembly of the original exists, so every physics constant here is a placeholder
- * awaiting the M1 measurement pass — see DESIGN.md §12. They are internally consistent
- * (the jump numbers solve to the stated apex) but they are not yet *right*.
+ * disassembly of the arcade original exists — the well-documented reverse engineering is
+ * of the Commodore 64 port, which is different programmers reimplementing the game and
+ * therefore worthless as a reference for these numbers. Nobody has published frame counts
+ * either. So the M1 measurement pass stays open, and [i] stays.
+ *
+ * But [i] was doing too much work as a single tag: it made a value fixed by the hardware
+ * look as uncertain as one picked by feel. The grades below say where each number
+ * actually comes from, so the fidelity pass can start with the ones that are actually
+ * free rather than re-deriving the ones that are not:
+ *
+ *   [hw]   Fixed by the original hardware. 8px tiles, a 256x224 playfield, 60Hz. Not
+ *          open to revision — changing one makes this a different game.
+ *   [der]  Follows arithmetically from a [hw] value or another constant. Check the
+ *          derivation, not the number.
+ *   [con]  Constrained: a range of values would play fine, but something in the game
+ *          fails outside that range, and a test pins the constraint. BUBBLE_LIFETIME is
+ *          the worked example — see its note.
+ *   [i]    Genuinely free. Chosen by feel, defensible, unverified. THESE are what the
+ *          measurement pass is for.
+ *
+ * What every physics constant means in countable units — tiles, frames, seconds — is in
+ * tests/observables.test.ts, expressed the way a frame-stepped clip yields them. That is
+ * the file to check footage against; `solveJump()` in game/physics.ts turns a corrected
+ * count straight back into JUMP_VELOCITY and GRAVITY.
  */
 
 export const T = {
-  // ---------------------------------------------------------------- world space (wu)
+  // ------------------------------------------------------- world space (wu) [hw]
   // Never change these. They define the simulation's units.
   /** One world unit is one original-hardware pixel. Tiles are 8x8 there, so 8 here. */
   TILE: 8,
@@ -20,10 +41,10 @@ export const T = {
   GRID_H: 28,
 
   /** The room IS the viewport — single screen, no scrolling, no camera. */
-  VIEW_W: 256, // TILE * GRID_W
-  VIEW_H: 224, // TILE * GRID_H
+  VIEW_W: 256, // [der] TILE * GRID_W
+  VIEW_H: 224, // [der] TILE * GRID_H
 
-  STEP_HZ: 60,
+  STEP_HZ: 60, // [hw] the original's refresh; the whole simulation is keyed to it
 
   // ---------------------------------------------------------------- presentation only
   /** Screen px per world unit at S=1. Art is authored at TILE * ART_SCALE = 16px per
@@ -38,7 +59,7 @@ export const T = {
   PAD_HYSTERESIS: 0.1,
   PAD_TRIGGER_THRESHOLD: 0.5,
 
-  // ---------------------------------------------------------------- movement [i]
+  // ----------------------------------------------------------- movement [i]
   /** wu/frame. The red shoe raises this to RUN_SPEED_FAST. */
   RUN_SPEED: 1.0,
   RUN_SPEED_FAST: 1.5,
@@ -71,14 +92,14 @@ export const T = {
    *  forever and the player tunnels through platforms on re-entry. */
   FALL_SPEED_MAX: 4.0,
 
-  // ---------------------------------------------------------------- collision boxes (wu)
+  // -------------------------------------------------- collision boxes (wu) [i]
   PLAYER_HALF_W: 6,
   PLAYER_HALF_H: 7,
   MONSTER_HALF: 6,
   BUBBLE_RADIUS: 8,
   ITEM_HALF: 6,
 
-  // ---------------------------------------------------------------- bubbles [i]
+  // ------------------------------------------------ bubbles [i], except as noted
   /** Fired horizontally at this speed, decelerating to zero over BUBBLE_FIRE_FRAMES,
    *  after which the bubble rises and joins the room's drift current. */
   BUBBLE_FIRE_SPEED: 3.0,
@@ -87,7 +108,9 @@ export const T = {
    *  speed, so the arc a player has learned to aim still holds. */
   BUBBLE_FIRE_FRAMES_FAR: 32,
   /**
-   * How fast a free bubble rises. [i]
+   * How fast a free bubble rises. [i] — and the single most load-bearing free number
+   * here, since BUBBLE_LIFETIME is now derived from how long a climb at this speed takes.
+   * Measure this one first.
    *
    * 0.35 climbed away too fast; 0.22 read as static. The second note was really about
    * the wobble below being absent rather than about this number — with lateral motion
@@ -113,8 +136,28 @@ export const T = {
   /** Frames between shots. The yellow sweet drops this to _RAPID. */
   BUBBLE_COOLDOWN: 18,
   BUBBLE_COOLDOWN_RAPID: 7,
-  /** Frames an empty bubble survives before popping itself. */
-  BUBBLE_LIFETIME: 600,
+  /**
+   * Frames an empty bubble survives before popping itself. [con]
+   *
+   * Not a free number, and not the 600 it was. A bubble has to outlive its own climb:
+   * blown from where the player spawns, it rises until something stops it, and only then
+   * can a cluster be built around it. Measured against the actual hundred rooms, the
+   * climb takes a median 159 frames — but seven rooms take 626–650, and at 600 frames a
+   * bubble in those rooms popped before it ever joined a pool. In 7% of the campaign the
+   * exponential chain curve, which DESIGN.md §3.8 calls the point of the game, was
+   * unreachable from the standard spawn.
+   *
+   * Derived rather than measured, and the derivation is the worst case plus what you
+   * then need to do with it: 650 to settle, 72 to blow a five-cluster (4 * COOLDOWN),
+   * ~60 to reposition and pop it = 782, rounded up for margin. tests/observables.test.ts
+   * checks all hundred rooms against it, so a room generator change that slows the climb
+   * fails the build rather than quietly killing the scoring in a few rooms.
+   *
+   * The other knob would have been a faster rise. Lifetime is the right one to move:
+   * BUBBLE_RISE_SPEED is tuned by eye against riding and the wobble, and this is tuned
+   * against nothing else at all.
+   */
+  BUBBLE_LIFETIME: 840,
   /** Default frames a trapped monster stays caught. Rooms override this — the original
    *  varies it per stage, and more sharply than any other per-stage value, which is
    *  what makes some rooms feel frantic. See DESIGN.md §3.3.2. */
@@ -144,7 +187,7 @@ export const T = {
    */
   BUBBLE_SPAWN_CLEARANCE: 4,
 
-  // ---------------------------------------------------------------- monsters [i]
+  // ----------------------------------------------------------- monsters [i]
   // Per-kind speeds, climb rates and projectiles live in data/roster.ts — they are the
   // roster's shape, not loose constants. Only what every monster shares is here.
   /** Multiplier applied to a kind's climb chance once it is angry. */
@@ -155,7 +198,7 @@ export const T = {
   FLOAT_AMPLITUDE: 0.35,
   FLOAT_PERIOD: 150,
 
-  // ---------------------------------------------------------------- projectiles [i]
+  // -------------------------------------------------------- projectiles [i]
   PROJECTILE_HALF: 3,
   /** Upward kick on a lobbed bottle, so it clears the thrower's own tier. */
   BOTTLE_LAUNCH_SPEED: 1.9,
@@ -163,7 +206,7 @@ export const T = {
    *  flat shots are fired uselessly at the ceiling all room. */
   THROW_ALIGN_WU: 24,
 
-  // ---------------------------------------------------------------- room clock [i]
+  // --------------------------------------------------------- room clock [i]
   /** Frames before HURRY UP flashes. */
   ROOM_TIMER: 1800,
   /** Frames between HURRY UP and the Baron entering. */
@@ -191,7 +234,7 @@ export const T = {
    *  a run of forty rooms is not mostly card. */
   INTERLUDE_FRAMES: 90,
 
-  // ---------------------------------------------------------------- items [i]
+  // -------------------------------------------------------------- items [i]
   /** Frames a dropped pickup survives before fading. Long enough to chase one down
    *  through the vertical wrap, short enough that a room does not silt up. */
   PICKUP_LIFETIME: 600,
@@ -203,7 +246,7 @@ export const T = {
   /** Sideways kick on fruit as it drops, so a chain scatters rather than stacking. */
   FRUIT_SCATTER: 0.9,
 
-  // ---------------------------------------------------------------- special bubbles [i]
+  // ---------------------------------------------------- special bubbles [i]
   /** Frames between special bubbles drifting into a room that offers them. */
   SPECIAL_INTERVAL: 540,
   /** Most a room will hold at once, so a long stall does not fill the screen. */

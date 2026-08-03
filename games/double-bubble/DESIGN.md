@@ -11,9 +11,24 @@
 >
 > Debug keys: **F1** jump meter, **F2** counter readout.
 >
-> Outstanding from M1: the physics constants are still `[i]` placeholders. They are
-> internally consistent and instrumented (F1 shows measured against predicted, in the
-> units a frame-stepped clip yields) but they have not been measured against footage.
+> Outstanding from M1: the physics constants have **still not been measured against
+> footage**, and cannot be from the desk — no disassembly of the *arcade* original exists
+> (the well-documented reverse engineering is of the C64 port, which is a different team's
+> reimplementation and no evidence at all), and nobody has published frame counts.
+>
+> What has been done instead, so the measurement pass is a checklist rather than a
+> research project: every constant is now graded by where it actually comes from
+> (`[hw]` hardware fact, `[der]` derived, `[con]` constrained by a test, `[i]` free
+> choice), and `tests/observables.test.ts` states what each one *means* in the units a
+> frame-stepped clip yields — the jump is 4.00 tiles and 38 airborne frames, a walk
+> crosses the room in 4.27s, a bubble flies 4.31 tiles. Check footage against that file;
+> `solveJump()` converts a corrected count back into constants.
+>
+> That work found one real defect: at the old 600-frame bubble lifetime, a bubble blown
+> from the player's spawn popped before it settled into a poolable cluster in **7 of the
+> 100 rooms**, which quietly removed the exponential chain curve (§3.8) — the point of
+> the game — from 7% of the campaign. `BUBBLE_LIFETIME` is now derived from the worst
+> observed climb rather than picked, and all hundred rooms are checked against it.
 >
 > Two behaviours flagged in play, both awaiting a look at reference footage before
 > anyone "fixes" them: a captive that escapes at point-blank range kills with no
