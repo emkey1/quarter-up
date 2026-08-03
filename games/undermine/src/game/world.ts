@@ -12,10 +12,15 @@ import {
   enemyCellY,
   type Enemy,
 } from './enemy';
+import { pump, crushScore } from './pump';
 
 /** What happened this tick, for the presentation layer to make noise about. */
 export interface WorldEvents {
   dug: boolean;
+  pumped: boolean;
+  burst: boolean;
+  /** Points earned this tick, and where, so the HUD can float a number there. */
+  scored: { points: number; x: number; y: number } | null;
   rockStartedFalling: boolean;
   rockLanded: boolean;
   playerCrushed: boolean;
@@ -58,6 +63,7 @@ export class World {
   private flowVersion = -1;
 
   frame = 0;
+  score = 0;
   /** Cleared by death, and the reason `step` stops advancing the digger. */
   playerAlive = true;
 
@@ -107,6 +113,9 @@ export class World {
     this.frame++;
     const events: WorldEvents = {
       dug: false,
+      pumped: false,
+      burst: false,
+      scored: null,
       rockStartedFalling: false,
       rockLanded: false,
       playerCrushed: false,
@@ -120,6 +129,23 @@ export class World {
     if (this.playerAlive) {
       this.digger.step(this.field, intent);
       events.dug = this.digger.digging;
+
+      if (intent.pump) {
+        const r = pump(
+          this.field,
+          this.enemies,
+          this.digger.x,
+          this.digger.y,
+          this.digger.facing,
+          this.digger.y,
+        );
+        events.pumped = r.target !== null;
+        if (r.burst && r.target) {
+          events.burst = true;
+          this.score += r.score;
+          events.scored = { points: r.score, x: r.target.x, y: r.target.y };
+        }
+      }
     }
 
     // The crushable view of the player is refreshed from the digger each tick rather
@@ -137,8 +163,17 @@ export class World {
       const e = stepRock(this.field, r, targets);
       events.rockStartedFalling ||= e.startedFalling;
       events.rockLanded ||= e.landed;
+      let crushedEnemies = 0;
       for (const victim of e.crushed) {
         if (victim === this.crushable) events.playerCrushed = true;
+        else crushedEnemies++;
+      }
+      // Scored per FALL rather than per victim, which is the whole point of the curve:
+      // four separate rocks pay 4,000 and one rock catching four pays 6,000.
+      if (crushedEnemies > 0) {
+        const points = crushScore(crushedEnemies);
+        this.score += points;
+        events.scored = { points, x: r.x, y: r.y };
       }
     }
     for (const en of this.enemies) {

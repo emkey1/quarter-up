@@ -130,6 +130,32 @@ describe('what the constants mean, in countable units', () => {
     });
   });
 
+  describe('the pump', () => {
+    it('takes four presses to burst something', () => {
+      // Discrete, and countable straight off a recording. No measurement required.
+      expect(T.PUMP_STAGES).toBe(4);
+    });
+
+    it('holds a target for three quarters of a second per stage', () => {
+      expect(SECONDS(T.PUMP_DEFLATE_F)).toBeCloseTo(0.75, 2);
+    });
+
+    it('buys about four and a half cells of walking for two presses', () => {
+      // What the stall tactic is actually WORTH, which is the thing a player feels.
+      // Under two cells and it is not worth the presses; far over five and the pump
+      // stops being a weapon and becomes a freeze ray.
+      const cells = (2 * T.PUMP_DEFLATE_F * T.MOVE_SPEED) / T.CELL;
+      expect(cells).toBeCloseTo(5.625, 3);
+      expect(cells).toBeGreaterThan(2);
+      expect(cells).toBeLessThan(8);
+    });
+
+    it('reaches two cells, which is close enough to be caught', () => {
+      expect(T.PUMP_REACH_CELLS).toBe(2);
+      expect(T.PUMP_REACH_CELLS * T.CELL, 'reach in world units').toBe(32);
+    });
+  });
+
   describe('the free constants, tracked', () => {
     it('has only four continuous values, and every one is named here', () => {
       // DESIGN.md §12 claims the continuous list is short. If it grows quietly, this

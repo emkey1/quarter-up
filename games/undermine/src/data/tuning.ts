@@ -141,6 +141,51 @@ export const T = {
    *  like it worked. */
   GHOST_NO_ROUTE_F: 12,
 
+  // ---------------------------------------------------------------- the pump
+  /**
+   * [i] Presses to burst a target.
+   *
+   * Discrete, and countable straight off a recording — nobody has to measure anything to
+   * check this one.
+   */
+  PUMP_STAGES: 4,
+
+  /** [i] How far the nozzle reaches along the facing axis, in cells. Short: the pump is
+   *  a reason to be dangerously close, not a gun. */
+  PUMP_REACH_CELLS: 2,
+
+  /**
+   * [i] Frames one stage of inflation takes to leak away once you stop pumping.
+   *
+   * The single most important number in the pump, and the reason it is not simply a slow
+   * gun. Two stages hold a target still for about a second and a half, which is enough to
+   * walk past it — so the pump doubles as crowd control and a player who only ever uses
+   * it to kill is playing it wrong. Long enough to be useful; short enough that you
+   * cannot leave a room full of half-inflated enemies parked while you do something else.
+   *
+   * Expressed as integer frames per stage rather than a rate, which keeps it off the
+   * continuous list DESIGN.md §12 tracks. That list stays at four.
+   */
+  PUMP_DEFLATE_F: 45,
+
+  // ---------------------------------------------------------------- scoring
+  /** [i] Bursting something, by the band it dies in. Depth is money: the deep bands pull
+   *  the player away from the surface and away from safety. Sources agree on the shape
+   *  and differ on the numbers — see DESIGN.md §3.8. */
+  SCORE_BURST: [200, 300, 400, 500],
+
+  /** [i] A dragon burst while you are standing in its fire lane, i.e. the dangerous way,
+   *  is worth double. */
+  SCORE_DRAGON_LANE_MULTIPLIER: 2,
+
+  /**
+   * [i] A rock fall, by how many it caught at once.
+   *
+   * Steeply escalating on purpose: this is the only way to kill several things at once,
+   * and the curve is what makes setting one up worth more than four separate pumps.
+   */
+  SCORE_CRUSH: [1000, 2500, 4000, 6000, 8000, 10000, 12000, 15000],
+
   // ---------------------------------------------------------------- the dragon's flame
   /** [i] Frames of visible wind-up before the flame appears. The only ranged threat in
    *  the game has to be escapable by a player who is watching. */

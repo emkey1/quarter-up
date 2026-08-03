@@ -38,6 +38,11 @@ function recordingCtx(): { ctx: CanvasRenderingContext2D; blits: Blit[] } {
     clip: () => {},
     fillRect: () => {},
     fillText: () => {},
+    stroke: () => {},
+    arc: () => {},
+    globalAlpha: 1,
+    strokeStyle: '',
+    lineWidth: 1,
     drawImage: (_img: unknown, sx: number, sy: number, _sw: number, _sh: number, dx: number, dy: number) => {
       blits.push({ sx, sy, dx, dy });
     },

@@ -20,7 +20,7 @@ export class App implements LoopHost {
   private readonly world = new World();
   private readonly atlas: TileAtlas;
   private readonly view: FieldView;
-  private intent: MoveIntent = { dir: Dir.None };
+  private intent: MoveIntent = { dir: Dir.None, pump: false };
   private paused = false;
 
   constructor(
@@ -63,12 +63,18 @@ export class App implements LoopHost {
       }
     }
 
-    this.intent = { dir };
+    // Edge-triggered: the pump is jabbed, not held. `pressed` is already a
+    // once-per-frame edge from the cabinet's keyboard, and poll() only runs on frames
+    // that will step, so a press can neither be lost nor counted twice.
+    const pumped = this.keyboard.pressed('pump') || this.pad.isPressed('pump');
+    this.intent = { dir, pump: pumped };
   }
 
   step(): void {
     if (this.paused) return;
     this.world.step(this.intent);
+    // Consumed: a press must not survive into a second step on a catch-up frame.
+    this.intent = { ...this.intent, pump: false };
   }
 
   draw(): void {
@@ -101,6 +107,6 @@ export class App implements LoopHost {
   /** M0 diagnostics, so the dev server shows something checkable without a HUD. */
   get debug(): string {
     const d = this.world.digger;
-    return `cell ${d.cellX},${d.cellY}  dug ${this.world.field.tunnelCount()}  left ${this.world.enemiesLeft}`;
+    return `score ${this.world.score}  left ${this.world.enemiesLeft}  cell ${d.cellX},${d.cellY}`;
   }
 }

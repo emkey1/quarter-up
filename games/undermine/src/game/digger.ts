@@ -15,6 +15,9 @@ export const DIR_DY = [-1, 0, 1, 0] as const;
 /** What the player asked for this frame. Four-way: no diagonals, ever. */
 export interface MoveIntent {
   dir: Dir;
+  /** True only on the frame the button went down. The pump is jabbed, not held — see
+   *  game/pump.ts for why that distinction is load-bearing. */
+  pump?: boolean;
 }
 
 /**

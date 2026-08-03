@@ -32,6 +32,17 @@ export interface Enemy {
   /** Dragon only: counts down the wind-up, the burn, and then the cooldown. */
   flameTimer: number;
   flameState: 'idle' | 'winding' | 'burning';
+
+  /**
+   * Pump stages currently in it, 0 to T.PUMP_STAGES.
+   *
+   * Anything above zero holds it still. That is the pump's second job and the reason it
+   * is not a slow gun: two stages buy about a second and a half of stillness, which is
+   * enough to walk past something rather than spend four presses killing it.
+   */
+  inflation: number;
+  /** Frames since the last pump press, counting toward losing a stage. */
+  deflateTimer: number;
 }
 
 export function makeEnemy(kind: EnemyKind, cx: number, cy: number): Enemy {
@@ -47,6 +58,8 @@ export function makeEnemy(kind: EnemyKind, cx: number, cy: number): Enemy {
     enteredEarth: false,
     flameTimer: T.FLAME_COOLDOWN_F,
     flameState: 'idle',
+    inflation: 0,
+    deflateTimer: 0,
   };
 }
 
@@ -66,6 +79,8 @@ export interface EnemyEvents {
   /** Cells the flame currently occupies, for drawing and for killing. */
   flame: { x: number; y: number }[];
   touchedPlayer: boolean;
+  /** Lost a stage of inflation this frame. */
+  deflated: boolean;
 }
 
 /**
@@ -101,8 +116,29 @@ export function stepEnemy(
     flameLit: false,
     flame: [],
     touchedPlayer: false,
+    deflated: false,
   };
   if (!e.alive || e.state === EnemyState.Dead) return out;
+
+  /*
+   * Inflated: held still, and leaking.
+   *
+   * Everything else is skipped — no movement, no pathing, and no breathing fire. A
+   * dragon that could still burn while pinned would make the stall tactic useless
+   * against exactly the enemy it is most needed against.
+   */
+  if (e.inflation > 0) {
+    if (++e.deflateTimer >= T.PUMP_DEFLATE_F) {
+      e.deflateTimer = 0;
+      e.inflation--;
+      out.deflated = true;
+    }
+    // Contact still kills. Walking into a held enemy is your mistake, not its win.
+    if (target.alive && Math.abs(target.x - e.x) < T.CELL * 0.7 && Math.abs(target.y - e.y) < T.CELL * 0.7) {
+      out.touchedPlayer = true;
+    }
+    return out;
+  }
 
   if (e.state === EnemyState.Ghosting) {
     stepGhost(field, e, target, out);

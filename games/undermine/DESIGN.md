@@ -1,10 +1,10 @@
 # Undermine — design
 
-> **Status:** **M0–M2 implemented.** The field renders with autotiling, the digger cuts
-> it at two speeds, rocks fall and kill, and enemies hunt through the tunnels and ghost
-> through the earth when you seal yourself in. It runs on `@quarter-up/cabinet` with no
-> local engine copy — there is no `src/engine/` directory at all. 65 tests. §11 is the
-> milestone list and §13 is what we do not yet know.
+> **Status:** **M0–M3 implemented.** The field renders with autotiling, the digger cuts
+> it at two speeds, rocks fall and kill, enemies hunt through the tunnels and ghost
+> through the earth, and the pump inflates, holds and bursts them for depth-banded score.
+> It runs on `@quarter-up/cabinet` with no local engine copy — there is no `src/engine/`
+> directory at all. 82 tests. §11 is the milestone list and §13 is what we do not know.
 >
 > Chosen as the third cabinet for a specific reason: it is playable well on a keyboard.
 > Four directions and one button, no twitch aiming, no gamepad required — which matters,
@@ -369,7 +369,7 @@ did and which needs no invention.
 | **M0** | Skeleton. Workspace on `@quarter-up/cabinet`, canvas, a field of earth rendering with autotiling, a digger that carves it. | **Done.** Builds, 31 tests, lane-locked digging at two speeds. |
 | **M1** | Movement and terrain. Four-way grid movement, the dig-speed difference, rocks falling and killing. | **Done.** A rock can be dropped on the player, and dodged during the teeter. Both speeds measured. |
 | **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | **Done.** A sealed pocket is reached; standing in the open is caught; running survives far longer than either. |
-| **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | Pump-and-stall is viable without being dominant. |
+| **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | **Done.** Two presses buy ~5.6 cells of walking; a room cannot be parked; crushing four still beats popping four. |
 | **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | Looks and sounds like a cabinet. |
 | **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | A full run start to finish. |
 | **M6** | Polish, and whatever the third game teaches the shared package — §7 predicts `terrain.ts`. | Both other games still green after any extraction. |
@@ -393,8 +393,9 @@ The lesson from Double Bubble, applied from the start rather than at M6.
   M0 (run speed, dig speed) and adding enemies at M2 made it four (enemy speed, ghost
   speed). The observables test fails the build if a non-integer constant appears that is
   not on the list, which is how that got noticed at the time rather than discovered at
-  M6. The pump's deflate rate is the last one expected; anything beyond that should be
-  argued for in this document before it is written.
+  M6. The pump's deflate rate was expected to be the fifth — it is not, because it is
+  expressible as integer frames per stage rather than as a rate, so the list is still
+  four. Anything that would make it five should be argued for here before it is written.
 
 ---
 

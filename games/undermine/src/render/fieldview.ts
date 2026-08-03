@@ -127,6 +127,32 @@ export class FieldView {
           ? ghost ? MISC.grubGhost : MISC.grub
           : ghost ? MISC.emberjawGhost : MISC.emberjaw;
       blit(col, e.x, e.y);
+
+      /*
+       * Inflation, drawn as a swelling ring rather than a bar.
+       *
+       * It has to be legible at a glance: the whole stall tactic depends on the player
+       * knowing, without reading anything, whether the thing in front of them is held
+       * and roughly how much longer for. A number or a bar would be read too slowly to
+       * act on in a corridor.
+       */
+      if (e.inflation > 0) {
+        const t = e.inflation / T.PUMP_STAGES;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = '#ffe9a0';
+        ctx.lineWidth = Math.max(1, Math.round(2 * px));
+        ctx.beginPath();
+        ctx.arc(
+          pf.x + e.x * px,
+          pf.y + e.y * px,
+          (T.CELL / 2 + 2 + t * 6) * px,
+          0,
+          Math.PI * 2,
+        );
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // The digger, drawn on top and positioned by its centre rather than its cell, so
