@@ -7,8 +7,16 @@
  */
 export type Bindings<A extends string> = Record<A, string[]>;
 
-/** Codes we swallow so the page never scrolls or activates browser UI mid-game. */
-const SWALLOW = new Set([
+/**
+ * Keys whose browser default is suppressed while the game has focus.
+ *
+ * Anything a game binds has to be here, or the browser acts on it too: arrows scroll,
+ * Space scrolls and re-activates the focused button, Tab moves focus out of the canvas,
+ * Backspace used to navigate back. Modifiers are the subtle ones — Alt alone focuses
+ * Chrome's menu bar on Windows, so a player using it as an action key kept losing the
+ * keyboard mid-run.
+ */
+export const SWALLOW = new Set([
   'ArrowUp',
   'ArrowDown',
   'ArrowLeft',
@@ -17,6 +25,13 @@ const SWALLOW = new Set([
   'Tab',
   'Backspace',
   'Slash',
+  // Enter activates whatever the browser thinks is focused — which, after a click on a
+  // menu button, is that button. Left alone it re-fires the last thing the player
+  // pressed every time they use Enter in play.
+  'Enter',
+  'NumpadEnter',
+  'AltLeft',
+  'AltRight',
 ]);
 
 export class Keyboard<A extends string> {

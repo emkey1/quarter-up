@@ -295,7 +295,7 @@ citizens — the simulation never sees a device, only an `ActionState` (§5.4).
 | --- | --- | --- | --- |
 | Move (8-way) | Arrow keys | `W A S D` | D-pad **or** left stick |
 | Fire | `Space` | `J` | `A` / cross, **or** right trigger |
-| Use potion (magic) | `Shift` (either) | `K` | `B` / circle, **or** left trigger |
+| Use potion (magic) | `Enter` | `K` | `B` / circle, **or** left trigger |
 | Face-lock / strafe (hold) | `Alt` | `L` | `X` / square |
 | Aim (twin-stick mode only) | Arrow keys | — | right stick |
 | Pause | `P` | `Esc` | `Start` |

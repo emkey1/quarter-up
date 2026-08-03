@@ -26,7 +26,20 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   aimLeft: ['ArrowLeft'],
   aimRight: ['ArrowRight'],
   fire: ['Space', 'KeyJ'],
-  magic: ['ShiftLeft', 'ShiftRight', 'KeyK'],
+  /**
+   * Enter, not Shift.
+   *
+   * Shift is a modifier, and a modifier is the wrong shape for an action key: held with
+   * a direction it turns arrow keys into text selection, and five presses in a row makes
+   * Windows offer to turn on Sticky Keys — mid-run, over the game. It also cannot be
+   * reported honestly on a controls card, because "Shift" means two different physical
+   * keys that behave differently under some OS accessibility settings.
+   *
+   * Enter overlaps `confirm` below, which is fine and already the established pattern:
+   * Space is both fire and confirm. The two are never live at once — confirm is only
+   * read by the menu screens, magic only during play.
+   */
+  magic: ['Enter', 'NumpadEnter', 'KeyK'],
   faceLock: ['AltLeft', 'AltRight', 'KeyL'],
   pause: ['KeyP', 'Escape'],
   mute: ['KeyM'],

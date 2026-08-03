@@ -11,6 +11,8 @@ const quantiseStick = (x: number, y: number, prev: number | null) =>
   quantise(x, y, prev, T.PAD_DEADZONE, T.PAD_HYSTERESIS);
 const analogStick = (x: number, y: number) => analog(x, y, T.PAD_DEADZONE);
 import { fireRoots } from '@/engine/input';
+import { DEFAULT_KEY_BINDINGS } from '@/engine/controls';
+import { SWALLOW } from '@cabinet/keyboard';
 
 describe('quantiseStick', () => {
   it('maps the eight compass directions', () => {
@@ -115,5 +117,44 @@ describe('fireRoots', () => {
   it('free and twin-stick never root', () => {
     expect(fireRoots('free', true, 999)).toBe(false);
     expect(fireRoots('twinstick', true, 999)).toBe(false);
+  });
+});
+
+describe('default key bindings', () => {
+  it('does not use Shift for anything', () => {
+    // Reported from play: Shift is a bad potion key. It is a bad ACTION key generally —
+    // held with a direction it turns the arrows into text selection, and five presses in
+    // a row makes Windows offer Sticky Keys over the top of the game. Magic is on Enter.
+    for (const [action, codes] of Object.entries(DEFAULT_KEY_BINDINGS)) {
+      for (const c of codes) {
+        expect(c, `${action} is bound to a Shift key`).not.toMatch(/^Shift/);
+      }
+    }
+    expect(DEFAULT_KEY_BINDINGS.magic).toContain('Enter');
+  });
+
+  it('swallows the browser default for every key it binds', () => {
+    // A bound key the browser also acts on is a key that does two things. Enter
+    // re-activates whatever button was last clicked; Alt focuses Chrome's menu bar and
+    // takes the keyboard with it. Both were live before this.
+    //
+    // Only keys with a browser default need to be listed, so this checks the ones that
+    // have one rather than demanding every letter key be swallowed.
+    const HAS_BROWSER_DEFAULT = /^(Arrow|Space$|Tab$|Backspace$|Slash$|Enter$|NumpadEnter$|Alt|Shift|Control|Meta)/;
+    for (const [action, codes] of Object.entries(DEFAULT_KEY_BINDINGS)) {
+      for (const c of codes) {
+        if (!HAS_BROWSER_DEFAULT.test(c)) continue;
+        expect(SWALLOW.has(c), `${action} binds ${c}, which the browser also acts on`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps magic and confirm apart in time, since they share Enter', () => {
+    // Enter is both. That is fine and matches Space, which is both fire and confirm —
+    // but only because confirm is read by the menu screens and magic only during play.
+    // If they were ever live together, one press would do both.
+    expect(DEFAULT_KEY_BINDINGS.confirm).toContain('Enter');
+    expect(DEFAULT_KEY_BINDINGS.fire).toContain('Space');
+    expect(DEFAULT_KEY_BINDINGS.confirm).toContain('Space');
   });
 });
