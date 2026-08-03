@@ -150,6 +150,16 @@ export class App implements LoopHost {
   private lastJumps = 0;
   private lastBlown = 0;
 
+  /**
+   * Paused, by P or Escape.
+   *
+   * The action was already bound and already sampled — nothing consumed it, so the key
+   * did nothing. Pausing halts the SIMULATION only: draw still runs every frame, so the
+   * room stays on screen with an overlay over it rather than freezing on whatever the
+   * last presented frame happened to be.
+   */
+  paused = false;
+
   poll(): void {
     this.devices.poll();
     // Browsers refuse to start an AudioContext until the page has been interacted with,
@@ -205,7 +215,16 @@ export class App implements LoopHost {
       if (this.devices.keyboard.wasCodePressed('F2')) this.showCounters = !this.showCounters;
       if (this.devices.keyboard.wasCodePressed('KeyR')) this.setRoom(this.room, this.roomNumber);
       if (a.mutePressed) this.audio.setMuted(!this.audio.muted);
+      if (a.pausePressed) {
+        this.paused = !this.paused;
+        this.audio.play('button');
+      }
     }
+
+    // Halt everything that advances: the world, the interlude countdown and the particle
+    // clock. Pausing that let the interlude tick would load the next room while you were
+    // away from the keyboard.
+    if (this.paused) return;
 
     if (this.interlude > 0) {
       if (--this.interlude === 0) this.loadNextRoom();
@@ -356,6 +375,36 @@ export class App implements LoopHost {
     this.drawHud(ctx, layout);
     if (this.showMeter) this.drawMeter(ctx, layout);
     if (this.showCounters) this.drawCounters(ctx, layout);
+    if (this.paused) this.drawPaused(ctx, layout);
+  }
+
+  /**
+   * The paused overlay.
+   *
+   * Dims the playfield rather than hiding it — you pause to look at the room as often as
+   * to walk away from it. Says which key resumes, because a pause you cannot get out of
+   * is indistinguishable from a hang.
+   */
+  private drawPaused(ctx: CanvasRenderingContext2D, layout: Layout): void {
+    const pf = layout.playfield;
+    const s = layout.uiScale;
+    ctx.save();
+    ctx.fillStyle = 'rgba(4,6,10,.72)';
+    ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = pf.x + pf.w / 2;
+    const cy = pf.y + pf.h / 2;
+
+    ctx.font = `800 ${Math.round(30 * s)}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText('PAUSED', cx, cy - 8 * s);
+
+    ctx.font = `600 ${Math.round(11 * s)}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(230,233,239,.6)';
+    ctx.fillText('P or ESC to resume', cx, cy + 20 * s);
+    ctx.restore();
   }
 
   /**
@@ -678,7 +727,9 @@ export class App implements LoopHost {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#5a6068';
     ctx.fillText(
-      'M2 — arrows / A D move, Space jump, J blow.   R reset   F1 meter',
+      // Kept current deliberately: a hint line that names a milestone the game passed
+      // three milestones ago is worse than none, and P and M were undiscoverable.
+      'arrows / A D move · Space jump · J blow · P pause · M mute · R reset · F1 meter · F2 counters',
       pf.x,
       pf.y + pf.h + Math.round(8 * s),
     );

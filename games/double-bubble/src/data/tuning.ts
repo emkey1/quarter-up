@@ -278,7 +278,13 @@ export const T = {
   /** EXTEND letters dropped, indexed by monsters popped in one chain. Index 0 and 1
    *  are unreachable (you cannot chain fewer than one) but keep the table 1:1 with n. */
   EXTEND_LETTERS: [0, 0, 0, 1, 2, 3, 4, 5, 6] as const,
-  EMPTY_BUBBLE_POP: 10,
+  /** Points for bursting a bubble with nothing in it.
+   *
+   *  Raised from 10 on a player's recollection of the original. Neither number is
+   *  sourced: the design's scoring section documents the exponential monster curve and
+   *  the EXTEND table in detail and says nothing about empty bubbles, so 10 was a guess
+   *  too. Flagged for the fidelity pass rather than quietly settled. [i] */
+  EMPTY_BUBBLE_POP: 50,
 } as const;
 
 /** Room dimensions in world units, derived not duplicated. */

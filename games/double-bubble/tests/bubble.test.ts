@@ -478,3 +478,40 @@ describe('chainFrom', () => {
     expect(chainFrom(bubbles, 0)).toEqual([0]);
   });
 });
+
+describe('empty bubbles are worth bursting', () => {
+  it('scores a flat amount each, not nothing', () => {
+    // Reported from play: an empty pop felt like it paid nothing. It paid 10 — an
+    // unsourced guess, as is the 50 that replaced it. The design documents the monster
+    // curve and the EXTEND table exactly and is silent on empties, so this is [i] and
+    // flagged for the fidelity pass rather than quietly settled.
+    expect(T.EMPTY_BUBBLE_POP).toBe(50);
+  });
+
+  it('pays more for a bubble with a monster in it than an empty one', () => {
+    // The ordering is the part that must hold whatever the constants end up being: a
+    // loaded pop is the whole game, an empty pop is tidying up.
+    expect(chainScore(1)).toBeGreaterThan(T.EMPTY_BUBBLE_POP);
+  });
+
+  it('keeps a chain worth vastly more than the same bubbles popped singly', () => {
+    // Herding is the skill the scoring is meant to teach. Four at once must beat four
+    // one at a time by a wide margin, or there is no reason to set anything up.
+    expect(chainScore(4)).toBeGreaterThan(chainScore(1) * 4);
+  });
+});
+
+describe('EXTEND is gated by chain size, not by level', () => {
+  it('drops nothing until three monsters go at once', () => {
+    // Answers "what level does EXTEND start on": none. It is available from room one,
+    // but a two-chain pays no letters, so it has to be set up deliberately.
+    expect(extendLetters(1)).toBe(0);
+    expect(extendLetters(2)).toBe(0);
+    expect(extendLetters(3)).toBe(1);
+  });
+
+  it('pays all six for a big enough chain', () => {
+    expect(extendLetters(8)).toBe(6);
+    expect(extendLetters(20)).toBe(6);
+  });
+});
