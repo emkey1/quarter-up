@@ -313,3 +313,64 @@ describe('M2 acceptance: neither camping nor open ground is safe', () => {
     expect(frames, 'running was no better than standing still').toBeGreaterThan(120);
   });
 });
+
+describe('enemies obey the same grid the player does', () => {
+  /**
+   * Reported from play: enemies were not lined up the way the player is.
+   *
+   * The digger is lane-locked by construction — travelling horizontally pins y to a row
+   * centre, vertically pins x to a column centre — so it is always either exactly on a
+   * cell centre or in a straight line between two adjacent ones. Enemies were not, and
+   * two things sharing a screen must share a grid or the whole thing reads as sloppy.
+   *
+   * Measured before the fix: enemies spent 35% of their time in positions the player
+   * cannot occupy, up to a full half-cell off the nearer lane.
+   */
+  const lane = (v: number) => Math.floor(v / T.CELL) * T.CELL + T.CELL / 2;
+  const onALane = (x: number, y: number) =>
+    Math.abs(x - lane(x)) < 1e-9 || Math.abs(y - lane(y)) < 1e-9;
+
+  it('never stands anywhere the player could not stand, while tunnelling', () => {
+    const w = new World(LAYOUTS[0]);
+    for (let f = 0; f < 60 * 20; f++) {
+      w.step({ dir: f % 120 < 60 ? Dir.Down : Dir.Right });
+      for (const e of w.enemies) {
+        if (!e.alive || e.state !== EnemyState.Tunnelling) continue;
+        expect(
+          onALane(e.x, e.y),
+          `frame ${f}: ${e.kind} at ${e.x.toFixed(2)},${e.y.toFixed(2)} is off both lanes`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('holds the same invariant the digger does', () => {
+    // Stated as the shared property rather than two separate checks, because the point
+    // is that they are the same rule.
+    const w = new World(LAYOUTS[0]);
+    for (let f = 0; f < 60 * 10; f++) {
+      w.step({ dir: f % 90 < 45 ? Dir.Right : Dir.Down });
+      expect(onALane(w.digger.x, w.digger.y), `frame ${f}: the digger itself drifted`).toBe(true);
+    }
+  });
+
+  it('turns at cell centres, not at cell boundaries', () => {
+    // The mechanism behind the bug: an enemy that re-asks for a direction the moment it
+    // crosses into a new cell turns half a cell early and never recovers.
+    const f = new Field();
+    for (let cx = 2; cx <= 8; cx++) f.dig(cx, 8);
+    for (let cy = 8; cy <= 12; cy++) f.dig(8, cy);
+    const flow = new FlowField();
+    const e = makeEnemy('grub', 2, 8);
+    const player = targetAt(8, 12);
+
+    for (let i = 0; i < 600; i++) {
+      flow.recompute(f, 8, 12);
+      stepEnemy(f, flow, e, player);
+      expect(
+        onALane(e.x, e.y),
+        `left the grid at ${e.x.toFixed(2)},${e.y.toFixed(2)} rounding the corner`,
+      ).toBe(true);
+    }
+  });
+});

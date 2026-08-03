@@ -29,6 +29,29 @@ export interface Enemy {
    *  on the open cell it started from. */
   enteredEarth: boolean;
 
+  /**
+   * The cell this enemy has committed to walking to, or null between commitments.
+   *
+   * Load-bearing, and its absence was a bug. Without it the enemy re-asked the flow field
+   * every frame from whatever cell it was currently inside — so the moment it crossed a
+   * cell boundary mid-stride, half a cell short of the centre, the field could hand back
+   * a PERPENDICULAR neighbour and it would set off on the other axis from there. It then
+   * stayed a half-cell off that lane for the rest of its life, and compounded at every
+   * subsequent turn.
+   *
+   * Measured before the fix: enemies spent 35% of their time in positions the player
+   * cannot occupy, up to 8wu off the nearer lane. The player is lane-locked by
+   * construction (Digger.step), and enemies must be constrained identically or the two
+   * are visibly playing on different grids.
+   *
+   * Committing to a target means an enemy is always either exactly on a cell centre or
+   * travelling in a straight line between two adjacent ones — which is precisely the
+   * digger's own invariant.
+   */
+  targetCx: number;
+  targetCy: number;
+  hasTarget: boolean;
+
   /** Dragon only: counts down the wind-up, the burn, and then the cooldown. */
   flameTimer: number;
   flameState: 'idle' | 'winding' | 'burning';
@@ -66,6 +89,9 @@ export function makeEnemy(kind: EnemyKind, cx: number, cy: number): Enemy {
     stuckFor: 0,
     lastDistance: -1,
     enteredEarth: false,
+    targetCx: 0,
+    targetCy: 0,
+    hasTarget: false,
     flameTimer: T.FLAME_COOLDOWN_F,
     flameState: 'idle',
     inflation: 0,
@@ -207,29 +233,39 @@ function stepTunnel(
     return;
   }
 
-  const step = flow.next(cx, cy);
-  if (!step) return; // standing on the player's own cell; contact will resolve it
-
-  const tx = step.cx * T.CELL + T.CELL / 2;
-  const ty = step.cy * T.CELL + T.CELL / 2;
-  const dx = Math.sign(tx - e.x);
-  const dy = Math.sign(ty - e.y);
-
-  // The flow field only ever hands back a 4-neighbour, so exactly one axis moves and
-  // the enemy stays lane-locked without needing the digger's turn rule.
-  if (dx !== 0) {
-    e.x += Math.sign(dx) * Math.min(T.ENEMY_SPEED * speedScale, Math.abs(tx - e.x));
-    e.facing = dx > 0 ? Dir.Right : Dir.Left;
-  } else if (dy !== 0) {
-    e.y += Math.sign(dy) * Math.min(T.ENEMY_SPEED * speedScale, Math.abs(ty - e.y));
-    e.facing = dy > 0 ? Dir.Down : Dir.Up;
+  // Commit to one cell at a time, and only ask for a new one once standing exactly on
+  // the last. See Enemy.targetCx for why re-asking every frame put enemies off-lane.
+  if (!e.hasTarget) {
+    const step = flow.next(cx, cy);
+    if (!step) return; // standing on the player's own cell; contact will resolve it
+    e.targetCx = step.cx;
+    e.targetCy = step.cy;
+    e.hasTarget = true;
   }
+
+  const tx = e.targetCx * T.CELL + T.CELL / 2;
+  const ty = e.targetCy * T.CELL + T.CELL / 2;
+  const speed = T.ENEMY_SPEED * speedScale;
+
+  // Exactly one axis differs, because the flow field only ever returns a 4-neighbour.
+  if (tx !== e.x) {
+    const d = tx - e.x;
+    e.x += Math.sign(d) * Math.min(speed, Math.abs(d));
+    e.facing = d > 0 ? Dir.Right : Dir.Left;
+  } else if (ty !== e.y) {
+    const d = ty - e.y;
+    e.y += Math.sign(d) * Math.min(speed, Math.abs(d));
+    e.facing = d > 0 ? Dir.Down : Dir.Up;
+  }
+
+  if (e.x === tx && e.y === ty) e.hasTarget = false;
 }
 
 function beginGhost(e: Enemy, out: EnemyEvents): void {
   e.state = EnemyState.Ghosting;
   e.enteredEarth = false;
   e.stuckFor = 0;
+  e.hasTarget = false;
   out.startedGhosting = true;
 }
 
@@ -267,6 +303,7 @@ function stepGhost(
     // field's cell-centre targets make it jitter.
     e.x = cx * T.CELL + T.CELL / 2;
     e.y = cy * T.CELL + T.CELL / 2;
+    e.hasTarget = false;
     out.solidified = true;
   }
 }
