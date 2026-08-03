@@ -4,6 +4,23 @@ import { Cell, Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
 
+/**
+ * Park the cast: alive, so the round does not report itself clear, but inert and out of
+ * the way.
+ *
+ * Needed because these tests are about one mechanic each, and a world with four enemies
+ * hunting the player kills it partway through and the measurement becomes about
+ * something else. Held rather than deleted, because an empty round is a different code
+ * path now.
+ */
+function park(w: World): void {
+  for (const e of w.enemies) {
+    e.x = T.CELL / 2;
+    e.y = T.CELL / 2;
+    e.inflation = Number.MAX_SAFE_INTEGER;
+  }
+}
+
 /** Run the digger in one direction for N frames. */
 function drive(w: World, dir: Dir, frames: number): void {
   for (let i = 0; i < frames; i++) w.step({ dir });
@@ -61,6 +78,7 @@ describe('digging', () => {
     // A digger that begins entombed cannot demonstrate that running a tunnel is faster
     // than cutting one, which is the first thing the game has to teach.
     const w = new World();
+    park(w);
     const { cellX, cellY } = w.digger;
     expect(w.field.at(cellX, cellY)).toBe(Cell.Tunnel);
     expect(w.field.at(cellX - 1, cellY)).toBe(Cell.Tunnel);
@@ -70,6 +88,7 @@ describe('digging', () => {
 
   it('carves earth by moving into it', () => {
     const w = new World();
+    park(w);
     const below = w.digger.cellY + 1;
     expect(w.field.at(w.digger.cellX, below)).toBe(Cell.Earth);
     drive(w, Dir.Down, 60);
@@ -80,6 +99,7 @@ describe('digging', () => {
     // The point of lane-locking. Without it the digger drifts off the row centre,
     // straddles two rows and carves a two-cell trench that looks nothing like a tunnel.
     const w = new World();
+    park(w);
     const row = w.digger.cellY;
     const startCol = w.digger.cellX;
     drive(w, Dir.Right, 300);
@@ -98,6 +118,7 @@ describe('digging', () => {
     // Cells have to be cleared as the body passes through them, not merely as it stops
     // in them, or a fast pass leaves an uncut cell in the middle of an open run.
     const w = new World();
+    park(w);
     const row = w.digger.cellY;
     const from = w.digger.cellX;
     drive(w, Dir.Right, 300);
@@ -140,6 +161,7 @@ describe('digging', () => {
     // Four-way movement on a grid needs a rule for when a turn is legal. Too loose and
     // the digger corner-cuts, ending up embedded in a cell it never cut.
     const w = new World();
+    park(w);
     const dirs = [Dir.Down, Dir.Right, Dir.Up, Dir.Left, Dir.Down, Dir.Left];
     for (const dir of dirs) {
       drive(w, dir, 37); // deliberately not a whole number of cells
@@ -152,6 +174,7 @@ describe('digging', () => {
 
   it('stops at the edge of the world rather than leaving it', () => {
     const w = new World();
+    park(w);
     drive(w, Dir.Left, 2000);
     expect(w.digger.x).toBeGreaterThanOrEqual(0);
     expect(w.digger.cellX).toBe(0);
@@ -159,6 +182,7 @@ describe('digging', () => {
 
   it('stands still when asked for nothing', () => {
     const w = new World();
+    park(w);
     const { x, y } = w.digger;
     drive(w, Dir.None, 60);
     expect(w.digger.x).toBe(x);

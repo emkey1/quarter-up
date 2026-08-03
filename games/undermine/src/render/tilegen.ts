@@ -1,4 +1,4 @@
-import { Px, P, ramp, palette } from './pixel';
+import { Px, ramp, palette } from './pixel';
 import { NB, reduceMask } from './autotile';
 
 /** Art is authored at twice the field cell, as in the other two cabinets. */
@@ -23,8 +23,29 @@ const SKY = ramp('#1a2038', { spread: 0.3 });
 const GRUB = ramp('#d24a4a', { spread: 0.3 });
 const EMBER = ramp('#4ab86a', { spread: 0.3 });
 const FLAME = ramp('#ffb03a', { spread: 0.4 });
+/**
+ * The digger gets its own ramp, and this is not cosmetic.
+ *
+ * It was drawn with the generic `P.*` palette enum, which resolves to the FIRST ramp in
+ * the palette — topsoil. So the player character was rendered in precisely the colour of
+ * the ground it spends the first band of every level standing in, and was very nearly
+ * invisible. Caught by looking at a rendered frame; no test was ever going to ask.
+ *
+ * Cold and bright against four warm earth tones, so it separates at every depth.
+ */
+const DIGGER = ramp('#5fc8ff', { spread: 0.35 });
 
-export const PALETTE = palette(BAND_RAMPS[0], BAND_RAMPS[1], BAND_RAMPS[2], BAND_RAMPS[3], SKY, GRUB, EMBER, FLAME);
+export const PALETTE = palette(
+  BAND_RAMPS[0],
+  BAND_RAMPS[1],
+  BAND_RAMPS[2],
+  BAND_RAMPS[3],
+  SKY,
+  GRUB,
+  EMBER,
+  FLAME,
+  DIGGER,
+);
 
 /** Palette slots for band n, since `palette()` lays ramps out six entries at a time. */
 export function bandSlots(band: number): { outline: number; darkest: number; dark: number; base: number; light: number } {
@@ -134,21 +155,22 @@ export function skyTile(): Px {
  *  Real art is M4. */
 export function diggerSprite(dir: number): Px {
   const p = new Px(TILE_PX, TILE_PX);
-  const body = P.Base;
-  const trim = P.Light;
-  const dark = P.Dark;
+  const s = bandSlots(8); // the digger's own ramp, not whichever earth it is standing in
 
-  p.ellipse(TILE_PX / 2, TILE_PX / 2 + 2, 9, 10, body);
-  p.rect(8, 6, 16, 7, trim); // helmet
-  p.rect(8, 12, 16, 2, dark);
+  // Bigger than it was, and filling most of the cell. A 14-cell-wide playfield read at a
+  // distance needs the thing you are steering to be the most legible object on screen.
+  p.ellipse(TILE_PX / 2, TILE_PX / 2 + 3, 12, 11, s.base);
+  p.ellipse(TILE_PX / 2 - 3, TILE_PX / 2 + 1, 6, 5, s.light);
+  p.rect(6, 4, 20, 8, s.dark); // helmet
+  p.rect(6, 11, 20, 2, s.outline);
 
-  // A visor on the facing side, so which way it is pointing is unambiguous.
-  const eye = P.Outline;
-  if (dir === 0) p.rect(12, 4, 8, 3, eye);
-  else if (dir === 1) p.rect(22, 9, 4, 4, eye);
-  else if (dir === 2) p.rect(12, 22, 8, 3, eye);
-  else p.rect(6, 9, 4, 4, eye);
+  // A bright visor on the facing side, so which way it points is unambiguous at a glance.
+  if (dir === 0) p.rect(11, 1, 10, 4, s.light);
+  else if (dir === 1) p.rect(24, 14, 6, 6, s.light);
+  else if (dir === 2) p.rect(11, 25, 10, 4, s.light);
+  else p.rect(2, 14, 6, 6, s.light);
 
+  p.outline(s.outline);
   return p;
 }
 
@@ -174,10 +196,12 @@ export function rockSprite(variant: 'rest' | 'teeter' | 'shatter'): Px {
     return p;
   }
 
-  p.ellipse(TILE_PX / 2 + shift, TILE_PX / 2, 12, 11, s.base);
-  p.ellipse(TILE_PX / 2 + shift - 3, TILE_PX / 2 - 3, 6, 5, s.light);
-  p.ellipse(TILE_PX / 2 + shift + 4, TILE_PX / 2 + 4, 4, 3, s.dark);
-  p.outline(s.outline);
+  p.ellipse(TILE_PX / 2 + shift, TILE_PX / 2, 14, 13, s.base);
+  p.ellipse(TILE_PX / 2 + shift - 4, TILE_PX / 2 - 4, 7, 6, s.light);
+  p.ellipse(TILE_PX / 2 + shift + 4, TILE_PX / 2 + 5, 5, 4, s.dark);
+  // A teetering rock is about to kill someone, so it is outlined in warning colour
+  // rather than left to be spotted by its two-pixel wobble.
+  p.outline(variant === 'teeter' ? bandSlots(7).light : s.outline);
   return p;
 }
 
@@ -207,8 +231,8 @@ export function enemySprite(kind: 'grub' | 'emberjaw', ghost: boolean): Px {
     return p;
   }
 
-  p.ellipse(TILE_PX / 2, TILE_PX / 2, 11, 10, s.base);
-  p.ellipse(TILE_PX / 2 - 3, TILE_PX / 2 - 3, 5, 4, s.light);
+  p.ellipse(TILE_PX / 2, TILE_PX / 2, 13, 12, s.base);
+  p.ellipse(TILE_PX / 2 - 3, TILE_PX / 2 - 4, 6, 5, s.light);
   p.rect(10, 12, 5, 6, 0);
   p.rect(18, 12, 5, 6, 0);
   p.rect(11, 13, 3, 4, s.outline);

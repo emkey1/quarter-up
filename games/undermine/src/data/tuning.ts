@@ -168,6 +168,15 @@ export const T = {
    */
   PUMP_DEFLATE_F: 45,
 
+  // ---------------------------------------------------------------- the run
+  /** [i] Lives per credit, matching the other two cabinets and the era's convention. */
+  STARTING_LIVES: 3,
+  /** [i] Frames the death animation holds before the round restarts. Long enough to see
+   *  what killed you, which is the difference between learning and being annoyed. */
+  DEATH_HOLD_F: 120,
+  /** [i] Frames the round-clear card is held. */
+  CLEAR_HOLD_F: 100,
+
   // ---------------------------------------------------------------- scoring
   /** [i] Bursting something, by the band it dies in. Depth is money: the deep bands pull
    *  the player away from the surface and away from safety. Sources agree on the shape

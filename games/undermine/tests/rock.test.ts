@@ -5,6 +5,23 @@ import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
 import { makeRock, stepRock, rockCell, RockState, type Crushable } from '@/game/rock';
 
+/**
+ * Park the cast: alive, so the round does not report itself clear, but inert and out of
+ * the way.
+ *
+ * Needed because these tests are about one mechanic each, and a world with four enemies
+ * hunting the player kills it partway through and the measurement becomes about
+ * something else. Held rather than deleted, because an empty round is a different code
+ * path now.
+ */
+function park(w: World): void {
+  for (const e of w.enemies) {
+    e.x = T.CELL / 2;
+    e.y = T.CELL / 2;
+    e.inflation = Number.MAX_SAFE_INTEGER;
+  }
+}
+
 /** A field with one column dug out below a given row, so a rock there is unsupported. */
 function undermined(rockCx: number, rockCy: number, depth: number): Field {
   const f = new Field();
@@ -140,7 +157,7 @@ describe('M1 acceptance: a rock can be dropped on the player', () => {
    */
   const rocksOnly = (): World => {
     const w = new World();
-    w.enemies.length = 0;
+    park(w);
     return w;
   };
 
@@ -183,17 +200,27 @@ describe('M1 acceptance: a rock can be dropped on the player', () => {
     expect(w.digger.x, 'the digger should have run clear').toBeLessThan(rock.x - T.CELL);
   });
 
-  it('leaves the digger dead rather than merely stopped', () => {
+  it('stops the digger dead, and costs a life rather than nothing', () => {
+    // Written at M1 as "dead stays dead", which stopped being true at M4 when death
+    // became a hold, a lost life and a respawn. The claim that still matters is that
+    // being crushed is not a free stumble: the digger stops on the spot, cannot be
+    // driven during the pause, and comes back at the start rather than where it fell.
     const w = rocksOnly();
     const rock = w.rocks[0];
     w.digger.x = rock.x;
     w.digger.y = (rockCell(rock) + 1) * T.CELL + T.CELL / 2;
     w.field.dig(rock.cx, rockCell(rock) + 1);
-    for (let f = 0; f < 400; f++) w.step({ dir: Dir.None });
 
-    const before = { x: w.digger.x, y: w.digger.y };
-    for (let f = 0; f < 60; f++) w.step({ dir: Dir.Right });
-    expect(w.digger.x, 'a dead digger should not still be driving').toBe(before.x);
-    expect(w.digger.y).toBe(before.y);
+    let died = false;
+    for (let f = 0; f < 400 && !died; f++) died = w.step({ dir: Dir.None }).died;
+    expect(died).toBe(true);
+
+    const whereItFell = { x: w.digger.x, y: w.digger.y };
+    for (let f = 0; f < T.DEATH_HOLD_F - 2; f++) w.step({ dir: Dir.Right });
+    expect(w.digger.x, 'driving during the death pause').toBe(whereItFell.x);
+
+    for (let f = 0; f < 10; f++) w.step({ dir: Dir.None });
+    expect(w.lives, 'being crushed cost nothing').toBe(T.STARTING_LIVES - 1);
+    expect(w.digger.x, 'respawned where it died instead of at the start').not.toBe(whereItFell.x);
   });
 });

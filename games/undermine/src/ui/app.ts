@@ -8,6 +8,8 @@ import { Dir, type MoveIntent } from '@/game/digger';
 import type { Action } from '@/game/controls';
 import { TileAtlas } from '@/render/atlas';
 import { FieldView } from '@/render/fieldview';
+import { Hud } from '@/render/hud';
+import { Audio } from './audio';
 
 /**
  * The cabinet shell.
@@ -20,6 +22,9 @@ export class App implements LoopHost {
   private readonly world = new World();
   private readonly atlas: TileAtlas;
   private readonly view: FieldView;
+  private readonly hud = new Hud();
+  readonly audio = new Audio();
+  private floaters: { points: number; x: number; y: number; life: number }[] = [];
   private intent: MoveIntent = { dir: Dir.None, pump: false };
   private paused = false;
 
@@ -44,7 +49,13 @@ export class App implements LoopHost {
     this.keyboard.poll();
     this.pad.poll();
 
-    if (this.keyboard.pressed('pause')) this.paused = !this.paused;
+    if (this.keyboard.pressed('pause')) {
+      this.paused = !this.paused;
+      this.audio.play('button');
+    }
+    // Browsers refuse to start audio without a gesture, so the first real key press is
+    // the one that unlocks it.
+    if (this.keyboard.anyActivity()) this.audio.unlock();
 
     const held = (a: Action): boolean => this.keyboard.held(a) || this.pad.isHeld(a);
     let dir = Dir.None;
@@ -72,9 +83,34 @@ export class App implements LoopHost {
 
   step(): void {
     if (this.paused) return;
-    this.world.step(this.intent);
+    const e = this.world.step(this.intent);
     // Consumed: a press must not survive into a second step on a catch-up frame.
     this.intent = { ...this.intent, pump: false };
+
+    this.playFor(e);
+    if (e.scored) this.floaters.push({ ...e.scored, life: 60 });
+    this.floaters = this.floaters.filter((f) => --f.life > 0);
+  }
+
+  /**
+   * Sounds for what just happened.
+   *
+   * Throttled where an event can repeat every frame — digging is the obvious one, and
+   * without a throttle it is a buzzsaw rather than a scrape.
+   */
+  private playFor(e: ReturnType<World['step']>): void {
+    const A = this.audio;
+    if (e.dug) A.play('dig', 70);
+    if (e.pumped) A.play('pump');
+    if (e.burst) A.play('burst');
+    if (e.rockStartedFalling) A.play('rockFall');
+    if (e.rockLanded) A.play('rockLand');
+    if (e.enemyStartedGhosting) A.play('ghost', 200);
+    if (e.enemySolidified) A.play('solidify', 200);
+    if (e.flameLit) A.play('flame');
+    if (e.died) A.play('die');
+    if (e.roundClear) A.play('roundClear');
+    if (e.gameOver) A.play('die');
   }
 
   draw(): void {
@@ -92,16 +128,21 @@ export class App implements LoopHost {
       layout,
     );
 
-    if (this.paused) {
-      const pf = layout.playfield;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(pf.x, pf.y, pf.w, pf.h);
-      ctx.fillStyle = '#e6e9ef';
-      ctx.font = `${Math.round(10 * layout.uiScale)}px ui-monospace, Menlo, monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText('PAUSED', pf.x + pf.w / 2, pf.y + pf.h / 2);
-      ctx.textAlign = 'left';
-    }
+    this.hud.drawFloaters(ctx, layout, this.floaters);
+    this.hud.draw(ctx, layout, {
+      score: this.world.score,
+      lives: this.world.lives,
+      enemiesLeft: this.world.enemiesLeft,
+      banner: this.banner(),
+    });
+  }
+
+  private banner(): string | null {
+    if (this.paused) return 'PAUSED';
+    if (this.world.over) return 'GAME OVER';
+    if (!this.world.playerAlive) return null; // the death animation speaks for itself
+    if (this.world.enemiesLeft === 0) return 'ROUND CLEAR';
+    return null;
   }
 
   /** M0 diagnostics, so the dev server shows something checkable without a HUD. */

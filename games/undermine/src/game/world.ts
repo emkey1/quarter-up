@@ -29,6 +29,31 @@ export interface WorldEvents {
   flameLit: boolean;
   playerCaught: boolean;
   playerBurned: boolean;
+  died: boolean;
+  respawned: boolean;
+  roundClear: boolean;
+  gameOver: boolean;
+}
+
+function emptyEvents(): WorldEvents {
+  return {
+    dug: false,
+    pumped: false,
+    burst: false,
+    scored: null,
+    rockStartedFalling: false,
+    rockLanded: false,
+    playerCrushed: false,
+    enemyStartedGhosting: false,
+    enemySolidified: false,
+    flameLit: false,
+    playerCaught: false,
+    playerBurned: false,
+    died: false,
+    respawned: false,
+    roundClear: false,
+    gameOver: false,
+  };
 }
 
 /**
@@ -64,11 +89,26 @@ export class World {
 
   frame = 0;
   score = 0;
+  lives: number = T.STARTING_LIVES;
+  /**
+   * Frames left on the death or clear pause, or 0 when play is live.
+   *
+   * A single timer for both, because they are the same thing structurally: the
+   * simulation stops, something is shown, and then the round moves on. Two timers would
+   * be two ways to get the same bug.
+   */
+  hold = 0;
+  over = false;
   /** Cleared by death, and the reason `step` stops advancing the digger. */
   playerAlive = true;
 
-  /** The player as something a rock can land on. Enemies will join this list at M2. */
+  /** The player as something a rock can land on. Enemies are in this list too. */
   private readonly crushable: Crushable;
+  private readonly startX: number;
+  private readonly startY: number;
+  /** A round that never had anything in it was never a round, and must not report
+   *  itself clear on frame one. */
+  private readonly startedWithEnemies: boolean;
 
   constructor() {
     // Start in the middle of the top earth band, in a short pre-cut tunnel — the
@@ -76,6 +116,8 @@ export class World {
     // that moving through tunnel is faster than cutting.
     const startX = Math.floor(T.GRID_W / 2);
     const startY = T.SKY_ROWS + 1;
+    this.startX = startX;
+    this.startY = startY;
     this.digger = new Digger(startX, startY);
 
     for (let cx = startX - 1; cx <= startX + 1; cx++) this.field.dig(cx, startY);
@@ -107,24 +149,29 @@ export class World {
       this.field.dig(cx, cy);
       this.enemies.push(makeEnemy(kind, cx, cy));
     }
+    this.startedWithEnemies = this.enemies.length > 0;
   }
 
   step(intent: MoveIntent): WorldEvents {
     this.frame++;
-    const events: WorldEvents = {
-      dug: false,
-      pumped: false,
-      burst: false,
-      scored: null,
-      rockStartedFalling: false,
-      rockLanded: false,
-      playerCrushed: false,
-      enemyStartedGhosting: false,
-      enemySolidified: false,
-      flameLit: false,
-      playerCaught: false,
-      playerBurned: false,
-    };
+
+    /*
+     * Once the run is over, nothing happens.
+     *
+     * Without this the death branch below re-arms every frame: the player is still not
+     * alive, so it sets the hold again, the hold expires, another life comes off, and
+     * `lives` walks off into negative numbers forever. Found by rendering a preview of a
+     * long scripted run and reading `lives=-4` off it, which is precisely the sort of
+     * thing no unit test was ever going to ask about.
+     */
+    if (this.over) return emptyEvents();
+
+    if (this.hold > 0) {
+      const events = emptyEvents();
+      if (--this.hold === 0) this.afterHold(events);
+      return events;
+    }
+    const events = emptyEvents();
 
     if (this.playerAlive) {
       this.digger.step(this.field, intent);
@@ -185,7 +232,35 @@ export class World {
     if (!this.crushable.alive) this.playerAlive = false;
     if (events.playerCaught || events.playerBurned) this.playerAlive = false;
 
+    if (!this.playerAlive && this.hold === 0) {
+      events.died = true;
+      this.hold = T.DEATH_HOLD_F;
+    } else if (this.startedWithEnemies && this.enemiesLeft === 0 && this.hold === 0) {
+      events.roundClear = true;
+      this.hold = T.CLEAR_HOLD_F;
+    }
+
     return events;
+  }
+
+  /** What happens when a death or clear pause runs out. */
+  private afterHold(events: WorldEvents): void {
+    if (!this.playerAlive) {
+      this.lives--;
+      if (this.lives <= 0) {
+        this.over = true;
+        events.gameOver = true;
+        return;
+      }
+      // Respawn where the round began. The field keeps whatever was already cut, which
+      // is the fair reading: the tunnels are the player's work and losing a life should
+      // not confiscate it.
+      this.playerAlive = true;
+      this.crushable.alive = true;
+      this.digger.x = this.startX * T.CELL + T.CELL / 2;
+      this.digger.y = this.startY * T.CELL + T.CELL / 2;
+      events.respawned = true;
+    }
   }
 
   private stepEnemies(events: WorldEvents): void {

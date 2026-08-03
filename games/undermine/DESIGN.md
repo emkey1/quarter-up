@@ -1,10 +1,14 @@
 # Undermine — design
 
-> **Status:** **M0–M3 implemented.** The field renders with autotiling, the digger cuts
+> **Status:** **M0–M4 implemented.** The field renders with autotiling, the digger cuts
 > it at two speeds, rocks fall and kill, enemies hunt through the tunnels and ghost
-> through the earth, and the pump inflates, holds and bursts them for depth-banded score.
-> It runs on `@quarter-up/cabinet` with no local engine copy — there is no `src/engine/`
-> directory at all. 84 tests. §11 is the milestone list and §13 is what we do not know.
+> through the earth, the pump inflates and bursts them for depth-banded score, and there
+> is audio, a HUD, lives and a round flow. It runs on `@quarter-up/cabinet` with no local
+> engine copy — there is no `src/engine/` directory at all. 90 tests.
+>
+> `npm run preview -w games/undermine` renders the real game to a PNG, headlessly. The
+> browser pane on this hardware never runs requestAnimationFrame, so this is the only way
+> to look at it — and looking at it is how the two worst bugs so far were found.
 >
 > Chosen as the third cabinet for a specific reason: it is playable well on a keyboard.
 > Four directions and one button, no twitch aiming, no gamepad required — which matters,
@@ -370,7 +374,7 @@ did and which needs no invention.
 | **M1** | Movement and terrain. Four-way grid movement, the dig-speed difference, rocks falling and killing. | **Done.** A rock can be dropped on the player, and dodged during the teeter. Both speeds measured. |
 | **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | **Done.** A sealed pocket is reached; standing in the open is caught; running survives far longer than either. |
 | **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | **Done.** Two presses buy ~5.6 cells of walking; a room cannot be parked; crushing four still beats popping four. |
-| **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | Looks and sounds like a cabinet. |
+| **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | **Mostly done.** Audio, HUD, lives, round flow, four bands. Outstanding: title/attract screen, and the sprites are first-pass. |
 | **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | A full run start to finish. |
 | **M6** | Polish, and whatever the third game teaches the shared package — §7 predicts `terrain.ts`. | Both other games still green after any extraction. |
 
@@ -405,7 +409,7 @@ The lesson from Double Bubble, applied from the start rather than at M6.
 | --- | --- |
 | **The scoring tables are `[i]` across the board.** | Sources agree on shape and disagree on numbers. Settle by counting a recording; until then the shape is what is implemented and the numbers are flagged. |
 | **Ghost frequency is the balance of the whole game.** | Too high and tunnels are pointless, too low and camping wins. The progress-based trigger in §8.3 is a reconstruction, not a documented rule. |
-| **Cell-aligned digging may read as too chunky.** | §8.1 commits to the grid first and names the alternative. Decide on evidence at M4, not now. |
+| ~~Cell-aligned digging may read as too chunky.~~ | **Settled at M4, and the grid was right.** A rendered frame shows tunnels reading clearly as tunnels at 16wu cells; the vertical shaft and the T-junction are unambiguous. No pixel mask needed. |
 | **No arcade disassembly is known to exist.** | Same position as Double Bubble. Checked during research; if one surfaces, it outranks everything in §14. |
 | **`terrain.ts` may not survive contact.** | It was written for walls that occasionally break, not earth that is mostly removed. If it needs forking rather than adapting, that is a finding about the extraction, not a failure. |
 
