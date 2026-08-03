@@ -59,7 +59,20 @@ export class Loop {
     this.prev = now;
     this.acc += dt;
 
-    this.host.poll();
+    /**
+     * Poll ONLY on a frame that will step.
+     *
+     * poll() latches "pressed since last poll" into a frame snapshot and clears the
+     * pending set, and only step() reads that snapshot — so polling on a frame that takes
+     * no step throws the press away. At 120Hz, which is every recent Mac, about every
+     * other frame accumulates less than one step and takes none.
+     *
+     * Found from Double Bubble, where jump and fire are edge-triggered and it was
+     * obvious. Bracer hid it: movement and fire are read as HELD, so only the genuinely
+     * edge-triggered actions — pause, the setup and controller keys, menu confirms —
+     * were being dropped about half the time.
+     */
+    if (this.acc >= STEP) this.host.poll();
 
     const stepStart = performance.now();
     let steps = 0;

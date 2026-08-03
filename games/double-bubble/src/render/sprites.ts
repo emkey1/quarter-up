@@ -397,7 +397,42 @@ export function projectileFrame(kind: ProjectileKind): Px {
 
 /* ------------------------------------------------------------------ items */
 
-const ITEM_PX = 16;
+/**
+ * Items are authored in a 16-unit box but BAKED at twice that.
+ *
+ * They used to be baked at 16px, and the renderer derives world size from art width, so
+ * a fruit occupied 8 world units against a monster's 16 — physically half the size of
+ * everything else on screen, which is exactly how it read in play.
+ *
+ * Doubling is done by scaling the drawing calls rather than by upscaling the finished
+ * tile, so the ellipses are genuinely rendered at the higher resolution instead of being
+ * a blocky 2x blit. The shapes stay authored in the units they were designed in.
+ */
+const ITEM_AUTHOR_PX = 16;
+const ITEM_SCALE = 2;
+const ITEM_PX = ITEM_AUTHOR_PX * ITEM_SCALE;
+
+/**
+ * A Px that multiplies every coordinate on its way through.
+ *
+ * Only the four primitives the item shapes actually use. Anything else would fail loudly
+ * at the type level rather than silently drawing at the wrong scale.
+ */
+function scaled(p: Px, k: number) {
+  return {
+    rect: (x: number, y: number, w: number, h: number, c: number) =>
+      p.rect(x * k, y * k, w * k, h * k, c),
+    ellipse: (cx: number, cy: number, rx: number, ry: number, c: number) =>
+      p.ellipse(cx * k, cy * k, rx * k, ry * k, c),
+    ellipseOutline: (cx: number, cy: number, rx: number, ry: number, c: number) =>
+      p.ellipseOutline(cx * k, cy * k, rx * k, ry * k, c),
+    line: (x0: number, y0: number, x1: number, y1: number, c: number) =>
+      p.line(x0 * k, y0 * k, x1 * k, y1 * k, c),
+  };
+}
+
+/** What the item shapes are written against. */
+type ItemCanvas = ReturnType<typeof scaled>;
 
 /**
  * Item art.
@@ -407,7 +442,7 @@ const ITEM_PX = 16;
  * a player who learns "round twist = sweet" can then read the colour as *which* sweet
  * without being taught twice.
  */
-const ITEM_SHAPES: Partial<Record<ItemKind, (p: Px, c: number) => void>> = {
+const ITEM_SHAPES: Partial<Record<ItemKind, (p: ItemCanvas, c: number) => void>> = {
   sweetYellow: (p, c) => sweet(p, c),
   sweetBlue: (p, c) => sweet(p, c),
   sweetPurple: (p, c) => sweet(p, c),
@@ -466,7 +501,7 @@ const ITEM_SHAPES: Partial<Record<ItemKind, (p: Px, c: number) => void>> = {
   },
 };
 
-function sweet(p: Px, c: number): void {
+function sweet(p: ItemCanvas, c: number): void {
   p.ellipse(c, c, 4.6, 4.6, P.Base);
   p.ellipse(c - 1.4, c - 1.4, 1.6, 1.6, P.Lightest);
   // Wrapper twists either side — the shape that says "sweet" at 16 pixels.
@@ -476,7 +511,7 @@ function sweet(p: Px, c: number): void {
   p.line(c + 5, c, c + 6, c, P.Light);
 }
 
-function umbrella(p: Px, c: number): void {
+function umbrella(p: ItemCanvas, c: number): void {
   for (let i = 0; i < 5; i++) p.rect(c - 6 + i, c - 3 + i, 13 - i * 2, 1, P.Base);
   p.rect(c - 6, c + 2, 13, 1, P.Dark);
   p.rect(c, c + 2, 1, 5, P.Outline);
@@ -484,14 +519,14 @@ function umbrella(p: Px, c: number): void {
 }
 
 /** An arched doorway. It has to read as a way OUT, not as another thing to collect. */
-function door(p: Px, c: number): void {
+function door(p: ItemCanvas, c: number): void {
   p.rect(c - 5, c - 2, 10, 8, P.Base);
   for (let i = 0; i < 4; i++) p.rect(c - 5 + i, c - 6 + i, 10 - i * 2, 1, P.Base);
   p.rect(c - 3, c + 1, 6, 5, P.Outline);
   p.ellipse(c + 2, c + 3, 1, 1, P.Lightest);
 }
 
-function ring(p: Px, c: number): void {
+function ring(p: ItemCanvas, c: number): void {
   p.ellipseOutline(c, c + 1, 4.6, 4.6, P.Base);
   p.ellipseOutline(c, c + 1, 3.4, 3.4, P.Light);
   p.ellipse(c, c - 5, 2, 2, P.Lightest);
@@ -503,9 +538,10 @@ export function itemFrame(kind: ItemKind): Px {
   if (!shape) {
     // EXTEND letters are drawn as text by the renderer; anything else missing shows as
     // an obvious placeholder rather than as nothing at all.
-    p.rect(4, 4, 8, 8, P.Base);
+    p.rect(4 * ITEM_SCALE, 4 * ITEM_SCALE, 8 * ITEM_SCALE, 8 * ITEM_SCALE, P.Base);
   } else {
-    shape(p, ITEM_PX / 2);
+    // Centre given in AUTHORING units; the wrapper scales it with everything else.
+    shape(scaled(p, ITEM_SCALE), ITEM_AUTHOR_PX / 2);
   }
   p.outline(P.Outline);
   return p;

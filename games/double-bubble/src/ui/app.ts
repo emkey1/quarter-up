@@ -32,6 +32,7 @@ import type { SpecialBubble } from '@/game/room';
 import { tierFor, type ItemKind } from '@/data/items';
 import { readCounters } from '@/game/counters';
 import { EXTEND_WORD, hasLetter } from '@/game/score';
+import { Audio } from '@/engine/audio';
 import {
   advance,
   doorFor,
@@ -134,10 +135,66 @@ export class App implements LoopHost {
     }
     this.world = new World(room, roomNumber);
     this.fx.clear();
+    this.audio.play('roomStart');
   }
+
+  readonly audio = new Audio();
+  /**
+   * Last-seen values of the two counters that correspond to a player action.
+   *
+   * The world does not emit an event for jumping or blowing — they are not things that
+   * happen TO the world, they are things the player did — but the counter system already
+   * records both. Watching those for a change gives the sound the same truth the item
+   * thresholds use, without adding events to the simulation for the renderer's benefit.
+   */
+  private lastJumps = 0;
+  private lastBlown = 0;
 
   poll(): void {
     this.devices.poll();
+    // Browsers refuse to start an AudioContext until the page has been interacted with,
+    // so unlocking is driven by the player touching a control rather than by load.
+    if (this.devices.keyboard.anyActivity() || this.devices.gamepad.anyActivity()) {
+      this.audio.unlock();
+    }
+  }
+
+  /**
+   * Turn what happened into sound.
+   *
+   * Driven off the same WorldEvent queue the particles use, so audio and visuals can
+   * never disagree about what occurred — and a burst that is skipped because the loop
+   * caught up on a backlog stays silent too.
+   */
+  private playFor(events: readonly { kind: string; monsters?: number }[]): void {
+    for (const e of events) {
+      switch (e.kind) {
+        case 'bubblePop':
+          this.audio.play('bubblePop', 25);
+          break;
+        case 'monsterPop':
+          this.audio.play('monsterPop', 20);
+          break;
+        case 'chain':
+          // Only for a chain worth the name; a one-monster "chain" already popped.
+          if ((e.monsters ?? 0) >= 2) this.audio.play('chain');
+          break;
+        case 'pickup':
+          this.audio.play('pickup', 30);
+          break;
+        case 'escape':
+          this.audio.play('escape', 60);
+          break;
+        case 'button':
+          this.audio.play('button', 40);
+          break;
+        case 'silver':
+          this.audio.play('silver');
+          break;
+        default:
+          break;
+      }
+    }
   }
 
   step(stepIndex: number): void {
@@ -147,6 +204,7 @@ export class App implements LoopHost {
       if (this.devices.keyboard.wasCodePressed('F1')) this.showMeter = !this.showMeter;
       if (this.devices.keyboard.wasCodePressed('F2')) this.showCounters = !this.showCounters;
       if (this.devices.keyboard.wasCodePressed('KeyR')) this.setRoom(this.room, this.roomNumber);
+      if (a.mutePressed) this.audio.setMuted(!this.audio.muted);
     }
 
     if (this.interlude > 0) {
@@ -158,6 +216,13 @@ export class App implements LoopHost {
     this.world.step(a);
     // Drained every step rather than every frame, so a burst is never missed when the
     // loop catches up on a backlog and steps twice between draws.
+    const c = this.world.counters;
+    if (c.jumps > this.lastJumps) this.audio.play('jump', 40);
+    if (c.bubblesBlown > this.lastBlown) this.audio.play('blow', 30);
+    this.lastJumps = c.jumps;
+    this.lastBlown = c.bubblesBlown;
+
+    this.playFor(this.world.events);
     this.fx.consume(this.world.events);
     this.fx.step();
 

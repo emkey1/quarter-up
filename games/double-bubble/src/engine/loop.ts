@@ -6,9 +6,10 @@ import type { LoopConfig } from './config';
  * Hard rules this enforces by shape:
  *   - step() is pure simulation and never touches the canvas.
  *   - draw() reads state and never mutates it.
- *   - Input is polled exactly ONCE per rendered frame; every simulation step in that
- *     frame sees the same snapshot. That is what makes replay determinism well-defined
- *     when the loop catches up on two steps.
+ *   - Input is polled exactly ONCE per frame that STEPS, and every step in that frame
+ *     sees the same snapshot. Once per frame would be wrong: a frame that takes no step
+ *     would poll, discard the pending edges, and drop the press. Once per step would be
+ *     wrong too — an edge would fire twice on a catch-up frame.
  */
 export interface LoopHost {
   /** Poll input devices. Called once per rendered frame, before any step. */
@@ -65,7 +66,23 @@ export class Loop {
     this.prev = now;
     this.acc += dt;
 
-    this.host.poll();
+    /**
+     * Poll ONLY on a frame that will actually step.
+     *
+     * poll() moves "pressed since last poll" into a frame snapshot and clears the pending
+     * set, and only step() ever reads that snapshot. So a poll on a frame that takes no
+     * step throws the press away — and at 120Hz, which is every recent Mac, roughly every
+     * other frame accumulates less than one step's worth of time and takes none.
+     *
+     * That is the whole of "pressing keys doesn't always register": measured here at
+     * 120Hz it was 60 polls against 29 steps, so about half of all edges vanished. Held
+     * keys were unaffected, which is why movement felt fine while jump and fire did not.
+     *
+     * Pending presses simply accumulate in the device layer until a stepping frame
+     * collects them, so nothing is lost and the worst-case latency is one display frame.
+     */
+    const willStep = this.acc >= step;
+    if (willStep) this.host.poll();
 
     const stepStart = performance.now();
     let steps = 0;
