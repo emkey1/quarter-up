@@ -4,7 +4,7 @@
 > it at two speeds, rocks fall and kill, enemies hunt through the tunnels and ghost
 > through the earth, and the pump inflates, holds and bursts them for depth-banded score.
 > It runs on `@quarter-up/cabinet` with no local engine copy — there is no `src/engine/`
-> directory at all. 82 tests. §11 is the milestone list and §13 is what we do not know.
+> directory at all. 84 tests. §11 is the milestone list and §13 is what we do not know.
 >
 > Chosen as the third cabinet for a specific reason: it is playable well on a keyboard.
 > Four directions and one button, no twitch aiming, no gamepad required — which matters,
