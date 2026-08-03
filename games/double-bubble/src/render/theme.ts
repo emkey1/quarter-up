@@ -1,4 +1,4 @@
-import { ramp, palette, type Ramp } from './pixel';
+import { ramp, palette, type Ramp } from '@cabinet/pixel';
 
 /**
  * Room palettes.

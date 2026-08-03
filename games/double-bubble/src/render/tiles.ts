@@ -1,4 +1,4 @@
-import { Px, P } from './pixel';
+import { Px, P } from '@cabinet/pixel';
 import { T } from '@/data/tuning';
 import { Tile } from '@/game/room';
 import { themePalette, type Theme } from './theme';

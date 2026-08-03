@@ -1,4 +1,4 @@
-import { BLOB_COUNT } from './autotile';
+import { BLOB_COUNT } from '@cabinet/autotile';
 import {
   PALETTE,
   TILE_PX,
@@ -10,7 +10,7 @@ import {
   enemySprite,
   flameSprite,
 } from './tilegen';
-import { BLOB_INDEX } from './autotile';
+import { BLOB_INDEX } from '@cabinet/autotile';
 import { T } from '@/data/tuning';
 
 /**

@@ -1,4 +1,4 @@
-import { Px, P, ramp, palette } from './pixel';
+import { Px, P, ramp, palette } from '@cabinet/pixel';
 import { T } from '@/data/tuning';
 import { MONSTER_SPECS, type ProjectileKind } from '@/data/roster';
 import { ITEM_SPECS, type ItemKind } from '@/data/items';

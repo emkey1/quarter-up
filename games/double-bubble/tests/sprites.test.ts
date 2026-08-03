@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildMonsterFrames, buildPlayerFrames, SPRITE_PX } from '@/render/sprites';
-import { Px, TRANSPARENT } from '@/render/pixel';
+import { Px, TRANSPARENT } from '@cabinet/pixel';
 import { T } from '@/data/tuning';
 
 /** Tight bounding box of everything painted. */

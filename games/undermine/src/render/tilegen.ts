@@ -1,5 +1,5 @@
-import { Px, ramp, palette } from './pixel';
-import { NB, reduceMask } from './autotile';
+import { Px, ramp, palette } from '@cabinet/pixel';
+import { NB, reduceMask } from '@cabinet/autotile';
 
 /** Art is authored at twice the field cell, as in the other two cabinets. */
 export const TILE_PX = 32;

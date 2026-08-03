@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { validateLevel } from '@/game/level';
 import { T } from '@/data/tuning';
 import { PROVING } from '@/data/proving';
-import { blobIndex, reduceMask, BLOB_COUNT, NB, neighbourMask } from '@/render/autotile';
+import { blobIndex, reduceMask, BLOB_COUNT, NB, neighbourMask } from '@cabinet/autotile';
 
 const levelDir = resolve(__dirname, '../src/data/levels');
 const levelFiles = readdirSync(levelDir).filter((f) => f.endsWith('.json'));

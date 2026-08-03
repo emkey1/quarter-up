@@ -67,6 +67,33 @@ about the game, that is what [`config.ts`](cabinet/src/config.ts) is for — and
 needs to know something a config field cannot express, that is a sign the code belongs
 back in the games.
 
+## What the third game said (M6)
+
+Undermine was the first game built ON this package rather than copied and diffed later,
+which makes it the real test. Two things came out of it.
+
+**`pixel.ts` and `autotile.ts` moved here, and the drift was the argument.** `pixel.ts`
+existed in all three games. Bracer's and Undermine's were byte-identical; Double Bubble's
+had gained defensive coordinate rounding and an `ellipseOutline` the others lacked, while
+Bracer had a `blitTo` where Double Bubble had `toCanvas`. Undermine — copied from Bracer —
+hand-rolled a hollow ellipse out of two filled ones, because nothing told it the method it
+wanted already existed one directory over. That is the cost of copies stated precisely.
+The extracted file is the union, so every game gains what the other two had learned.
+
+`autotile.ts` was byte-identical in the two games that use it. Double Bubble does not:
+a gravity platformer has no autotiled terrain. Shared does not mean universal.
+
+**The prediction about `terrain.ts` was wrong, and it stays out.** §7 of Undermine's design
+expected the terrain layer to be next through the door. The evidence says no: Bracer's
+`terrain.ts` is 243 lines of walls, doors, traps, teleporters, breakables and tile flags;
+Undermine's `field.ts` is 99 lines of earth, tunnel and sky. They share a *shape* — flat
+typed arrays, a version counter, dirty tracking — and almost no code. Extracting the shape
+would mean a base class whose only job is to be inherited, which is how you get an
+abstraction nobody can read and everybody has to fight.
+
+Worth recording as a miss rather than quietly dropping. The rule the first extraction set —
+diff before you lift — worked exactly as intended here: it stopped a plausible guess.
+
 ## Was it worth it
 
 The immediate evidence: a single input bug — polling on frames that take no simulation

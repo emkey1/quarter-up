@@ -1,6 +1,6 @@
 import { CLASSES, CLASS_ORDER, type ClassId } from '@/data/classes';
 import type { MonsterKind } from '@/game/monster';
-import { Px, palette, ramp, type Ramp } from './pixel';
+import { Px, palette, ramp, type Ramp } from '@cabinet/pixel';
 
 /**
  * Procedural sprite generation at true native resolution.

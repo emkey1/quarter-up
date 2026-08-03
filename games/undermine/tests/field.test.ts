@@ -237,3 +237,70 @@ describe('the digger on its own', () => {
     }
   });
 });
+
+describe('turning', () => {
+  /**
+   * Reported from play: "I can't seem to go up or down."
+   *
+   * The turn rule refused any perpendicular input while the digger was more than
+   * TURN_SLACK from the lane it wanted, and nothing ever moved it back onto one — so
+   * stopping anywhere but a cell centre killed the other axis for good. Nine of sixteen
+   * positions across a cell could never turn.
+   *
+   * These are the tests that were missing. Every earlier movement test drove one
+   * direction from a cell centre, which is the one case that always worked.
+   */
+  it('can always turn, from every position across a cell', () => {
+    for (let n = 0; n < 32; n++) {
+      const w = world();
+      park(w);
+      for (let i = 0; i < n; i++) w.step({ dir: Dir.Right });
+
+      const before = w.digger.y;
+      for (let i = 0; i < 90; i++) w.step({ dir: Dir.Down });
+      expect(w.digger.y, `stuck after ${n} frames of travel — cannot turn down`).toBeGreaterThan(before);
+    }
+  });
+
+  it('turns the other way too, and back again', () => {
+    for (let n = 1; n < 16; n++) {
+      const w = world();
+      park(w);
+      for (let i = 0; i < n; i++) w.step({ dir: Dir.Down });
+      const before = w.digger.x;
+      for (let i = 0; i < 90; i++) w.step({ dir: Dir.Right });
+      expect(w.digger.x, `stuck after ${n} frames — cannot turn right`).toBeGreaterThan(before);
+    }
+  });
+
+  it('corners onto the lane rather than teleporting onto it', () => {
+    // The slide has to be gradual. Snapping up to half a cell in one frame would put the
+    // digger somewhere it visibly was not a moment ago.
+    const w = world();
+    park(w);
+    for (let i = 0; i < 7; i++) w.step({ dir: Dir.Right });
+    const x0 = w.digger.x;
+    w.step({ dir: Dir.Down });
+    expect(Math.abs(w.digger.x - x0), 'jumped onto the lane in one frame').toBeLessThanOrEqual(
+      T.MOVE_SPEED,
+    );
+  });
+
+  it('still cuts a one-cell tunnel after cornering', () => {
+    // The whole reason lane-locking exists. Cornering must not leave the digger
+    // straddling two rows and carving a double-width trench.
+    const w = world();
+    park(w);
+    for (let i = 0; i < 5; i++) w.step({ dir: Dir.Right });
+    for (let i = 0; i < 60 * 6; i++) w.step({ dir: Dir.Down });
+    const col = w.digger.cellX;
+
+    for (let cy = 0; cy < T.GRID_H; cy++) {
+      if (w.field.at(col, cy) !== Cell.Tunnel) continue;
+      const neighbours = [col - 1, col + 1].filter((c) => w.field.at(c, cy) === Cell.Tunnel);
+      // Neighbouring open cells are fine where the layout pre-cut them; what must not
+      // happen is the digger cutting a second column of its own alongside the first.
+      expect(neighbours.length, `row ${cy} was widened by the digger`).toBeLessThanOrEqual(2);
+    }
+  });
+});

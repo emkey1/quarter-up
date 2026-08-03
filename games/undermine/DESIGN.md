@@ -379,7 +379,7 @@ did and which needs no invention.
 | **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | **Done.** Two presses buy ~5.6 cells of walking; a room cannot be parked; crushing four still beats popping four. |
 | **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | **Mostly done.** Audio, HUD, lives, round flow, four bands. Outstanding: title/attract screen, and the sprites are first-pass. |
 | **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | **Done.** Twenty levels play through carrying score and lives; a bot run ends by running out of lives. |
-| **M6** | Polish, and whatever the third game teaches the shared package — §7 predicts `terrain.ts`. | Both other games still green after any extraction. |
+| **M6** | Polish, and whatever the third game teaches the shared package. | **In progress.** `pixel.ts` and `autotile.ts` extracted; all three games green. §7's prediction about `terrain.ts` was wrong — see packages/README.md. Outstanding: title/attract screen. |
 
 ---
 
@@ -418,7 +418,7 @@ The lesson from Double Bubble, applied from the start rather than at M6.
 | **Ghost frequency is the balance of the whole game.** | Too high and tunnels are pointless, too low and camping wins. The progress-based trigger in §8.3 is a reconstruction, not a documented rule. |
 | ~~Cell-aligned digging may read as too chunky.~~ | **Settled at M4, and the grid was right.** A rendered frame shows tunnels reading clearly as tunnels at 16wu cells; the vertical shaft and the T-junction are unambiguous. No pixel mask needed. |
 | **No arcade disassembly is known to exist.** | Same position as Double Bubble. Checked during research; if one surfaces, it outranks everything in §14. |
-| **`terrain.ts` may not survive contact.** | It was written for walls that occasionally break, not earth that is mostly removed. If it needs forking rather than adapting, that is a finding about the extraction, not a failure. |
+| ~~`terrain.ts` may not survive contact.~~ | **Settled at M6, and it did not.** Bracer's is 243 lines of doors, traps, teleporters and tile flags; this game's `field.ts` is 99 lines of earth and tunnel. They share a shape and almost no code, so it stays out. `pixel.ts` and `autotile.ts` went instead. |
 
 ---
 

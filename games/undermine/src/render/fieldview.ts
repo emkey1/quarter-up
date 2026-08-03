@@ -4,7 +4,7 @@ import { Cell, Field } from '@/game/field';
 import { Digger } from '@/game/digger';
 import { RockState, type Rock } from '@/game/rock';
 import { EnemyState, type Enemy } from '@/game/enemy';
-import { blobIndex, neighbourMask } from './autotile';
+import { blobIndex, neighbourMask } from '@cabinet/autotile';
 import { AtlasRow, MISC, TileAtlas } from './atlas';
 
 /**

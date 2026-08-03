@@ -1,12 +1,17 @@
 /**
  * A tiny indexed-colour pixel buffer.
  *
- * Everything here works on palette INDICES, not colours, so a sprite can be recoloured
- * (monster kinds, angry states, bubble tints) by swapping a ramp rather than redrawing
- * it — which is what keeps the art budget sane.
+ * Everything works on palette INDICES rather than colours, so a sprite can be recoloured
+ * — monster kinds, angry states, bubble tints, four bands of earth — by swapping a ramp
+ * instead of redrawing it. That is what keeps the art budget sane across three games.
  *
- * Copied from Bracer unchanged. It has no game-specific knowledge at all and is the
- * strongest candidate for packages/cabinet at M6.
+ * Extracted at M6 with three copies to diff, which is what packages/README asks for, and
+ * the drift between them is the argument for doing it. Double Bubble had gained
+ * defensive coordinate rounding and an `ellipseOutline` the others lacked; Bracer had
+ * `blitTo` where Double Bubble had `toCanvas`; and Undermine — copied from Bracer —
+ * hand-rolled a hollow ellipse out of two filled ones, because nothing told it the
+ * method it wanted already existed one directory over. This file is the union of all
+ * three, which means every game gains whatever the other two had learned.
  */
 
 export const TRANSPARENT = 0;
@@ -256,6 +261,30 @@ export class Px {
   }
 
   /** Render to an offscreen canvas once, so the hot path blits instead of per-pixel. */
+  /**
+   * Paint into an existing context at an offset.
+   *
+   * Both this and `toCanvas` below survived the merge because the games want different
+   * things: an atlas blits many sprites into one big canvas, while a one-off wants its
+   * own. Neither is a wrapper for the other — `toCanvas` needs a canvas that does not
+   * exist yet.
+   */
+  blitTo(ctx: CanvasRenderingContext2D, ox: number, oy: number, pal: readonly string[]): void {
+    const img = ctx.createImageData(this.w, this.h);
+    for (let i = 0; i < this.data.length; i++) {
+      const v = this.data[i];
+      if (v === TRANSPARENT) continue;
+      const hex = pal[v] ?? '#ff00ff';
+      const n = parseInt(hex.slice(1), 16);
+      const o = i * 4;
+      img.data[o] = (n >> 16) & 255;
+      img.data[o + 1] = (n >> 8) & 255;
+      img.data[o + 2] = n & 255;
+      img.data[o + 3] = 255;
+    }
+    ctx.putImageData(img, ox, oy);
+  }
+
   toCanvas(pal: readonly string[]): HTMLCanvasElement {
     const c = document.createElement('canvas');
     c.width = this.w;

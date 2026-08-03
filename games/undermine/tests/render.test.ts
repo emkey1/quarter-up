@@ -3,7 +3,7 @@ import { T } from '@/data/tuning';
 import { Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { FieldView } from '@/render/fieldview';
-import { BLOB_COUNT, blobIndex, neighbourMask, reduceMask, NB } from '@/render/autotile';
+import { BLOB_COUNT, blobIndex, neighbourMask, reduceMask, NB } from '@cabinet/autotile';
 import type { Layout } from '@cabinet/display';
 
 /**

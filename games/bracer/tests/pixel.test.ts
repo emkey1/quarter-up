@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Px, palette, ramp, TRANSPARENT } from '@/render/pixel';
+import { Px, palette, ramp, TRANSPARENT } from '@cabinet/pixel';
 import { wallTile, floorTile, TILE_PX } from '@/render/tilegen';
-import { NB } from '@/render/autotile';
+import { NB } from '@cabinet/autotile';
 
 describe('pixel buffer', () => {
   it('leaves everything transparent until drawn', () => {

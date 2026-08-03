@@ -1,5 +1,5 @@
-import { NB } from './autotile';
-import { Px, palette, ramp } from './pixel';
+import { NB } from '@cabinet/autotile';
+import { Px, palette, ramp } from '@cabinet/pixel';
 import type { Theme } from './theme';
 
 /**

@@ -76,11 +76,37 @@ export class Digger {
 
     const horizontal = dir === Dir.Left || dir === Dir.Right;
 
-    // A turn onto the other axis is only legal near the lane it would join, and snaps
-    // exactly onto it. Snapping is what keeps a tunnel one cell wide.
+    /*
+     * Turning onto the other axis: slide onto the lane, never refuse.
+     *
+     * Reported from play as "I can't seem to go up or down", and it was worse than
+     * intermittent. The rule used to be a flat rejection — if the digger was further than
+     * TURN_SLACK from the lane it wanted to join, the input did nothing. Nothing ever
+     * moved it back onto a lane either, so stopping anywhere but a cell centre left the
+     * perpendicular axis permanently dead. Measured across a cell: 9 of 16 positions
+     * could never turn at all.
+     *
+     * The fix is what every grid game of this era actually does. Asking for a
+     * perpendicular direction while off-lane spends the frame CORNERING — sliding along
+     * the current axis toward the nearest lane centre — and the turn happens once it
+     * arrives. The digger visibly slides a few pixels sideways before setting off, which
+     * is exactly how cornering looks in the originals.
+     *
+     * The slide is always along a lane the digger is already standing in, so it can never
+     * push into earth, and it is bounded by half a cell.
+     */
     const cross = horizontal ? this.y : this.x;
     const lane = Digger.laneCentre(cross);
-    if (Math.abs(cross - lane) > T.TURN_SLACK) return;
+    const off = cross - lane;
+
+    if (Math.abs(off) > T.TURN_SLACK) {
+      const slide = Math.min(T.MOVE_SPEED, Math.abs(off)) * (off > 0 ? -1 : 1);
+      if (horizontal) this.y += slide;
+      else this.x += slide;
+      this.facing = dir;
+      return;
+    }
+
     if (horizontal) this.y = lane;
     else this.x = lane;
 

@@ -5,7 +5,9 @@
  * configurations to the 47 distinct *appearances* a blob tileset needs, which is what
  * lets a theme be ~12 hand-drawn source pieces instead of 47 (DESIGN.md §14, art risk).
  *
- * M0 draws each case procedurally; M4 swaps in a real atlas behind the same index.
+ * Extracted at M6, byte-identical in the two games that use it. Double Bubble does not:
+ * a gravity platformer has no autotiled terrain, and that is the expected outcome rather
+ * than a gap — shared does not mean universal.
  */
 
 export const NB = {

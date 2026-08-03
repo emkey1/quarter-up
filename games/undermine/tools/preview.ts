@@ -9,8 +9,8 @@ import { LAYOUTS } from '@/data/layouts';
 import { RockState } from '@/game/rock';
 import { EnemyState } from '@/game/enemy';
 import { PALETTE, TILE_PX, earthTile, tunnelTile, skyTile, diggerSprite, rockSprite, enemySprite, flameSprite } from '@/render/tilegen';
-import { neighbourMask } from '@/render/autotile';
-import type { Px } from '@/render/pixel';
+import { neighbourMask } from '@cabinet/autotile';
+import type { Px } from '@cabinet/pixel';
 
 /**
  * Renders the actual game to a PNG, headlessly.

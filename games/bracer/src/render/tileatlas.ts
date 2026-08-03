@@ -1,6 +1,6 @@
 import { T } from '@/data/tuning';
 import { Tile } from '@/game/terrain';
-import { BLOB_COUNT, NB } from './autotile';
+import { BLOB_COUNT, NB } from '@cabinet/autotile';
 import type { Theme } from './theme';
 import {
   TILE_PX,
