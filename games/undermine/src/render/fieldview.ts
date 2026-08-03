@@ -3,6 +3,7 @@ import { T, bandOf } from '@/data/tuning';
 import { Cell, Field } from '@/game/field';
 import { Digger } from '@/game/digger';
 import { RockState, type Rock } from '@/game/rock';
+import { EnemyState, type Enemy } from '@/game/enemy';
 import { blobIndex, neighbourMask } from './autotile';
 import { AtlasRow, MISC, TileAtlas } from './atlas';
 
@@ -38,7 +39,15 @@ export class FieldView {
     f.clearDirty();
   }
 
-  draw(ctx: CanvasRenderingContext2D, f: Field, digger: Digger, rocks: readonly Rock[], layout: Layout): void {
+  draw(
+    ctx: CanvasRenderingContext2D,
+    f: Field,
+    digger: Digger,
+    rocks: readonly Rock[],
+    enemies: readonly Enemy[],
+    flame: readonly { x: number; y: number }[],
+    layout: Layout,
+  ): void {
     this.refreshMasks(f);
 
     const pf = layout.playfield;
@@ -94,6 +103,30 @@ export class FieldView {
         Math.round(pf.y + (r.y - T.CELL / 2) * px),
         dst, dst,
       );
+    }
+
+    const blit = (col: number, wx: number, wy: number) => {
+      const [bx, by, bw, bh] = this.atlas.src(AtlasRow.Misc, col);
+      ctx.drawImage(
+        this.atlas.canvas,
+        bx, by, bw, bh,
+        Math.round(pf.x + (wx - T.CELL / 2) * px),
+        Math.round(pf.y + (wy - T.CELL / 2) * px),
+        dst, dst,
+      );
+    };
+
+    // Flame under the enemies that made it, so a dragon is never hidden by its own jet.
+    for (const c of flame) blit(MISC.flame, c.x, c.y);
+
+    for (const e of enemies) {
+      if (!e.alive || e.state === EnemyState.Dead) continue;
+      const ghost = e.state === EnemyState.Ghosting;
+      const col =
+        e.kind === 'grub'
+          ? ghost ? MISC.grubGhost : MISC.grub
+          : ghost ? MISC.emberjawGhost : MISC.emberjaw;
+      blit(col, e.x, e.y);
     }
 
     // The digger, drawn on top and positioned by its centre rather than its cell, so

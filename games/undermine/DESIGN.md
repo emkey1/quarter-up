@@ -1,8 +1,9 @@
 # Undermine — design
 
-> **Status:** **M0 and M1 implemented.** The field renders with autotiling, the digger
-> cuts it at two speeds, and rocks fall and kill. It runs on `@quarter-up/cabinet` with no
-> local engine copy — there is no `src/engine/` directory at all. 47 tests. §11 is the
+> **Status:** **M0–M2 implemented.** The field renders with autotiling, the digger cuts
+> it at two speeds, rocks fall and kill, and enemies hunt through the tunnels and ghost
+> through the earth when you seal yourself in. It runs on `@quarter-up/cabinet` with no
+> local engine copy — there is no `src/engine/` directory at all. 65 tests. §11 is the
 > milestone list and §13 is what we do not yet know.
 >
 > Chosen as the third cabinet for a specific reason: it is playable well on a keyboard.
@@ -367,7 +368,7 @@ did and which needs no invention.
 | --- | --- | --- |
 | **M0** | Skeleton. Workspace on `@quarter-up/cabinet`, canvas, a field of earth rendering with autotiling, a digger that carves it. | **Done.** Builds, 31 tests, lane-locked digging at two speeds. |
 | **M1** | Movement and terrain. Four-way grid movement, the dig-speed difference, rocks falling and killing. | **Done.** A rock can be dropped on the player, and dodged during the teeter. Both speeds measured. |
-| **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | Neither camping nor open ground is safe. |
+| **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | **Done.** A sealed pocket is reached; standing in the open is caught; running survives far longer than either. |
 | **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | Pump-and-stall is viable without being dominant. |
 | **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | Looks and sounds like a cabinet. |
 | **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | A full run start to finish. |
@@ -387,8 +388,13 @@ The lesson from Double Bubble, applied from the start rather than at M6.
   start, no rock seals the only route, the level is completable.
 - **This game can actually finish its fidelity pass.** Almost everything is discrete —
   pump stages, depth bands, score tiers, cell counts. Those are countable from any
-  recording, including of a legitimate re-release. The continuous values are few: dig
-  speed, ghost rate, deflate rate. That is a short list, and §13 tracks it.
+  recording, including of a legitimate re-release.
+- **The continuous list is pinned by a test, and it has already moved.** It was two at
+  M0 (run speed, dig speed) and adding enemies at M2 made it four (enemy speed, ghost
+  speed). The observables test fails the build if a non-integer constant appears that is
+  not on the list, which is how that got noticed at the time rather than discovered at
+  M6. The pump's deflate rate is the last one expected; anything beyond that should be
+  argued for in this document before it is written.
 
 ---
 

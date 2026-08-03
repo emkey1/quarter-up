@@ -131,11 +131,16 @@ describe('what the constants mean, in countable units', () => {
   });
 
   describe('the free constants, tracked', () => {
-    it('has only two continuous values so far, and both are named here', () => {
-      // DESIGN.md §12 claims the continuous list is short — dig speed, run speed, and
-      // later the ghost rate. If that list grows quietly, this game inherits Double
-      // Bubble's problem, so the claim is pinned rather than trusted.
-      const CONTINUOUS = ['MOVE_SPEED', 'DIG_SPEED'];
+    it('has only four continuous values, and every one is named here', () => {
+      // DESIGN.md §12 claims the continuous list is short. If it grows quietly, this
+      // game inherits Double Bubble's problem, so the claim is pinned rather than
+      // trusted — and it has already earned its keep: adding enemies at M2 pushed the
+      // list from two to four, and this test is how that got noticed rather than
+      // discovered at M6.
+      //
+      // Still to come: the pump's deflate rate. Anything beyond that is a surprise and
+      // should be argued for in the design before it is added here.
+      const CONTINUOUS = ['MOVE_SPEED', 'DIG_SPEED', 'ENEMY_SPEED', 'GHOST_SPEED'];
       const known = new Set([...CONTINUOUS, 'TURN_SLACK']);
       // PAD_* are cabinet input tuning rather than gameplay: they describe a thumbstick,
       // not this game, and they are shared with the other two cabinets.

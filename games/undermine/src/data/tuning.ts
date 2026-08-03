@@ -105,6 +105,56 @@ export const T = {
    *  enough to read as an event rather than a disappearance. */
   ROCK_SHATTER_F: 24,
 
+  // ---------------------------------------------------------------- enemies
+  /**
+   * [i] How fast an enemy travels an open tunnel, wu per frame.
+   *
+   * Below the digger's pace on purpose. Enemies that match you turn every encounter into
+   * a dead end you cannot leave, and the game stops being about routes. Slower means a
+   * player who has cut a good network can always disengage — which is the reward for
+   * having cut one.
+   */
+  ENEMY_SPEED: 0.6,
+
+  /**
+   * [i] How fast an enemy moves while passing through solid earth.
+   *
+   * Much slower than through a tunnel, and that gap is the whole balance of the mechanic.
+   * Ghosting has to be the thing that stops you camping, without being the fast way
+   * around — if it were quicker than walking, no enemy would ever use a tunnel and the
+   * network the player cuts would stop mattering.
+   */
+  GHOST_SPEED: 0.28,
+
+  /**
+   * [i] Frames of making no headway before an enemy gives up on tunnels and ghosts.
+   *
+   * Progress-based rather than a random timer, which is the reconstruction DESIGN.md
+   * §8.3 flags as ours rather than documented. A random trigger punishes everyone
+   * equally; this one specifically punishes walling yourself in, because sealing the
+   * route is exactly what stops an enemy making progress.
+   */
+  GHOST_STUCK_F: 90,
+
+  /** [i] An enemy with no tunnel route at all does not wait this out — it ghosts
+   *  immediately. Sealing yourself in should fail fast, not after a pause that reads
+   *  like it worked. */
+  GHOST_NO_ROUTE_F: 12,
+
+  // ---------------------------------------------------------------- the dragon's flame
+  /** [i] Frames of visible wind-up before the flame appears. The only ranged threat in
+   *  the game has to be escapable by a player who is watching. */
+  FLAME_WINDUP_F: 40,
+  /** [i] Frames the flame burns. */
+  FLAME_ACTIVE_F: 30,
+  /** [i] Frames before it can breathe again. */
+  FLAME_COOLDOWN_F: 180,
+  /** [i] How many cells the jet reaches down its own tunnel, stopping at earth. */
+  FLAME_CELLS: 3,
+  /** [i] Vertical tolerance for "in my tunnel", wu. Wider than nothing, because a
+   *  player half a pixel off-lane should still be in danger. */
+  FLAME_ALIGN_WU: 10,
+
   /**
    * [con] How close to a cell's centre line the digger must be before it may turn onto
    * the other axis, in wu.

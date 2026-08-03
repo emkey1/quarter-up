@@ -2,6 +2,16 @@ import { T } from '@/data/tuning';
 import { Field } from './field';
 import { Digger, Dir, type MoveIntent } from './digger';
 import { makeRock, stepRock, RockState, type Crushable, type Rock } from './rock';
+import { FlowField } from './flow';
+import {
+  makeEnemy,
+  stepEnemy,
+  flameHits,
+  EnemyState,
+  enemyCellX,
+  enemyCellY,
+  type Enemy,
+} from './enemy';
 
 /** What happened this tick, for the presentation layer to make noise about. */
 export interface WorldEvents {
@@ -9,6 +19,11 @@ export interface WorldEvents {
   rockStartedFalling: boolean;
   rockLanded: boolean;
   playerCrushed: boolean;
+  enemyStartedGhosting: boolean;
+  enemySolidified: boolean;
+  flameLit: boolean;
+  playerCaught: boolean;
+  playerBurned: boolean;
 }
 
 /**
@@ -25,6 +40,22 @@ export class World {
   readonly field = new Field();
   readonly digger: Digger;
   readonly rocks: Rock[] = [];
+  readonly enemies: Enemy[] = [];
+  /** Cells the dragons' flames occupy right now, for drawing. */
+  flame: { x: number; y: number }[] = [];
+
+  /**
+   * Route field to the player, rebuilt when the player changes cell OR the field does.
+   *
+   * Both triggers matter and the second is the one Bracer never needed: there, terrain
+   * changed a handful of times a level. Here the player reshapes the map continuously,
+   * and a route computed against earth that has since been cut away sends every enemy
+   * the long way round a wall that is no longer there.
+   */
+  private readonly flow = new FlowField();
+  private flowCx = -1;
+  private flowCy = -1;
+  private flowVersion = -1;
 
   frame = 0;
   /** Cleared by death, and the reason `step` stops advancing the digger. */
@@ -57,6 +88,19 @@ export class World {
     ] as const) {
       this.rocks.push(makeRock(cx, cy));
     }
+
+    // A placeholder cast until layouts arrive at M5. Each starts in its own small pocket
+    // — an enemy entombed in solid earth with no tunnel at all would ghost immediately
+    // and permanently, which is the mechanic working correctly and reads as broken.
+    for (const [kind, cx, cy] of [
+      ['grub', 3, 7],
+      ['grub', 10, 9],
+      ['emberjaw', 6, 13],
+      ['grub', 11, 15],
+    ] as const) {
+      this.field.dig(cx, cy);
+      this.enemies.push(makeEnemy(kind, cx, cy));
+    }
   }
 
   step(intent: MoveIntent): WorldEvents {
@@ -66,6 +110,11 @@ export class World {
       rockStartedFalling: false,
       rockLanded: false,
       playerCrushed: false,
+      enemyStartedGhosting: false,
+      enemySolidified: false,
+      flameLit: false,
+      playerCaught: false,
+      playerBurned: false,
     };
 
     if (this.playerAlive) {
@@ -80,20 +129,64 @@ export class World {
     this.crushable.y = this.digger.y;
     this.crushable.alive = this.playerAlive;
 
-    const targets = [this.crushable];
+    // Enemies are crushable too: luring one under a rock is the high-scoring kill, and
+    // it only works if a rock treats them exactly as it treats the player.
+    const targets: Crushable[] = [this.crushable, ...this.enemies];
     for (const r of this.rocks) {
       if (r.state === RockState.Gone) continue;
       const e = stepRock(this.field, r, targets);
       events.rockStartedFalling ||= e.startedFalling;
       events.rockLanded ||= e.landed;
-      if (e.crushed.length) events.playerCrushed = true;
+      for (const victim of e.crushed) {
+        if (victim === this.crushable) events.playerCrushed = true;
+      }
+    }
+    for (const en of this.enemies) {
+      if (!en.alive) en.state = EnemyState.Dead;
     }
 
+    this.stepEnemies(events);
+
     if (!this.crushable.alive) this.playerAlive = false;
+    if (events.playerCaught || events.playerBurned) this.playerAlive = false;
 
     return events;
   }
+
+  private stepEnemies(events: WorldEvents): void {
+    const pcx = this.digger.cellX;
+    const pcy = this.digger.cellY;
+    if (pcx !== this.flowCx || pcy !== this.flowCy || this.field.version !== this.flowVersion) {
+      this.flow.recompute(this.field, pcx, pcy);
+      this.flowCx = pcx;
+      this.flowCy = pcy;
+      this.flowVersion = this.field.version;
+    }
+
+    const target = { x: this.digger.x, y: this.digger.y, alive: this.playerAlive };
+    this.flame = [];
+
+    for (const en of this.enemies) {
+      if (!en.alive || en.state === EnemyState.Dead) continue;
+      const e = stepEnemy(this.field, this.flow, en, target);
+      events.enemyStartedGhosting ||= e.startedGhosting;
+      events.enemySolidified ||= e.solidified;
+      events.flameLit ||= e.flameLit;
+      if (e.touchedPlayer) events.playerCaught = true;
+      if (e.flame.length) this.flame.push(...e.flame);
+    }
+
+    if (this.playerAlive && flameHits(this.flame, this.digger.x, this.digger.y)) {
+      events.playerBurned = true;
+    }
+  }
+
+  /** Enemies still in play. The level ends when this reaches zero — or, from M5, when
+   *  the last one escapes instead. */
+  get enemiesLeft(): number {
+    return this.enemies.filter((e) => e.alive && e.state !== EnemyState.Dead).length;
+  }
 }
 
-export { Dir, RockState };
-export type { MoveIntent, Rock };
+export { Dir, RockState, EnemyState, enemyCellX, enemyCellY };
+export type { MoveIntent, Rock, Enemy };

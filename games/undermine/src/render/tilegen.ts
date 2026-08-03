@@ -20,8 +20,11 @@ export const BAND_RAMPS = [
 ] as const;
 
 const SKY = ramp('#1a2038', { spread: 0.3 });
+const GRUB = ramp('#d24a4a', { spread: 0.3 });
+const EMBER = ramp('#4ab86a', { spread: 0.3 });
+const FLAME = ramp('#ffb03a', { spread: 0.4 });
 
-export const PALETTE = palette(BAND_RAMPS[0], BAND_RAMPS[1], BAND_RAMPS[2], BAND_RAMPS[3], SKY);
+export const PALETTE = palette(BAND_RAMPS[0], BAND_RAMPS[1], BAND_RAMPS[2], BAND_RAMPS[3], SKY, GRUB, EMBER, FLAME);
 
 /** Palette slots for band n, since `palette()` lays ramps out six entries at a time. */
 export function bandSlots(band: number): { outline: number; darkest: number; dark: number; base: number; light: number } {
@@ -174,6 +177,60 @@ export function rockSprite(variant: 'rest' | 'teeter' | 'shatter'): Px {
   p.ellipse(TILE_PX / 2 + shift, TILE_PX / 2, 12, 11, s.base);
   p.ellipse(TILE_PX / 2 + shift - 3, TILE_PX / 2 - 3, 6, 5, s.light);
   p.ellipse(TILE_PX / 2 + shift + 4, TILE_PX / 2 + 4, 4, 3, s.dark);
+  p.outline(s.outline);
+  return p;
+}
+
+
+/**
+ * An enemy. `ghost` is the same creature seen through earth.
+ *
+ * The ghost has to be unmistakable and still obviously the same thing: a player who
+ * cannot tell a ghosting enemy from a solid one cannot make the decision the mechanic
+ * exists to force. Hollowed out rather than recoloured, so it reads at a glance without
+ * becoming a different sprite.
+ */
+export function enemySprite(kind: 'grub' | 'emberjaw', ghost: boolean): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const slot = kind === 'grub' ? 5 : 6; // ramps 5 and 6, after the four bands and sky
+  const s = bandSlots(slot);
+
+  if (ghost) {
+    // Outline and eyes only: something coming through the wall, not something standing
+    // in front of it.
+    // Hollow: fill, then punch the middle back out. Px has no ellipse-outline op and
+    // one filled shape minus a smaller one is exactly what that would be anyway.
+    p.ellipse(TILE_PX / 2, TILE_PX / 2, 11, 10, s.light);
+    p.ellipse(TILE_PX / 2, TILE_PX / 2, 8, 7, 0);
+    p.rect(11, 13, 3, 4, s.light);
+    p.rect(19, 13, 3, 4, s.light);
+    return p;
+  }
+
+  p.ellipse(TILE_PX / 2, TILE_PX / 2, 11, 10, s.base);
+  p.ellipse(TILE_PX / 2 - 3, TILE_PX / 2 - 3, 5, 4, s.light);
+  p.rect(10, 12, 5, 6, 0);
+  p.rect(18, 12, 5, 6, 0);
+  p.rect(11, 13, 3, 4, s.outline);
+  p.rect(19, 13, 3, 4, s.outline);
+  if (kind === 'emberjaw') {
+    // A snout, so the thing that breathes fire looks like it might.
+    p.rect(24, 15, 6, 5, s.dark);
+    p.rect(28, 16, 3, 3, s.light);
+  }
+  p.outline(s.outline);
+  return p;
+}
+
+/** One cell of flame. */
+export function flameSprite(): Px {
+  const p = new Px(TILE_PX, TILE_PX);
+  const s = bandSlots(7);
+  for (let i = 0; i < 5; i++) {
+    const y = 4 + i * 5;
+    const w = 26 - Math.abs(i - 2) * 4;
+    p.rect(TILE_PX / 2 - w / 2, y, w, 4, i % 2 === 0 ? s.base : s.light);
+  }
   p.outline(s.outline);
   return p;
 }

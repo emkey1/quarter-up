@@ -76,7 +76,15 @@ export class App implements LoopHost {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, layout.canvasW, layout.canvasH);
 
-    this.view.draw(ctx, this.world.field, this.world.digger, this.world.rocks, layout);
+    this.view.draw(
+      ctx,
+      this.world.field,
+      this.world.digger,
+      this.world.rocks,
+      this.world.enemies,
+      this.world.flame,
+      layout,
+    );
 
     if (this.paused) {
       const pf = layout.playfield;
@@ -93,6 +101,6 @@ export class App implements LoopHost {
   /** M0 diagnostics, so the dev server shows something checkable without a HUD. */
   get debug(): string {
     const d = this.world.digger;
-    return `cell ${d.cellX},${d.cellY}  dug ${this.world.field.tunnelCount()}/${T.GRID_W * T.GRID_H}`;
+    return `cell ${d.cellX},${d.cellY}  dug ${this.world.field.tunnelCount()}  left ${this.world.enemiesLeft}`;
   }
 }

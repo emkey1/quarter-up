@@ -131,10 +131,23 @@ describe('rocks', () => {
 });
 
 describe('M1 acceptance: a rock can be dropped on the player', () => {
+  /**
+   * Rocks only, no cast.
+   *
+   * The placeholder enemies added at M2 sit close enough to the placeholder rocks that
+   * a grub reaches the digger before the rock lands, and the player dies to the wrong
+   * thing. That is the game working; it is not what these tests are about.
+   */
+  const rocksOnly = (): World => {
+    const w = new World();
+    w.enemies.length = 0;
+    return w;
+  };
+
   it('kills the digger that dug out from under it', () => {
     // The whole milestone in one test. Put the digger under a rock, have it dig straight
     // down, and let it stand there.
-    const w = new World();
+    const w = rocksOnly();
     const rock = w.rocks[0];
 
     // Walk the digger into the rock's column, one row below it, by fiat — pathing there
@@ -155,7 +168,7 @@ describe('M1 acceptance: a rock can be dropped on the player', () => {
   it('spares a digger that moves out of the way during the teeter', () => {
     // The other half: the warning has to be long enough to actually use. A digger that
     // runs sideways the moment the rock wobbles must get clear.
-    const w = new World();
+    const w = rocksOnly();
     const rock = w.rocks[0];
     const under = rockCell(rock) + 1;
 
@@ -171,7 +184,7 @@ describe('M1 acceptance: a rock can be dropped on the player', () => {
   });
 
   it('leaves the digger dead rather than merely stopped', () => {
-    const w = new World();
+    const w = rocksOnly();
     const rock = w.rocks[0];
     w.digger.x = rock.x;
     w.digger.y = (rockCell(rock) + 1) * T.CELL + T.CELL / 2;

@@ -1,5 +1,15 @@
 import { BLOB_COUNT } from './autotile';
-import { PALETTE, TILE_PX, earthTile, tunnelTile, skyTile, diggerSprite, rockSprite } from './tilegen';
+import {
+  PALETTE,
+  TILE_PX,
+  earthTile,
+  tunnelTile,
+  skyTile,
+  diggerSprite,
+  rockSprite,
+  enemySprite,
+  flameSprite,
+} from './tilegen';
 import { BLOB_INDEX } from './autotile';
 import { T } from '@/data/tuning';
 
@@ -31,6 +41,11 @@ export const MISC = {
   rock: 5,
   rockTeeter: 6,
   rockShatter: 7,
+  grub: 8,
+  grubGhost: 9,
+  emberjaw: 10,
+  emberjawGhost: 11,
+  flame: 12,
 } as const;
 
 export class TileAtlas {
@@ -38,7 +53,7 @@ export class TileAtlas {
   readonly tilePx = TILE_PX;
 
   constructor() {
-    const cols = Math.max(BLOB_COUNT, 8);
+    const cols = Math.max(BLOB_COUNT, 13);
     const rows = AtlasRow.Misc + 1;
     this.canvas = document.createElement('canvas');
     this.canvas.width = cols * TILE_PX;
@@ -67,6 +82,11 @@ export class TileAtlas {
       rockSprite('rest'),
       rockSprite('teeter'),
       rockSprite('shatter'),
+      enemySprite('grub', false),
+      enemySprite('grub', true),
+      enemySprite('emberjaw', false),
+      enemySprite('emberjaw', true),
+      flameSprite(),
     ];
     misc.forEach((px, i) => px.blitTo(ctx, i * TILE_PX, AtlasRow.Misc * TILE_PX, PALETTE));
   }
