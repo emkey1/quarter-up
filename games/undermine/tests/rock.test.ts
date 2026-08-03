@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { T } from '@/data/tuning';
+import { T, CONTACT_REACH } from '@/data/tuning';
 import { Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
@@ -148,6 +148,35 @@ describe('rocks', () => {
       run(f, r, 300, [victim]);
       expect(victim.alive, `spared at an offset of ${off}wu — the rock landed on it`).toBe(false);
     }
+  });
+
+  it('spares someone who walked out from under it', () => {
+    // Reported from play: "I passed under a rock and it fell on me." Caused by the fix
+    // for the previous report overshooting — widening the reach to the sum of two half
+    // widths put it at 15wu, nearly a whole cell in every direction, so a player who had
+    // cleared the column was still inside it.
+    //
+    // The pair of tests either side of this one is the actual specification: catch what
+    // is mid-stride, spare what has left. One without the other gets fixed into the
+    // opposite bug, which is exactly what happened.
+    const f = undermined(5, 8, 4);
+    const r = makeRock(5, 8);
+    const walker: Crushable = {
+      x: 5 * T.CELL + T.CELL / 2 + T.CELL, // one clear cell along
+      y: 11 * T.CELL + T.CELL / 2,
+      alive: true,
+    };
+    run(f, r, 300, [walker]);
+    expect(walker.alive, 'crushed a full cell away from the rock').toBe(true);
+  });
+
+  it('uses the same reach as every other kind of contact', () => {
+    // Three hardcoded radii is three chances to be wrong, and two of them were.
+    expect(CONTACT_REACH).toBeCloseTo(T.CELL * T.CONTACT_RATIO, 6);
+    expect(CONTACT_REACH, 'must still catch something a half-cell off mid-stride').toBeGreaterThan(
+      T.CELL / 2,
+    );
+    expect(CONTACT_REACH, 'must not reach into the next cell along').toBeLessThan(T.CELL);
   });
 
   it('misses anything in a different column', () => {

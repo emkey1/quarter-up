@@ -106,19 +106,24 @@ export const T = {
   ROCK_SHATTER_F: 24,
 
   /**
-   * [con] Half-width of a body for the purposes of being crushed, in wu.
+   * [con] How close two things have to be to touch, in wu. One number for the whole game.
    *
-   * Reported from play: a monster walked under a falling rock and was ignored. The check
-   * was "is the victim's CENTRE inside the rock's column", i.e. within CELL/2. Anything
-   * mid-stride between two columns sits up to a full half-cell off that centre, so a
-   * boulder could come down visibly on top of something and miss it — measured, offsets
-   * of 8wu and beyond were spared.
+   * This started as three different numbers and both of the wrong ones were reported from
+   * play within an hour of each other.
    *
-   * A rock is one cell wide. What should die is whatever it OVERLAPS, so the test is the
-   * sum of two half-widths rather than one. Slightly under a full cell, so something
-   * cleanly in the next column along is still safe.
+   * A rock originally killed only what sat within CELL/2 of its column, which is "is your
+   * CENTRE inside my column" — and anything walking is between columns most of the time,
+   * so boulders landed visibly on monsters and missed. Widening it to the sum of two half
+   * widths (15wu) then overshot in the other direction: a player who had walked out from
+   * under a rock was still caught, because 15 is nearly a whole cell of reach in every
+   * direction.
+   *
+   * 0.7 of a cell is what enemy contact already used, and it is the right answer for both.
+   * It catches something a half-cell off mid-stride, and spares anything that has actually
+   * moved on. Everything that can touch anything now uses this, so there is one number to
+   * be wrong rather than three.
    */
-  CRUSH_HALF: 7,
+  CONTACT_RATIO: 0.7,
 
   // ---------------------------------------------------------------- enemies
   /**
@@ -263,6 +268,14 @@ export const T = {
    */
   TURN_SLACK: 3,
 } as const;
+
+/**
+ * [der] How close two things have to be to touch, in wu. `CELL * CONTACT_RATIO`.
+ *
+ * Derived rather than written down, so it cannot drift from the cell size the way three
+ * separate hardcoded radii did.
+ */
+export const CONTACT_REACH = T.CELL * T.CONTACT_RATIO;
 
 /** [der] Cell coordinates to the world position of that cell's centre. */
 export const cellCentre = (cx: number, cy: number): [number, number] => [

@@ -157,7 +157,7 @@ describe('what the constants mean, in countable units', () => {
   });
 
   describe('the free constants, tracked', () => {
-    it('names every continuous value, and there are now seven', () => {
+    it('names every continuous value, and there are now eight', () => {
       /*
        * The list, and its history, because the history is the point.
        *
@@ -181,6 +181,10 @@ describe('what the constants mean, in countable units', () => {
         'ESCAPE_SPEED',
         'RAMP_PER_LEVEL',
         'RAMP_MAX',
+        // Joined the list at M6, but it was always here — 0.7 was hardcoded in three
+        // places outside this file, in violation of the rule at the top of it. Two of the
+        // three were wrong, and both got reported from play within an hour of each other.
+        'CONTACT_RATIO',
       ];
       const known = new Set([...CONTINUOUS, 'TURN_SLACK']);
       // PAD_* are cabinet input tuning rather than gameplay: they describe a thumbstick,

@@ -1,4 +1,4 @@
-import { T } from '@/data/tuning';
+import { T, CONTACT_REACH } from '@/data/tuning';
 import { Field } from './field';
 
 export const enum RockState {
@@ -97,19 +97,18 @@ export function stepRock(field: Field, r: Rock, crushables: readonly Crushable[]
       /*
        * Kill whatever the rock now OVERLAPS.
        *
-       * The sum of two half-widths, not one: a rock is a cell wide and so is a body, and
-       * asking whether the victim's centre is inside the rock's column spares anything
-       * caught mid-stride between two columns — which is most of the time something is
-       * walking. Reported from play as a rock coming down on a monster and being ignored.
+       * The same reach everything else in the game uses — see CONTACT_REACH, which
+       * documents both ways this was wrong. Asking whether the victim's centre sits inside
+       * the rock's column spares anything caught mid-stride; reaching a full body-width
+       * beyond the column catches people who have already walked out from under it.
        *
        * Checked after the move, so a body standing exactly where the rock lands is caught
        * rather than spared by a rounding accident.
        */
-      const reachX = T.CELL / 2 + T.CRUSH_HALF;
-      const reachY = T.CELL / 2 + T.CRUSH_HALF;
+      const reach = CONTACT_REACH;
       for (const c of crushables) {
         if (!c.alive) continue;
-        if (Math.abs(c.x - r.x) < reachX && Math.abs(c.y - r.y) < reachY) {
+        if (Math.abs(c.x - r.x) < reach && Math.abs(c.y - r.y) < reach) {
           c.alive = false;
           out.crushed.push(c);
         }

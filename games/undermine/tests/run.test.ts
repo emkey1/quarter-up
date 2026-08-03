@@ -46,6 +46,64 @@ describe('the run', () => {
     expect(w.playerAlive).toBe(true);
   });
 
+  it('does not respawn the player into an instant death', () => {
+    /*
+     * Reported from play: "on respawn, the player often ends up in an insta death
+     * position." Reliable rather than unlucky — nothing steps during the death pause, so
+     * enemies stay frozen exactly where they cornered the player, and since a run usually
+     * begins and often ends near the start, the fresh life reappeared inside them.
+     *
+     * Driven here by killing the player with an enemy standing on the spawn point, which
+     * is the exact situation being reported.
+     */
+    const w = world();
+    w.rocks.length = 0;
+    const killer = w.enemies[0];
+    killer.x = w.digger.x;
+    killer.y = w.digger.y;
+
+    let died = false;
+    for (let f = 0; f < 200 && !died; f++) died = w.step({ dir: Dir.None }).died;
+    expect(died, 'the enemy never caught the player').toBe(true);
+
+    let respawned = false;
+    for (let f = 0; f < T.DEATH_HOLD_F + 5 && !respawned; f++) {
+      respawned = w.step({ dir: Dir.None }).respawned;
+    }
+    expect(respawned).toBe(true);
+
+    // The life must survive long enough to be worth having.
+    const livesAfterRespawn = w.lives;
+    for (let f = 0; f < 30; f++) w.step({ dir: Dir.None });
+    expect(w.playerAlive, 'died again within half a second of respawning').toBe(true);
+    expect(w.lives, 'lost another life immediately').toBe(livesAfterRespawn);
+  });
+
+  it('puts the cast back where the layout placed them, but keeps the tunnels', () => {
+    // What resets is the threat; what the player keeps is their work.
+    const w = world();
+    w.rocks.length = 0;
+    for (let f = 0; f < 240; f++) w.step({ dir: Dir.Down });
+    const dug = w.field.tunnelCount();
+
+    const killer = w.enemies[0];
+    killer.x = w.digger.x;
+    killer.y = w.digger.y;
+    for (let f = 0; f < 200 && w.playerAlive; f++) w.step({ dir: Dir.None });
+
+    // Checked ON the respawn frame, not after it: the enemy starts walking again
+    // immediately, so a few frames later it is legitimately no longer on its spawn.
+    let where = { x: 0, y: 0 };
+    for (let f = 0; f < T.DEATH_HOLD_F + 5; f++) {
+      if (w.step({ dir: Dir.None }).respawned) where = { x: killer.x, y: killer.y };
+    }
+
+    const spawn = w.layout.enemies[0];
+    expect(where.x, 'enemy was not returned to its start').toBe(spawn.x * T.CELL + T.CELL / 2);
+    expect(where.y).toBe(spawn.y * T.CELL + T.CELL / 2);
+    expect(w.field.tunnelCount(), 'the tunnels were confiscated').toBeGreaterThanOrEqual(dug);
+  });
+
   it('keeps the tunnels the player already cut when they lose a life', () => {
     // The network is the player's work. Confiscating it on death would punish the same
     // mistake twice, and the second punishment is the one that ends runs.

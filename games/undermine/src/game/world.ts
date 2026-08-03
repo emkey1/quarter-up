@@ -1,4 +1,4 @@
-import { T } from '@/data/tuning';
+import { T, CONTACT_REACH } from '@/data/tuning';
 import { Field } from './field';
 import { Digger, Dir, type MoveIntent } from './digger';
 import { makeRock, stepRock, RockState, type Crushable, type Rock } from './rock';
@@ -263,8 +263,8 @@ export class World {
     if (this.bonus) {
       if (
         this.playerAlive &&
-        Math.abs(this.digger.x - this.bonus.x) < T.CELL * 0.7 &&
-        Math.abs(this.digger.y - this.bonus.y) < T.CELL * 0.7
+        Math.abs(this.digger.x - this.bonus.x) < CONTACT_REACH &&
+        Math.abs(this.digger.y - this.bonus.y) < CONTACT_REACH
       ) {
         this.score += this.bonus.value;
         events.scored = { points: this.bonus.value, x: this.bonus.x, y: this.bonus.y };
@@ -340,13 +340,44 @@ export class World {
         events.gameOver = true;
         return;
       }
-      // Respawn where the round began. The field keeps whatever was already cut, which
-      // is the fair reading: the tunnels are the player's work and losing a life should
-      // not confiscate it.
+      /*
+       * Respawn: the player goes back to the start, and so does everything hunting them.
+       *
+       * Reported from play as respawning into an instant death, and it was reliable
+       * rather than unlucky. Nothing steps during the death pause, so enemies stay frozen
+       * exactly where they cornered you — and if they cornered you near the start, which
+       * is where a run usually begins and often ends, the fresh life reappeared inside
+       * them and died on the first frame. A life that cannot be used is not a life.
+       *
+       * Putting the cast back where the layout placed them is the fair reading and the
+       * authentic one: what the player keeps is the TUNNELS, because the network is their
+       * work and losing a life should not confiscate it. What resets is the threat.
+       *
+       * Rocks are deliberately NOT reset. One already fallen is spent, and a level that
+       * quietly restocked them would make the bonus farmable by dying.
+       */
       this.playerAlive = true;
       this.crushable.alive = true;
       this.digger.x = this.startX * T.CELL + T.CELL / 2;
       this.digger.y = this.startY * T.CELL + T.CELL / 2;
+      this.digger.facing = Dir.Down;
+
+      this.enemies.forEach((e, i) => {
+        const spawn = this.layout.enemies[i];
+        if (!spawn || !e.alive) return;
+        e.x = spawn.x * T.CELL + T.CELL / 2;
+        e.y = spawn.y * T.CELL + T.CELL / 2;
+        e.state = EnemyState.Tunnelling;
+        e.hasTarget = false;
+        e.stuckFor = 0;
+        e.lastDistance = -1;
+        e.inflation = 0;
+        e.escaping = false;
+        e.flameState = 'idle';
+        e.flameTimer = T.FLAME_COOLDOWN_F;
+      });
+      this.fleeing = false;
+
       events.respawned = true;
     }
   }

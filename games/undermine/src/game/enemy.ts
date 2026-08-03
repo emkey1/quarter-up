@@ -1,4 +1,4 @@
-import { T } from '@/data/tuning';
+import { T, CONTACT_REACH } from '@/data/tuning';
 import { Field } from './field';
 import { FlowField } from './flow';
 import { Dir, DIR_DX, DIR_DY } from './digger';
@@ -161,7 +161,7 @@ export function stepEnemy(
   // A runner is World's business, not this function's — see Enemy.escaping. Contact is
   // still checked, because catching it by walking into it should not be safe.
   if (e.escaping) {
-    if (target.alive && Math.abs(target.x - e.x) < T.CELL * 0.7 && Math.abs(target.y - e.y) < T.CELL * 0.7) {
+    if (target.alive && Math.abs(target.x - e.x) < CONTACT_REACH && Math.abs(target.y - e.y) < CONTACT_REACH) {
       out.touchedPlayer = true;
     }
     return out;
@@ -181,7 +181,7 @@ export function stepEnemy(
       out.deflated = true;
     }
     // Contact still kills. Walking into a held enemy is your mistake, not its win.
-    if (target.alive && Math.abs(target.x - e.x) < T.CELL * 0.7 && Math.abs(target.y - e.y) < T.CELL * 0.7) {
+    if (target.alive && Math.abs(target.x - e.x) < CONTACT_REACH && Math.abs(target.y - e.y) < CONTACT_REACH) {
       out.touchedPlayer = true;
     }
     return out;
@@ -197,7 +197,7 @@ export function stepEnemy(
 
   // Contact. Checked after moving, so an enemy that walks into the player on the frame
   // it arrives still catches them.
-  if (target.alive && Math.abs(target.x - e.x) < T.CELL * 0.7 && Math.abs(target.y - e.y) < T.CELL * 0.7) {
+  if (target.alive && Math.abs(target.x - e.x) < CONTACT_REACH && Math.abs(target.y - e.y) < CONTACT_REACH) {
     out.touchedPlayer = true;
   }
 
