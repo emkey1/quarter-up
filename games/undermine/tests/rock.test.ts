@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { T, CONTACT_REACH } from '@/data/tuning';
+import { T, CONTACT_REACH, ROCK_CRUSH_REACH } from '@/data/tuning';
 import { Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
@@ -130,14 +130,16 @@ describe('rocks', () => {
   });
 
   it('catches something caught mid-stride between two columns', () => {
-    // Reported from play: a monster walked under a falling rock and was ignored. The
-    // check asked whether the victim's CENTRE sat inside the rock's column, and anything
-    // walking is between columns most of the time — measured, an 8wu offset was spared
-    // while the rock came down visibly on top of it.
+    // Reported from play: a monster walked under a falling rock and was ignored.
     //
-    // Swept across a whole cell of offsets, because the failure was position-dependent
-    // and a single sample would have passed.
-    for (let off = 0; off <= T.CELL / 2; off++) {
+    // The first diagnosis blamed the reach and widened it, which caused the opposite bug.
+    // The real culprits were two: enemies were off-grid on both axes at the time (fixed
+    // separately, see enemy.test.ts), and a rock never re-checked what it landed on after
+    // settling onto its resting cell.
+    //
+    // Swept across the offsets the rock does claim, because the failure was
+    // position-dependent and a single sample would have passed.
+    for (let off = 0; off < ROCK_CRUSH_REACH; off++) {
       const f = undermined(5, 8, 4);
       const r = makeRock(5, 8);
       const victim: Crushable = {
@@ -148,6 +150,56 @@ describe('rocks', () => {
       run(f, r, 300, [victim]);
       expect(victim.alive, `spared at an offset of ${off}wu — the rock landed on it`).toBe(false);
     }
+  });
+
+  it('CAN be outrun by a digger who undermines it and keeps going', () => {
+    /*
+     * Reported twice. The second time the answer was arithmetic rather than tuning:
+     *
+     *   the cell under a rock only opens when the digger's CENTRE crosses into it, so
+     *   the player starts half a cell BEHIND the rock's column centre, not level with it
+     *
+     *   escape window = ROCK_TEETER_F + CELL / ROCK_FALL_SPEED
+     *   distance covered, still cutting earth = window * DIG_SPEED
+     *   final offset = -CELL/2 + that
+     *
+     * At the body-contact reach of 11.2 the answer came out at 11.0 — caught by two
+     * tenths of a world unit, on every rock, for every player who undermines one and
+     * keeps digging. Not unlucky; certain.
+     *
+     * Computed here rather than hardcoded, so changing the teeter, the fall speed or the
+     * dig speed reports its own consequence instead of quietly reintroducing this.
+     */
+    const window = T.ROCK_TEETER_F + T.CELL / T.ROCK_FALL_SPEED;
+    const whileDigging = -T.CELL / 2 + window * T.DIG_SPEED;
+    const whileRunning = -T.CELL / 2 + window * T.MOVE_SPEED;
+
+    expect(
+      Math.abs(whileDigging),
+      `a digger clears only ${whileDigging.toFixed(1)}wu in the ${window}-frame window; ` +
+        `the rock reaches ${ROCK_CRUSH_REACH}`,
+    ).toBeGreaterThan(ROCK_CRUSH_REACH);
+    expect(Math.abs(whileRunning)).toBeGreaterThan(ROCK_CRUSH_REACH);
+
+    // And a margin worth having, not a photo finish.
+    expect(Math.abs(whileDigging) - ROCK_CRUSH_REACH, 'escapes by a hair').toBeGreaterThan(2);
+  });
+
+  it('actually lets a simulated digger walk out from under one', () => {
+    // The arithmetic above, played. Undermine a rock and keep digging in a straight line.
+    const w = world();
+    park(w);
+    const rock = w.rocks[0];
+    const rockCy = Math.floor(rock.y / T.CELL);
+
+    // Stand the digger one row below the rock, a cell to its left, and walk right —
+    // which cuts the cell out from under the rock as it passes.
+    w.digger.y = (rockCy + 1) * T.CELL + T.CELL / 2;
+    w.digger.x = rock.x - T.CELL;
+    w.field.dig(rock.cx - 1, rockCy + 1);
+
+    for (let f = 0; f < 300; f++) w.step({ dir: Dir.Right });
+    expect(w.playerAlive, 'walked under a rock, kept going, and was still crushed').toBe(true);
   });
 
   it('spares someone who walked out from under it', () => {
@@ -170,13 +222,25 @@ describe('rocks', () => {
     expect(walker.alive, 'crushed a full cell away from the rock').toBe(true);
   });
 
-  it('uses the same reach as every other kind of contact', () => {
-    // Three hardcoded radii is three chances to be wrong, and two of them were.
-    expect(CONTACT_REACH).toBeCloseTo(T.CELL * T.CONTACT_RATIO, 6);
-    expect(CONTACT_REACH, 'must still catch something a half-cell off mid-stride').toBeGreaterThan(
-      T.CELL / 2,
-    );
-    expect(CONTACT_REACH, 'must not reach into the next cell along').toBeLessThan(T.CELL);
+  it('reaches its own column and no further', () => {
+    // A rock is column-constrained in a way a body is not: it occupies one cell and falls
+    // straight down it. Giving it the body-contact radius — which is what unifying them
+    // did — makes it reach two thirds of the way into both neighbouring cells, and that
+    // is what made undermining one unsurvivable.
+    expect(ROCK_CRUSH_REACH).toBe(T.CELL / 2);
+    expect(ROCK_CRUSH_REACH, 'a rock must not reach wider than a body').toBeLessThan(CONTACT_REACH);
+  });
+
+  it('kills whatever it comes to rest on top of', () => {
+    // A rock stops the moment its centre crosses into the cell it will rest in, then
+    // snaps down to that cell's centre — up to half a cell of travel that nothing was
+    // looking at. Anything standing exactly where it landed was missed, and the old
+    // over-wide reach was the only thing hiding it.
+    const f = undermined(5, 8, 1);
+    const r = makeRock(5, 8);
+    const victim: Crushable = { x: 5 * T.CELL + T.CELL / 2, y: 9 * T.CELL + T.CELL / 2, alive: true };
+    run(f, r, 200, [victim]);
+    expect(victim.alive, 'the rock landed squarely on it and it survived').toBe(false);
   });
 
   it('misses anything in a different column', () => {

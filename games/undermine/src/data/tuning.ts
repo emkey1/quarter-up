@@ -270,12 +270,37 @@ export const T = {
 } as const;
 
 /**
- * [der] How close two things have to be to touch, in wu. `CELL * CONTACT_RATIO`.
+ * [der] How close two BODIES have to be to touch, in wu. `CELL * CONTACT_RATIO`.
  *
  * Derived rather than written down, so it cannot drift from the cell size the way three
  * separate hardcoded radii did.
  */
 export const CONTACT_REACH = T.CELL * T.CONTACT_RATIO;
+
+/**
+ * [der] How far a falling rock reaches, in wu. Half a cell — its own column, and nothing
+ * either side of it.
+ *
+ * Deliberately NOT the body-contact reach, and unifying the two was a mistake that made
+ * a reported bug worse. A rock is column-constrained in a way a body is not: it occupies
+ * exactly one cell and falls straight down it, so "did it land on you" means "were you
+ * in its column", not "were your edges touching".
+ *
+ * The arithmetic, which is the point — the cell under a rock only opens when the digger's
+ * CENTRE crosses into it, so the player begins half a cell BEHIND the rock's column
+ * centre, not level with it:
+ *
+ *     escape = ROCK_TEETER_F + CELL / ROCK_FALL_SPEED   = 38 frames
+ *     covered while still cutting earth, at DIG_SPEED   = 19wu
+ *     final offset from the column centre  -8 + 19      = +11wu
+ *
+ * At the body-contact reach of 11.2 that is caught by two tenths of a world unit. Not
+ * unlucky — arithmetically certain, on every rock, for any player who undermines one and
+ * keeps digging. Against the column it clears by 3wu, and by 22wu if running an
+ * already-cut tunnel. tests/rock.test.ts computes that margin from the constants rather
+ * than hardcoding it, so changing the teeter or the dig speed reports the consequence.
+ */
+export const ROCK_CRUSH_REACH = T.CELL / 2;
 
 /** [der] Cell coordinates to the world position of that cell's centre. */
 export const cellCentre = (cx: number, cy: number): [number, number] => [

@@ -1,4 +1,4 @@
-import { T, CONTACT_REACH } from '@/data/tuning';
+import { T, ROCK_CRUSH_REACH } from '@/data/tuning';
 import { Field } from './field';
 
 export const enum RockState {
@@ -93,31 +93,28 @@ export function stepRock(field: Field, r: Rock, crushables: readonly Crushable[]
 
     case RockState.Falling: {
       r.y += T.ROCK_FALL_SPEED;
-
-      /*
-       * Kill whatever the rock now OVERLAPS.
-       *
-       * The same reach everything else in the game uses — see CONTACT_REACH, which
-       * documents both ways this was wrong. Asking whether the victim's centre sits inside
-       * the rock's column spares anything caught mid-stride; reaching a full body-width
-       * beyond the column catches people who have already walked out from under it.
-       *
-       * Checked after the move, so a body standing exactly where the rock lands is caught
-       * rather than spared by a rounding accident.
-       */
-      const reach = CONTACT_REACH;
-      for (const c of crushables) {
-        if (!c.alive) continue;
-        if (Math.abs(c.x - r.x) < reach && Math.abs(c.y - r.y) < reach) {
-          c.alive = false;
-          out.crushed.push(c);
-        }
-      }
+      crush(r, crushables, out);
 
       // Land when the next cell down is solid, or at the floor of the world.
       const below = rockCell(r) + 1;
       if (below >= T.GRID_H || !field.isOpen(r.cx, below)) {
         r.y = rockCell(r) * T.CELL + T.CELL / 2; // settle onto the cell it stopped in
+
+        /*
+         * Check again, because the settle MOVES it.
+         *
+         * The rock stops the moment its centre crosses into the cell it will rest in, and
+         * then snaps down to that cell's centre — up to half a cell of travel that nothing
+         * was looking at. Anything standing exactly where it came to rest was therefore
+         * missed: the last mid-air sample was taken half a cell short.
+         *
+         * It went unnoticed because the crush reach used to be wide enough to catch the
+         * victim on that earlier sample anyway. Narrowing the reach to the rock's own
+         * column, which is what stopped rocks killing people who had walked clear, took
+         * the cover away and exposed this underneath.
+         */
+        crush(r, crushables, out);
+
         r.state = RockState.Shattering;
         r.timer = T.ROCK_SHATTER_F;
         out.landed = true;
@@ -128,6 +125,26 @@ export function stepRock(field: Field, r: Rock, crushables: readonly Crushable[]
     case RockState.Shattering:
       if (--r.timer <= 0) r.state = RockState.Gone;
       return out;
+  }
+}
+
+/**
+ * Kill whatever is in the rock's column, right now.
+ *
+ * Its own column and nothing either side — see ROCK_CRUSH_REACH, which works out why a
+ * body-contact radius is the wrong tool here and shows the arithmetic that made escaping
+ * a rock you had undermined impossible. A rock falls down exactly one cell, so what it
+ * lands on is whatever is in that cell.
+ *
+ * Called after every move AND after the settle, because the settle is a move too.
+ */
+function crush(r: Rock, crushables: readonly Crushable[], out: RockEvents): void {
+  for (const c of crushables) {
+    if (!c.alive) continue;
+    if (Math.abs(c.x - r.x) < ROCK_CRUSH_REACH && Math.abs(c.y - r.y) < ROCK_CRUSH_REACH) {
+      c.alive = false;
+      out.crushed.push(c);
+    }
   }
 }
 
