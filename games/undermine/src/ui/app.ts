@@ -3,7 +3,8 @@ import type { Display } from '@cabinet/display';
 import type { Keyboard } from '@cabinet/keyboard';
 import type { GamepadInput } from '@cabinet/gamepad';
 import { T } from '@/data/tuning';
-import { World } from '@/game/world';
+import { Run } from '@/game/run';
+import type { World } from '@/game/world';
 import { Dir, type MoveIntent } from '@/game/digger';
 import type { Action } from '@/game/controls';
 import { TileAtlas } from '@/render/atlas';
@@ -19,7 +20,7 @@ import { Audio } from './audio';
  * shell arrive at M4.
  */
 export class App implements LoopHost {
-  private readonly world = new World();
+  private readonly run = new Run();
   private readonly atlas: TileAtlas;
   private readonly view: FieldView;
   private readonly hud = new Hud();
@@ -83,7 +84,7 @@ export class App implements LoopHost {
 
   step(): void {
     if (this.paused) return;
-    const e = this.world.step(this.intent);
+    const e = this.run.step(this.intent);
     // Consumed: a press must not survive into a second step on a catch-up frame.
     this.intent = { ...this.intent, pump: false };
 
@@ -111,6 +112,10 @@ export class App implements LoopHost {
     if (e.died) A.play('die');
     if (e.roundClear) A.play('roundClear');
     if (e.gameOver) A.play('die');
+    if (e.bonusAppeared) A.play('bonus');
+    if (e.bonusTaken) A.play('bonus');
+    if (e.enemyEscaped) A.play('roundClear');
+    if (e.levelStarted) A.play('roundStart');
   }
 
   draw(): void {
@@ -120,34 +125,34 @@ export class App implements LoopHost {
 
     this.view.draw(
       ctx,
-      this.world.field,
-      this.world.digger,
-      this.world.rocks,
-      this.world.enemies,
-      this.world.flame,
+      this.run.world.field,
+      this.run.world.digger,
+      this.run.world.rocks,
+      this.run.world.enemies,
+      this.run.world.flame,
       layout,
     );
 
     this.hud.drawFloaters(ctx, layout, this.floaters);
     this.hud.draw(ctx, layout, {
-      score: this.world.score,
-      lives: this.world.lives,
-      enemiesLeft: this.world.enemiesLeft,
+      score: this.run.score,
+      lives: this.run.lives,
+      enemiesLeft: this.run.world.enemiesLeft,
       banner: this.banner(),
     });
   }
 
   private banner(): string | null {
     if (this.paused) return 'PAUSED';
-    if (this.world.over) return 'GAME OVER';
-    if (!this.world.playerAlive) return null; // the death animation speaks for itself
-    if (this.world.enemiesLeft === 0) return 'ROUND CLEAR';
+    if (this.run.over) return 'GAME OVER';
+    if (!this.run.world.playerAlive) return null; // the death animation speaks for itself
+    if (this.run.world.enemiesLeft === 0) return 'ROUND CLEAR';
     return null;
   }
 
   /** M0 diagnostics, so the dev server shows something checkable without a HUD. */
   get debug(): string {
-    const d = this.world.digger;
-    return `score ${this.world.score}  left ${this.world.enemiesLeft}  cell ${d.cellX},${d.cellY}`;
+    const d = this.run.world.digger;
+    return `score ${this.run.score}  left ${this.run.world.enemiesLeft}  cell ${d.cellX},${d.cellY}`;
   }
 }

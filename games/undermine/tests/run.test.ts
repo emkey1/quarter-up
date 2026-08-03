@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { T } from '@/data/tuning';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
+
+/** A world on the first layout, which is the gentlest and the most predictable. */
+const world = (level = 1) => new World(LAYOUTS[0], level);
 import { Dir } from '@/game/digger';
 
 /** Alive so the round is not instantly clear, but inert and out of the way. */
@@ -14,14 +18,14 @@ function park(w: World): void {
 
 describe('the run', () => {
   it('starts with three lives and no score', () => {
-    const w = new World();
+    const w = world();
     expect(w.lives).toBe(T.STARTING_LIVES);
     expect(w.score).toBe(0);
     expect(w.over).toBe(false);
   });
 
   it('holds after a death, then respawns at the start', () => {
-    const w = new World();
+    const w = world();
     park(w);
     const rock = w.rocks[0];
     w.field.dig(rock.cx, Math.floor(rock.y / T.CELL) + 1);
@@ -45,7 +49,7 @@ describe('the run', () => {
   it('keeps the tunnels the player already cut when they lose a life', () => {
     // The network is the player's work. Confiscating it on death would punish the same
     // mistake twice, and the second punishment is the one that ends runs.
-    const w = new World();
+    const w = world();
     park(w);
     for (let f = 0; f < 200; f++) w.step({ dir: Dir.Down });
     const dug = w.field.tunnelCount();
@@ -64,7 +68,7 @@ describe('the run', () => {
     // picture. The death branch re-armed every frame: the player was still not alive, so
     // it set the hold again, the hold expired, another life came off, and it never
     // stopped. No unit test was asking, because nothing was obviously wrong from inside.
-    const w = new World();
+    const w = world();
     park(w);
     w.lives = 1;
 
@@ -80,7 +84,7 @@ describe('the run', () => {
   });
 
   it('does nothing at all after game over', () => {
-    const w = new World();
+    const w = world();
     w.over = true;
     const before = { x: w.digger.x, y: w.digger.y, score: w.score, dug: w.field.tunnelCount() };
     for (let f = 0; f < 300; f++) w.step({ dir: Dir.Right, pump: true });
@@ -90,7 +94,7 @@ describe('the run', () => {
   });
 
   it('calls the round clear when the last enemy is gone', () => {
-    const w = new World();
+    const w = world();
     w.rocks.length = 0;
     for (const e of w.enemies) e.alive = false;
     let clear = false;

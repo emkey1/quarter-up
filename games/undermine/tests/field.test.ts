@@ -3,6 +3,10 @@ import { T, bandOf } from '@/data/tuning';
 import { Cell, Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
+
+/** A world on the first layout, which is the gentlest and the most predictable. */
+const world = (level = 1) => new World(LAYOUTS[0], level);
 
 /**
  * Park the cast: alive, so the round does not report itself clear, but inert and out of
@@ -77,7 +81,7 @@ describe('digging', () => {
   it('starts in a short pre-cut tunnel with a way up to the sky', () => {
     // A digger that begins entombed cannot demonstrate that running a tunnel is faster
     // than cutting one, which is the first thing the game has to teach.
-    const w = new World();
+    const w = world();
     park(w);
     const { cellX, cellY } = w.digger;
     expect(w.field.at(cellX, cellY)).toBe(Cell.Tunnel);
@@ -87,18 +91,25 @@ describe('digging', () => {
   });
 
   it('carves earth by moving into it', () => {
-    const w = new World();
+    // Driven far enough to run out of the layout's pre-cut shaft and into virgin ground.
+    // The first version stopped one cell down, which on this layout is already open —
+    // it was measuring the pre-dug network rather than any digging.
+    const w = world();
     park(w);
-    const below = w.digger.cellY + 1;
-    expect(w.field.at(w.digger.cellX, below)).toBe(Cell.Earth);
-    drive(w, Dir.Down, 60);
-    expect(w.field.at(w.digger.cellX, below)).toBe(Cell.Tunnel);
+    const col = w.digger.cellX;
+
+    let firstEarth = w.digger.cellY + 1;
+    while (firstEarth < T.GRID_H && w.field.at(col, firstEarth) !== Cell.Earth) firstEarth++;
+    expect(firstEarth, 'this layout has no earth below the start at all').toBeLessThan(T.GRID_H);
+
+    drive(w, Dir.Down, 60 * 10);
+    expect(w.field.at(col, firstEarth)).toBe(Cell.Tunnel);
   });
 
   it('cuts a tunnel exactly one cell wide', () => {
     // The point of lane-locking. Without it the digger drifts off the row centre,
     // straddles two rows and carves a two-cell trench that looks nothing like a tunnel.
-    const w = new World();
+    const w = world();
     park(w);
     const row = w.digger.cellY;
     const startCol = w.digger.cellX;
@@ -117,7 +128,7 @@ describe('digging', () => {
   it('leaves no plug of earth behind in a finished tunnel', () => {
     // Cells have to be cleared as the body passes through them, not merely as it stops
     // in them, or a fast pass leaves an uncut cell in the middle of an open run.
-    const w = new World();
+    const w = world();
     park(w);
     const row = w.digger.cellY;
     const from = w.digger.cellX;
@@ -160,7 +171,7 @@ describe('digging', () => {
   it('never ends a turn inside earth it did not remove', () => {
     // Four-way movement on a grid needs a rule for when a turn is legal. Too loose and
     // the digger corner-cuts, ending up embedded in a cell it never cut.
-    const w = new World();
+    const w = world();
     park(w);
     const dirs = [Dir.Down, Dir.Right, Dir.Up, Dir.Left, Dir.Down, Dir.Left];
     for (const dir of dirs) {
@@ -173,7 +184,7 @@ describe('digging', () => {
   });
 
   it('stops at the edge of the world rather than leaving it', () => {
-    const w = new World();
+    const w = world();
     park(w);
     drive(w, Dir.Left, 2000);
     expect(w.digger.x).toBeGreaterThanOrEqual(0);
@@ -181,7 +192,7 @@ describe('digging', () => {
   });
 
   it('stands still when asked for nothing', () => {
-    const w = new World();
+    const w = world();
     park(w);
     const { x, y } = w.digger;
     drive(w, Dir.None, 60);

@@ -5,6 +5,7 @@ import { T, bandOf } from '@/data/tuning';
 import { Cell, Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
 import { RockState } from '@/game/rock';
 import { EnemyState } from '@/game/enemy';
 import { PALETTE, TILE_PX, earthTile, tunnelTile, skyTile, diggerSprite, rockSprite, enemySprite, flameSprite } from '@/render/tilegen';
@@ -176,7 +177,7 @@ function maskFor(cx: number, cy: number, isEarth: (x: number, y: number) => bool
 }
 
 it('writes a preview PNG of a played-in field', () => {
-  const w = new World();
+  const w = new World(LAYOUTS[8]); // 'The Cistern' — one big room, good for a portrait
 
   /*
    * A POSED shot, not a played one.

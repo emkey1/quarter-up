@@ -3,6 +3,10 @@ import { T } from '@/data/tuning';
 import { Field } from '@/game/field';
 import { Digger, Dir } from '@/game/digger';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
+
+/** A world on the first layout, which is the gentlest and the most predictable. */
+const world = (level = 1) => new World(LAYOUTS[0], level);
 import { makeRock, stepRock, rockCell, RockState, type Crushable } from '@/game/rock';
 
 /**
@@ -156,7 +160,7 @@ describe('M1 acceptance: a rock can be dropped on the player', () => {
    * thing. That is the game working; it is not what these tests are about.
    */
   const rocksOnly = (): World => {
-    const w = new World();
+    const w = world();
     park(w);
     return w;
   };

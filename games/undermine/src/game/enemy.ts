@@ -43,6 +43,16 @@ export interface Enemy {
   inflation: number;
   /** Frames since the last pump press, counting toward losing a stage. */
   deflateTimer: number;
+
+  /**
+   * The last survivor, running for the surface.
+   *
+   * Set by World, and it makes `stepEnemy` stand aside entirely. Without it the escape
+   * and the chase fight each other every frame — World nudges the runner toward the
+   * corner, then stepEnemy's ghost logic drags it straight back toward the player, and
+   * it oscillates in place forever instead of leaving. The round then never ends.
+   */
+  escaping: boolean;
 }
 
 export function makeEnemy(kind: EnemyKind, cx: number, cy: number): Enemy {
@@ -60,6 +70,7 @@ export function makeEnemy(kind: EnemyKind, cx: number, cy: number): Enemy {
     flameState: 'idle',
     inflation: 0,
     deflateTimer: 0,
+    escaping: false,
   };
 }
 
@@ -109,6 +120,7 @@ export function stepEnemy(
   flow: FlowField,
   e: Enemy,
   target: EnemyTarget,
+  speedScale = 1,
 ): EnemyEvents {
   const out: EnemyEvents = {
     startedGhosting: false,
@@ -119,6 +131,15 @@ export function stepEnemy(
     deflated: false,
   };
   if (!e.alive || e.state === EnemyState.Dead) return out;
+
+  // A runner is World's business, not this function's — see Enemy.escaping. Contact is
+  // still checked, because catching it by walking into it should not be safe.
+  if (e.escaping) {
+    if (target.alive && Math.abs(target.x - e.x) < T.CELL * 0.7 && Math.abs(target.y - e.y) < T.CELL * 0.7) {
+      out.touchedPlayer = true;
+    }
+    return out;
+  }
 
   /*
    * Inflated: held still, and leaking.
@@ -141,9 +162,9 @@ export function stepEnemy(
   }
 
   if (e.state === EnemyState.Ghosting) {
-    stepGhost(field, e, target, out);
+    stepGhost(field, e, target, out, speedScale);
   } else {
-    stepTunnel(field, flow, e, target, out);
+    stepTunnel(field, flow, e, target, out, speedScale);
   }
 
   if (e.kind === 'emberjaw') stepFlame(field, e, target, out);
@@ -163,6 +184,7 @@ function stepTunnel(
   e: Enemy,
   target: EnemyTarget,
   out: EnemyEvents,
+  speedScale: number,
 ): void {
   const cx = enemyCellX(e);
   const cy = enemyCellY(e);
@@ -196,10 +218,10 @@ function stepTunnel(
   // The flow field only ever hands back a 4-neighbour, so exactly one axis moves and
   // the enemy stays lane-locked without needing the digger's turn rule.
   if (dx !== 0) {
-    e.x += Math.sign(dx) * Math.min(T.ENEMY_SPEED, Math.abs(tx - e.x));
+    e.x += Math.sign(dx) * Math.min(T.ENEMY_SPEED * speedScale, Math.abs(tx - e.x));
     e.facing = dx > 0 ? Dir.Right : Dir.Left;
   } else if (dy !== 0) {
-    e.y += Math.sign(dy) * Math.min(T.ENEMY_SPEED, Math.abs(ty - e.y));
+    e.y += Math.sign(dy) * Math.min(T.ENEMY_SPEED * speedScale, Math.abs(ty - e.y));
     e.facing = dy > 0 ? Dir.Down : Dir.Up;
   }
 }
@@ -211,15 +233,21 @@ function beginGhost(e: Enemy, out: EnemyEvents): void {
   out.startedGhosting = true;
 }
 
-function stepGhost(field: Field, e: Enemy, target: EnemyTarget, out: EnemyEvents): void {
+function stepGhost(
+  field: Field,
+  e: Enemy,
+  target: EnemyTarget,
+  out: EnemyEvents,
+  speedScale: number,
+): void {
   // Straight at the player, through whatever is in the way. Earth is not disturbed —
   // a ghost passes through it rather than digging, so it leaves no tunnel behind and the
   // player gains nothing from having been visited.
   const dx = target.x - e.x;
   const dy = target.y - e.y;
   const len = Math.hypot(dx, dy) || 1;
-  e.x += (dx / len) * T.GHOST_SPEED;
-  e.y += (dy / len) * T.GHOST_SPEED;
+  e.x += (dx / len) * T.GHOST_SPEED * speedScale;
+  e.y += (dy / len) * T.GHOST_SPEED * speedScale;
   e.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? Dir.Right : Dir.Left) : dy > 0 ? Dir.Down : Dir.Up;
 
   const cx = enemyCellX(e);

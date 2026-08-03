@@ -1,6 +1,9 @@
 # Undermine — design
 
-> **Status:** **M0–M4 implemented.** The field renders with autotiling, the digger cuts
+> **Status:** **M0–M5 implemented.** Fifteen layouts, a level cycle, the difficulty ramp,
+> the bonus and the last-enemy escape are in; a run plays start to finish.
+>
+> Previously: The field renders with autotiling, the digger cuts
 > it at two speeds, rocks fall and kill, enemies hunt through the tunnels and ghost
 > through the earth, the pump inflates and bursts them for depth-banded score, and there
 > is audio, a HUD, lives and a round flow. It runs on `@quarter-up/cabinet` with no local
@@ -375,7 +378,7 @@ did and which needs no invention.
 | **M2** | Enemies. Tunnel pursuit on the flow field, ghosting, contact death, the dragon's flame. | **Done.** A sealed pocket is reached; standing in the open is caught; running survives far longer than either. |
 | **M3** | The pump. Stages, decay, bursting, depth-band scoring, the immobilise tactic. | **Done.** Two presses buy ~5.6 cells of walking; a room cannot be parked; crushing four still beats popping four. |
 | **M4** | Presentation. Sprites, the four bands, audio voices, the cabinet shell, score and lives. | **Mostly done.** Audio, HUD, lives, round flow, four bands. Outstanding: title/attract screen, and the sprites are first-pass. |
-| **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | A full run start to finish. |
+| **M5** | Content. Fifteen layouts, the level cycle, difficulty ramp, bonus items, the last-enemy escape. | **Done.** Twenty levels play through carrying score and lives; a bot run ends by running out of lives. |
 | **M6** | Polish, and whatever the third game teaches the shared package — §7 predicts `terrain.ts`. | Both other games still green after any extraction. |
 
 ---
@@ -393,13 +396,17 @@ The lesson from Double Bubble, applied from the start rather than at M6.
 - **This game can actually finish its fidelity pass.** Almost everything is discrete —
   pump stages, depth bands, score tiers, cell counts. Those are countable from any
   recording, including of a legitimate re-release.
-- **The continuous list is pinned by a test, and it has already moved.** It was two at
-  M0 (run speed, dig speed) and adding enemies at M2 made it four (enemy speed, ghost
-  speed). The observables test fails the build if a non-integer constant appears that is
-  not on the list, which is how that got noticed at the time rather than discovered at
-  M6. The pump's deflate rate was expected to be the fifth — it is not, because it is
-  expressible as integer frames per stage rather than as a rate, so the list is still
-  four. Anything that would make it five should be argued for here before it is written.
+- **The continuous list is pinned by a test, and it is drifting.** Two at M0 (run speed,
+  dig speed). Four at M2, when enemies arrived. Still four at M3 — the pump's deflate
+  rate turned out to be expressible as integer frames per stage. **Seven at M5**: an
+  escape speed and the two numbers shaping the difficulty ramp.
+  
+  That is worth stating plainly rather than absorbing quietly. §1 claimed this game could
+  finish its fidelity pass where Double Bubble could not, and the claim rested on the
+  continuous list staying short. It is no longer very short. Everything on it needs a
+  recording to settle and none of it can be counted off a screenshot. The observables
+  test fails the build when the list grows, which is how each of these got noticed at the
+  time; the rule stands that anything joining it should be argued for here first.
 
 ---
 

@@ -157,16 +157,31 @@ describe('what the constants mean, in countable units', () => {
   });
 
   describe('the free constants, tracked', () => {
-    it('has only four continuous values, and every one is named here', () => {
-      // DESIGN.md §12 claims the continuous list is short. If it grows quietly, this
-      // game inherits Double Bubble's problem, so the claim is pinned rather than
-      // trusted — and it has already earned its keep: adding enemies at M2 pushed the
-      // list from two to four, and this test is how that got noticed rather than
-      // discovered at M6.
-      //
-      // Still to come: the pump's deflate rate. Anything beyond that is a surprise and
-      // should be argued for in the design before it is added here.
-      const CONTINUOUS = ['MOVE_SPEED', 'DIG_SPEED', 'ENEMY_SPEED', 'GHOST_SPEED'];
+    it('names every continuous value, and there are now seven', () => {
+      /*
+       * The list, and its history, because the history is the point.
+       *
+       * Two at M0. Four at M2, when enemies arrived. Still four at M3 — the pump's
+       * deflate rate turned out to be expressible as integer frames per stage. Seven at
+       * M5: an escape speed, and the two numbers that shape the difficulty ramp.
+       *
+       * DESIGN.md §12 predicted this list would stay short, and it is drifting. That is
+       * worth saying plainly rather than absorbing quietly, because a long list of
+       * unverifiable continuous constants is precisely the state Double Bubble is stuck
+       * in. Every one of these needs a recording to settle, and none of them can be
+       * counted off a screenshot.
+       *
+       * The rule stands: anything added here should be argued for in the design first.
+       */
+      const CONTINUOUS = [
+        'MOVE_SPEED',
+        'DIG_SPEED',
+        'ENEMY_SPEED',
+        'GHOST_SPEED',
+        'ESCAPE_SPEED',
+        'RAMP_PER_LEVEL',
+        'RAMP_MAX',
+      ];
       const known = new Set([...CONTINUOUS, 'TURN_SLACK']);
       // PAD_* are cabinet input tuning rather than gameplay: they describe a thumbstick,
       // not this game, and they are shared with the other two cabinets.
@@ -177,6 +192,7 @@ describe('what the constants mean, in countable units', () => {
       // countable from a recording instead of inferred from feel.
       for (const [k, v] of Object.entries(T)) {
         if (known.has(k) || isInputConfig(k) || typeof v !== 'number') continue;
+        if (Array.isArray(v)) continue; // score tables are lists of integers
         expect(Number.isInteger(v), `${k} = ${v} is neither an integer nor a tracked constant`).toBe(true);
       }
     });

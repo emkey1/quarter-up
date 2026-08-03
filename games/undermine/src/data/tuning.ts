@@ -177,6 +177,34 @@ export const T = {
   /** [i] Frames the round-clear card is held. */
   CLEAR_HOLD_F: 100,
 
+  // ---------------------------------------------------------------- the bonus
+  /** [i] Rocks that must be dropped before the bonus appears. The game paying you to
+   *  play the risky, elaborate way — it is gated on rocks, not on time or kills. */
+  BONUS_AFTER_ROCKS: 2,
+  /** [i] Frames the bonus stays before it goes. Long enough to reach from most of the
+   *  field, short enough that you have to leave what you were doing. */
+  BONUS_LIFETIME_F: 600,
+  /** [i] Base value; it climbs with level number. */
+  BONUS_BASE: 400,
+  BONUS_PER_LEVEL: 100,
+  BONUS_MAX: 5000,
+
+  // ---------------------------------------------------------------- the last enemy
+  /** [i] Speed the last survivor runs for the surface at. Faster than a hunting enemy:
+   *  it is fleeing, and catching it should be a decision rather than a formality. */
+  ESCAPE_SPEED: 0.9,
+
+  // ---------------------------------------------------------------- difficulty
+  /** [i] Enemy speed gained per level, as a fraction of the base. Ten levels in,
+   *  everything moves half again as fast. */
+  RAMP_PER_LEVEL: 0.05,
+  /** [con] Ceiling on the ramp. Enemies faster than the digger make a run unwinnable
+   *  rather than hard — there would be no disengaging, ever. Pinned by a test. */
+  RAMP_MAX: 1.6,
+  /** [der] Layouts repeat from here once the fifteen run out, so the cycle never drops a
+   *  hardened player back into the teaching levels. */
+  CYCLE_FROM: 11,
+
   // ---------------------------------------------------------------- scoring
   /** [i] Bursting something, by the band it dies in. Depth is money: the deep bands pull
    *  the player away from the surface and away from safety. Sources agree on the shape

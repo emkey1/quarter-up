@@ -13,6 +13,8 @@ import {
   type Enemy,
 } from './enemy';
 import { pump, crushScore } from './pump';
+import type { Layout } from './layout';
+import { speedScale } from '@/data/layouts';
 
 /** What happened this tick, for the presentation layer to make noise about. */
 export interface WorldEvents {
@@ -29,10 +31,16 @@ export interface WorldEvents {
   flameLit: boolean;
   playerCaught: boolean;
   playerBurned: boolean;
+  bonusAppeared: boolean;
+  bonusTaken: boolean;
+  lastEnemyFleeing: boolean;
+  enemyEscaped: boolean;
   died: boolean;
   respawned: boolean;
   roundClear: boolean;
   gameOver: boolean;
+  /** Set by Run when it swaps in the next level's World. */
+  levelStarted: boolean;
 }
 
 function emptyEvents(): WorldEvents {
@@ -49,10 +57,15 @@ function emptyEvents(): WorldEvents {
     flameLit: false,
     playerCaught: false,
     playerBurned: false,
+    bonusAppeared: false,
+    bonusTaken: false,
+    lastEnemyFleeing: false,
+    enemyEscaped: false,
     died: false,
     respawned: false,
     roundClear: false,
     gameOver: false,
+    levelStarted: false,
   };
 }
 
@@ -89,6 +102,17 @@ export class World {
 
   frame = 0;
   score = 0;
+  readonly level: number;
+  readonly layout: Layout;
+  /** Enemy speed multiplier for this level. */
+  readonly speed: number;
+  /** Rocks that have finished falling, which is what the bonus is gated on. */
+  rocksDropped = 0;
+  /** The bonus item, once it has appeared. */
+  bonus: { x: number; y: number; life: number; value: number } | null = null;
+  private bonusSpawned = false;
+  /** True once only one enemy is left and it has given up hunting. */
+  fleeing = false;
   lives: number = T.STARTING_LIVES;
   /**
    * Frames left on the death or clear pause, or 0 when play is live.
@@ -110,45 +134,26 @@ export class World {
    *  itself clear on frame one. */
   private readonly startedWithEnemies: boolean;
 
-  constructor() {
-    // Start in the middle of the top earth band, in a short pre-cut tunnel — the
-    // original opens the same way, and a digger that begins entombed cannot demonstrate
-    // that moving through tunnel is faster than cutting.
-    const startX = Math.floor(T.GRID_W / 2);
-    const startY = T.SKY_ROWS + 1;
+  constructor(layout: Layout, level = 1) {
+    this.layout = layout;
+    this.level = level;
+    this.speed = speedScale(level);
+    // Cut the layout's pre-dug network into the field.
+    for (let cy = 0; cy < T.GRID_H; cy++) {
+      for (let cx = 0; cx < T.GRID_W; cx++) {
+        if (layout.rows[cy][cx] === '.') this.field.dig(cx, cy);
+      }
+    }
+
+    const [startX, startY] = layout.start;
     this.startX = startX;
     this.startY = startY;
     this.digger = new Digger(startX, startY);
 
-    for (let cx = startX - 1; cx <= startX + 1; cx++) this.field.dig(cx, startY);
-    this.field.dig(startX, startY - 1); // a way up to the sky
-
     this.crushable = { x: this.digger.x, y: this.digger.y, alive: true };
 
-    // A placeholder scatter until layouts arrive at M5. Deliberately not under the start
-    // tunnel: the first thing a new player does is move, and being killed by geometry
-    // they never touched teaches nothing.
-    for (const [cx, cy] of [
-      [2, 6],
-      [11, 6],
-      [4, 11],
-      [9, 14],
-    ] as const) {
-      this.rocks.push(makeRock(cx, cy));
-    }
-
-    // A placeholder cast until layouts arrive at M5. Each starts in its own small pocket
-    // — an enemy entombed in solid earth with no tunnel at all would ghost immediately
-    // and permanently, which is the mechanic working correctly and reads as broken.
-    for (const [kind, cx, cy] of [
-      ['grub', 3, 7],
-      ['grub', 10, 9],
-      ['emberjaw', 6, 13],
-      ['grub', 11, 15],
-    ] as const) {
-      this.field.dig(cx, cy);
-      this.enemies.push(makeEnemy(kind, cx, cy));
-    }
+    for (const [cx, cy] of layout.rocks) this.rocks.push(makeRock(cx, cy));
+    for (const e of layout.enemies) this.enemies.push(makeEnemy(e.kind, e.x, e.y));
     this.startedWithEnemies = this.enemies.length > 0;
   }
 
@@ -210,6 +215,7 @@ export class World {
       const e = stepRock(this.field, r, targets);
       events.rockStartedFalling ||= e.startedFalling;
       events.rockLanded ||= e.landed;
+      if (e.landed) this.rocksDropped++;
       let crushedEnemies = 0;
       for (const victim of e.crushed) {
         if (victim === this.crushable) events.playerCrushed = true;
@@ -229,6 +235,9 @@ export class World {
 
     this.stepEnemies(events);
 
+    this.stepBonus(events);
+    this.stepEscape(events);
+
     if (!this.crushable.alive) this.playerAlive = false;
     if (events.playerCaught || events.playerBurned) this.playerAlive = false;
 
@@ -241,6 +250,85 @@ export class World {
     }
 
     return events;
+  }
+
+  /**
+   * The bonus.
+   *
+   * Gated on rocks DROPPED, not on time and not on kills. That rule is the game openly
+   * paying you to play the elaborate, dangerous way: rocks are the only multi-kill and
+   * dropping one means standing under it long enough to undermine it.
+   */
+  private stepBonus(events: WorldEvents): void {
+    if (this.bonus) {
+      if (
+        this.playerAlive &&
+        Math.abs(this.digger.x - this.bonus.x) < T.CELL * 0.7 &&
+        Math.abs(this.digger.y - this.bonus.y) < T.CELL * 0.7
+      ) {
+        this.score += this.bonus.value;
+        events.scored = { points: this.bonus.value, x: this.bonus.x, y: this.bonus.y };
+        events.bonusTaken = true;
+        this.bonus = null;
+        return;
+      }
+      if (--this.bonus.life <= 0) this.bonus = null;
+      return;
+    }
+
+    if (this.bonusSpawned || this.rocksDropped < T.BONUS_AFTER_ROCKS) return;
+    this.bonusSpawned = true;
+
+    // The centre of the field, and it is dug out so the bonus is always reachable — an
+    // item that appears inside solid earth is an item that taunts you.
+    const cx = Math.floor(T.GRID_W / 2);
+    const cy = Math.floor(T.GRID_H / 2);
+    this.field.dig(cx, cy);
+    this.bonus = {
+      x: cx * T.CELL + T.CELL / 2,
+      y: cy * T.CELL + T.CELL / 2,
+      life: T.BONUS_LIFETIME_F,
+      value: Math.min(T.BONUS_MAX, T.BONUS_BASE + (this.level - 1) * T.BONUS_PER_LEVEL),
+    };
+    events.bonusAppeared = true;
+  }
+
+  /**
+   * The last one out.
+   *
+   * When a single enemy is left it stops hunting and runs for the top-left corner, and
+   * the round ends when it leaves rather than when it dies. That inverts the ending: the
+   * level is not over when you have killed everything, it is over when the survivor
+   * gets away — and chasing it down is optional points and a real risk.
+   */
+  private stepEscape(events: WorldEvents): void {
+    const alive = this.enemies.filter((e) => e.alive && e.state !== EnemyState.Dead);
+    if (alive.length !== 1) return;
+
+    const last = alive[0];
+    if (!this.fleeing) {
+      this.fleeing = true;
+      last.escaping = true;
+      events.lastEnemyFleeing = true;
+    }
+    if (last.inflation > 0) return; // pinned on the pump: not going anywhere
+
+    // Straight for the surface at the top-left, through earth if it must — it has given
+    // up on the tunnel network along with everything else.
+    const tx = T.CELL / 2;
+    const ty = T.CELL / 2;
+    const dx = tx - last.x;
+    const dy = ty - last.y;
+    const len = Math.hypot(dx, dy) || 1;
+    last.x += (dx / len) * T.ESCAPE_SPEED;
+    last.y += (dy / len) * T.ESCAPE_SPEED;
+    last.state = EnemyState.Ghosting;
+
+    if (len < T.CELL) {
+      last.alive = false;
+      last.state = EnemyState.Dead;
+      events.enemyEscaped = true;
+    }
   }
 
   /** What happens when a death or clear pause runs out. */
@@ -278,7 +366,7 @@ export class World {
 
     for (const en of this.enemies) {
       if (!en.alive || en.state === EnemyState.Dead) continue;
-      const e = stepEnemy(this.field, this.flow, en, target);
+      const e = stepEnemy(this.field, this.flow, en, target, this.speed);
       events.enemyStartedGhosting ||= e.startedGhosting;
       events.enemySolidified ||= e.solidified;
       events.flameLit ||= e.flameLit;
@@ -291,10 +379,16 @@ export class World {
     }
   }
 
-  /** Enemies still in play. The level ends when this reaches zero — or, from M5, when
-   *  the last one escapes instead. */
+  /** Enemies still in play. A round ends when this reaches zero, whether the last one
+   *  was killed or simply left. */
   get enemiesLeft(): number {
     return this.enemies.filter((e) => e.alive && e.state !== EnemyState.Dead).length;
+  }
+
+  /** The round is cleared AND its card has been shown. Run waits for this rather than
+   *  for `enemiesLeft`, or the next level starts over the top of the clear. */
+  get roundFinished(): boolean {
+    return this.startedWithEnemies && this.enemiesLeft === 0 && this.hold === 0 && !this.over;
   }
 }
 

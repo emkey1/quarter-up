@@ -3,6 +3,10 @@ import { T } from '@/data/tuning';
 import { Field } from '@/game/field';
 import { FlowField } from '@/game/flow';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
+
+/** A world on the first layout, which is the gentlest and the most predictable. */
+const world = (level = 1) => new World(LAYOUTS[0], level);
 import { Dir } from '@/game/digger';
 import {
   makeEnemy,
@@ -261,7 +265,7 @@ describe('M2 acceptance: neither camping nor open ground is safe', () => {
   it('reaches a player who has walled themselves into a pocket', () => {
     // The dominant strategy this mechanic exists to kill: dig one hole, sit in it,
     // survive forever. The player here does nothing at all in a sealed pocket.
-    const w = new World();
+    const w = world();
     w.rocks.length = 0; // rocks are M1's business
 
     // Seal the digger into a one-cell pocket far from everything.
@@ -279,7 +283,7 @@ describe('M2 acceptance: neither camping nor open ground is safe', () => {
   });
 
   it('catches a player standing still in open tunnel', () => {
-    const w = new World();
+    const w = world();
     w.rocks.length = 0;
     let caught = false;
     for (let f = 0; f < 60 * 60 && !caught; f++) {
@@ -292,7 +296,7 @@ describe('M2 acceptance: neither camping nor open ground is safe', () => {
     // The other half of the claim: if nothing can be escaped, the mechanic is not
     // tension, it is a timer. A player running a loop should outlast a stationary one
     // by a wide margin.
-    const w = new World();
+    const w = world();
     w.rocks.length = 0;
 
     // Cut a long horizontal corridor for the digger to run, then pace it.

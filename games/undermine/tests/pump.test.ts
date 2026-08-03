@@ -6,6 +6,10 @@ import { Dir } from '@/game/digger';
 import { makeEnemy, stepEnemy, type EnemyTarget } from '@/game/enemy';
 import { pump, burstScore, crushScore } from '@/game/pump';
 import { World } from '@/game/world';
+import { LAYOUTS } from '@/data/layouts';
+
+/** A world on the first layout, which is the gentlest and the most predictable. */
+const world = (level = 1) => new World(LAYOUTS[0], level);
 
 function tunnelRow(f: Field, row: number, from: number, to: number): void {
   for (let cx = from; cx <= to; cx++) f.dig(cx, row);
@@ -210,7 +214,7 @@ describe('M3 acceptance: pump-and-stall is viable without being dominant', () =>
   });
 
   it('banks the points on the world when something bursts', () => {
-    const w = new World();
+    const w = world();
     w.rocks.length = 0;
     const e = w.enemies[0];
     // Stand the digger next to it, facing it, in open ground.
