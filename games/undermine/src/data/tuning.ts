@@ -105,6 +105,21 @@ export const T = {
    *  enough to read as an event rather than a disappearance. */
   ROCK_SHATTER_F: 24,
 
+  /**
+   * [con] Half-width of a body for the purposes of being crushed, in wu.
+   *
+   * Reported from play: a monster walked under a falling rock and was ignored. The check
+   * was "is the victim's CENTRE inside the rock's column", i.e. within CELL/2. Anything
+   * mid-stride between two columns sits up to a full half-cell off that centre, so a
+   * boulder could come down visibly on top of something and miss it — measured, offsets
+   * of 8wu and beyond were spared.
+   *
+   * A rock is one cell wide. What should die is whatever it OVERLAPS, so the test is the
+   * sum of two half-widths rather than one. Slightly under a full cell, so something
+   * cleanly in the next column along is still safe.
+   */
+  CRUSH_HALF: 7,
+
   // ---------------------------------------------------------------- enemies
   /**
    * [i] How fast an enemy travels an open tunnel, wu per frame.

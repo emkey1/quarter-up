@@ -94,12 +94,22 @@ export function stepRock(field: Field, r: Rock, crushables: readonly Crushable[]
     case RockState.Falling: {
       r.y += T.ROCK_FALL_SPEED;
 
-      // Kill anything the rock's box now overlaps. Checked after the move, so a body
-      // standing exactly where the rock lands is caught rather than spared by a
-      // rounding accident.
+      /*
+       * Kill whatever the rock now OVERLAPS.
+       *
+       * The sum of two half-widths, not one: a rock is a cell wide and so is a body, and
+       * asking whether the victim's centre is inside the rock's column spares anything
+       * caught mid-stride between two columns — which is most of the time something is
+       * walking. Reported from play as a rock coming down on a monster and being ignored.
+       *
+       * Checked after the move, so a body standing exactly where the rock lands is caught
+       * rather than spared by a rounding accident.
+       */
+      const reachX = T.CELL / 2 + T.CRUSH_HALF;
+      const reachY = T.CELL / 2 + T.CRUSH_HALF;
       for (const c of crushables) {
         if (!c.alive) continue;
-        if (Math.abs(c.x - r.x) < T.CELL / 2 && Math.abs(c.y - r.y) < T.CELL) {
+        if (Math.abs(c.x - r.x) < reachX && Math.abs(c.y - r.y) < reachY) {
           c.alive = false;
           out.crushed.push(c);
         }

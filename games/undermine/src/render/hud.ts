@@ -19,6 +19,8 @@ export interface HudState {
   enemiesLeft: number;
   /** Large centred message, or null. */
   banner: string | null;
+  /** Small line under the banner — the level name, or a controls reminder. */
+  subtitle: string | null;
 }
 
 export class Hud {
@@ -39,6 +41,13 @@ export class Hud {
       ctx.fillText(value, x, y + Math.round(9 * u));
     };
 
+    /*
+     * The controls, written down.
+     *
+     * Reported from play as "how do I activate the pump" — which is a fair question when
+     * nothing on screen says. A one-button game can afford to state its one button, and a
+     * cabinet would have had it silkscreened on the panel.
+     */
     if (panel && panel.w > 90 * u) {
       const x = panel.x + Math.round(14 * u);
       let y = panel.y + Math.round(16 * u);
@@ -47,6 +56,12 @@ export class Hud {
       label('LIVES', String(s.lives), x, y);
       y += Math.round(34 * u);
       label('LEFT', String(s.enemiesLeft), x, y);
+      y += Math.round(44 * u);
+      ctx.fillStyle = 'rgba(230,233,239,.45)';
+      ctx.font = `${Math.round(7 * u)}px ui-monospace, Menlo, monospace`;
+      ctx.fillText('ARROWS  DIG', x, y);
+      ctx.fillText('SPACE   PUMP', x, y + Math.round(10 * u));
+      ctx.fillText('P       PAUSE', x, y + Math.round(20 * u));
     } else {
       // No margin: put it over the sky, which is empty by construction.
       ctx.fillStyle = '#ffe9a0';
@@ -65,6 +80,11 @@ export class Hud {
       ctx.fillStyle = '#ffe9a0';
       ctx.font = `${Math.round(14 * u)}px ui-monospace, Menlo, monospace`;
       ctx.fillText(s.banner, pf.x + pf.w / 2, pf.y + pf.h / 2 - Math.round(7 * u));
+      if (s.subtitle) {
+        ctx.fillStyle = 'rgba(230,233,239,.75)';
+        ctx.font = `${Math.round(8 * u)}px ui-monospace, Menlo, monospace`;
+        ctx.fillText(s.subtitle, pf.x + pf.w / 2, pf.y + pf.h / 2 + Math.round(9 * u));
+      }
       ctx.textAlign = 'left';
     }
 

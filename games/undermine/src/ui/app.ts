@@ -88,6 +88,9 @@ export class App implements LoopHost {
     // Consumed: a press must not survive into a second step on a catch-up frame.
     this.intent = { ...this.intent, pump: false };
 
+    if (e.levelStarted || this.run.world.frame === 1) this.levelCard = 150;
+    if (this.levelCard > 0) this.levelCard--;
+
     this.playFor(e);
     if (e.scored) this.floaters.push({ ...e.scored, life: 60 });
     this.floaters = this.floaters.filter((f) => --f.life > 0);
@@ -139,12 +142,30 @@ export class App implements LoopHost {
       lives: this.run.lives,
       enemiesLeft: this.run.world.enemiesLeft,
       banner: this.banner(),
+      subtitle: this.subtitle(),
     });
+  }
+
+  /**
+   * A short card at the start of each level.
+   *
+   * It names the layout, and for the first few seconds of a fresh run it says which key
+   * the pump is on — asked in play, and a fair question when nothing on screen answered
+   * it. Fades out on its own rather than needing dismissing.
+   */
+  private levelCard = 0;
+
+  private subtitle(): string | null {
+    if (this.paused) return 'P TO RESUME';
+    if (this.run.over) return `FINAL SCORE ${this.run.score}`;
+    if (this.levelCard > 0) return this.run.world.layout.name.toUpperCase();
+    return null;
   }
 
   private banner(): string | null {
     if (this.paused) return 'PAUSED';
     if (this.run.over) return 'GAME OVER';
+    if (this.levelCard > 0) return `LEVEL ${this.run.level}`;
     if (!this.run.world.playerAlive) return null; // the death animation speaks for itself
     if (this.run.world.enemiesLeft === 0) return 'ROUND CLEAR';
     return null;

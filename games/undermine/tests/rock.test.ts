@@ -129,10 +129,33 @@ describe('rocks', () => {
     expect(seen.crushed).toBe(1);
   });
 
+  it('catches something caught mid-stride between two columns', () => {
+    // Reported from play: a monster walked under a falling rock and was ignored. The
+    // check asked whether the victim's CENTRE sat inside the rock's column, and anything
+    // walking is between columns most of the time — measured, an 8wu offset was spared
+    // while the rock came down visibly on top of it.
+    //
+    // Swept across a whole cell of offsets, because the failure was position-dependent
+    // and a single sample would have passed.
+    for (let off = 0; off <= T.CELL / 2; off++) {
+      const f = undermined(5, 8, 4);
+      const r = makeRock(5, 8);
+      const victim: Crushable = {
+        x: 5 * T.CELL + T.CELL / 2 + off,
+        y: 11 * T.CELL + T.CELL / 2,
+        alive: true,
+      };
+      run(f, r, 300, [victim]);
+      expect(victim.alive, `spared at an offset of ${off}wu — the rock landed on it`).toBe(false);
+    }
+  });
+
   it('misses anything in a different column', () => {
     const f = undermined(5, 8, 4);
     const r = makeRock(5, 8);
-    const bystander: Crushable = { x: 6 * T.CELL + T.CELL / 2, y: 11 * T.CELL + T.CELL / 2, alive: true };
+    // A clear cell away, not merely off-centre: the widened reach must not turn a rock
+    // into a two-column weapon.
+    const bystander: Crushable = { x: 7 * T.CELL + T.CELL / 2, y: 11 * T.CELL + T.CELL / 2, alive: true };
     run(f, r, 300, [bystander]);
     expect(bystander.alive).toBe(true);
   });
